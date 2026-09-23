@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#1a1a1a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="TimerHub">
+    
+    <title>TimerHub - Time Tracker</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%231a1a1a' width='180' height='180'/><circle cx='90' cy='90' r='70' fill='%234A90E2'/><text x='90' y='105' font-size='60' font-weight='bold' fill='white' text-anchor='middle' font-family='Arial'>T</text></svg>">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%231a1a1a' width='180' height='180'/><circle cx='90' cy='90' r='70' fill='%234A90E2'/><text x='90' y='105' font-size='60' font-weight='bold' fill='white' text-anchor='middle' font-family='Arial'>T</text></svg>">
+    
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="root">
+        <!-- Navigation -->
+        <nav class="navbar">
+            <div class="navbar-content">
+                <h1 class="navbar-title" id="navHome" role="button" tabindex="0" aria-label="Go to home screen">TimerHub</h1>
+                <div class="navbar-actions">
+                    <button id="navLog" class="nav-btn" aria-label="View log">📋</button>
+                    <button id="navSettings" class="nav-btn" aria-label="Settings">⚙️</button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main screen -->
+        <div id="mainScreen" class="screen active">
+            <div class="safe-area-top"></div>
+            
+            <div class="activities-grid" id="activitiesGrid">
+                <!-- Activity buttons will be rendered here -->
+            </div>
+            
+            <button id="addActivityBtn" class="add-button" aria-label="Add new activity">+</button>
+            
+            <div class="safe-area-bottom"></div>
+        </div>
+
+        <!-- Log screen -->
+        <div id="logScreen" class="screen">
+            <div class="screen-header">
+                <h2>Time Log</h2>
+            </div>
+            
+            <div class="log-filters">
+                <div class="filter-row">
+                    <select id="logDateFilter" class="filter-select">
+                        <option value="today">Today</option>
+                        <option value="yesterday">Yesterday</option>
+                        <option value="range">Date Range</option>
+                        <option value="all">All Time</option>
+                    </select>
+                    <select id="logActivityFilter" class="filter-select">
+                        <option value="">All Activities</option>
+                    </select>
+                </div>
+                <div id="dateRangeFilter" class="date-range-filter" style="display: none;">
+                    <input type="date" id="dateFrom" class="date-input">
+                    <input type="date" id="dateTo" class="date-input">
+                </div>
+            </div>
+            
+            <div class="log-actions">
+                <button id="copyLogBtn" class="action-btn">📋 Copy</button>
+                <button id="shareLogBtn" class="action-btn">📤 Share</button>
+                <button id="exportTxtBtn" class="action-btn">💾 TXT</button>
+                <button id="exportCsvBtn" class="action-btn">📊 CSV</button>
+                <button id="exportJsonBtn" class="action-btn">🔧 JSON</button>
+            </div>
+
+            <div id="logContent" class="log-content">
+                <!-- Log entries will be rendered here -->
+            </div>
+            
+            <div class="safe-area-bottom"></div>
+        </div>
+
+        <!-- Settings screen -->
+        <div id="settingsScreen" class="screen">
+            <div class="screen-header">
+                <h2>Settings</h2>
+            </div>
+            
+            <div class="settings-content">
+                <div class="settings-group">
+                    <label for="themeSelect">Theme</label>
+                    <select id="themeSelect" class="setting-select">
+                        <option value="system">System</option>
+                        <option value="light">Light</option>
+                        <option value="dark">Dark</option>
+                    </select>
+                </div>
+                
+                <div class="settings-group">
+                    <label for="languageSelect">Language</label>
+                    <select id="languageSelect" class="setting-select">
+                        <option value="en">English</option>
+                        <option value="de">German</option>
+                        <option value="ru">Russian</option>
+                    </select>
+                </div>
+                
+                <div class="settings-group">
+                    <label for="timeFormatSelect">Time Format</label>
+                    <select id="timeFormatSelect" class="setting-select">
+                        <option value="24h">24 Hour</option>
+                        <option value="12h">12 Hour</option>
+                    </select>
+                </div>
+                
+                <div class="settings-group">
+                    <label for="firstDaySelect">First Day of Week</label>
+                    <select id="firstDaySelect" class="setting-select">
+                        <option value="0">Sunday</option>
+                        <option value="1">Monday</option>
+                    </select>
+                </div>
+                
+                <div class="settings-group">
+                    <label>
+                        <input type="checkbox" id="confirmDeleteCheckbox">
+                        Confirm before delete
+                    </label>
+                </div>
+                
+                <div class="settings-divider"></div>
+                
+                <button id="backupBtn" class="settings-btn">💾 Backup Data</button>
+                <button id="restoreBtn" class="settings-btn">📥 Restore Data</button>
+                <button id="demoDataBtn" class="settings-btn demo-only">🎮 Load Demo Data</button>
+                
+                <div class="settings-divider"></div>
+                <div class="settings-info">
+                    <p>Version 1.0 | Data stored locally</p>
+                </div>
+            </div>
+            
+            <div class="safe-area-bottom"></div>
+        </div>
+
+        <!-- Modal: Create/Edit Activity -->
+        <div id="activityModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="modalTitle">Create Activity</h3>
+                    <button id="modalCloseBtn" class="modal-close" aria-label="Close">✕</button>
+                </div>
+                
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="activityName">Name</label>
+                        <input type="text" id="activityName" class="form-input" placeholder="e.g., Abkleben" maxlength="30">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Color</label>
+                        <div id="colorPicker" class="color-picker">
+                            <!-- Colors will be populated -->
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Shape</label>
+                        <div id="shapePicker" class="shape-picker">
+                            <!-- Shapes will be populated -->
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Size</label>
+                        <div class="size-picker">
+                            <button class="size-btn" data-size="small">Small</button>
+                            <button class="size-btn" data-size="medium">Medium</button>
+                            <button class="size-btn" data-size="large">Large</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="modal-footer">
+                    <button id="modalCancelBtn" class="btn-secondary">Cancel</button>
+                    <button id="modalSaveBtn" class="btn-primary">Save</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: Activity Menu (Edit/Delete/Archive) -->
+        <div id="activityMenuModal" class="modal">
+            <div class="modal-content modal-small">
+                <div class="modal-header">
+                    <h3 id="activityMenuTitle">Activity</h3>
+                    <button id="menuCloseBtn" class="modal-close" aria-label="Close">✕</button>
+                </div>
+                
+                <div class="modal-body">
+                    <button id="menuEditBtn" class="menu-item">✏️ Edit</button>
+                    <button id="menuArchiveBtn" class="menu-item">📦 Archive</button>
+                    <button id="menuDeleteBtn" class="menu-item menu-danger">🗑️ Delete</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: Edit TimeEntry -->
+        <div id="entryEditModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Edit Entry</h3>
+                    <button id="entryEditCloseBtn" class="modal-close" aria-label="Close">✕</button>
+                </div>
+                
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="entryEditActivity">Activity</label>
+                        <select id="entryEditActivity" class="form-input"></select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="entryEditDate">Date</label>
+                        <input type="date" id="entryEditDate" class="form-input">
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="entryEditStart">Start Time</label>
+                            <input type="time" id="entryEditStart" class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label for="entryEditEnd">End Time</label>
+                            <input type="time" id="entryEditEnd" class="form-input">
+                        </div>
+                    </div>
+                    
+                    <div id="entryConflictWarning" class="warning" style="display: none;">
+                        ⚠️ This time overlaps with another entry
+                    </div>
+                </div>
+                
+                <div class="modal-footer">
+                    <button id="entryEditDeleteBtn" class="btn-danger">Delete</button>
+                    <button id="entryEditCancelBtn" class="btn-secondary">Cancel</button>
+                    <button id="entryEditSaveBtn" class="btn-primary">Save</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast notifications -->
+        <div id="toast" class="toast"></div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').catch(err => 
+                console.log('SW registration failed:', err)
+            );
+        }
+    </script>
+</body>
+</html>
