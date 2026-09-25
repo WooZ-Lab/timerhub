@@ -87,10 +87,76 @@ export class TimerHubDurableObject {
             });
         }
 
-        return new Response("Not found", { status: 404 });
-    }
-}
 
+        if (request.method === "POST" && url.pathname === "/schedule") {
+            const data = await request.json();
+            if (!data || typeof data.alarmId !== "string" || !Number.isFinite(data.timestamp) || data.timestamp <= Date.now()) {
+                return Response.json({ error: "Invalid alarm schedule" }, { status: 400 });
+            }
+            await this.state.storage.put("alarm", data);
+            await this.state.storage.setAlarm(data.timestamp);
+            return Response.json({ ok: true });
+        }
+
+        if (request.method === "POST" && url.pathname === "/cancel") {
+            await this.state.storage.deleteAlarm();
+            await this.state.storage.delete("alarm");
+            return Response.json({ ok: true });
+        }
+
+        return new Response("Not found", { status: 404 });
+        }
+
+    async alarm() {
+        const alarm = await this.state.storage.get("alarm");
+        if (!alarm) return;
+
+        const subscription = await this.state.storage.get("subscription");
+        if (!subscription) return;
+
+        try {
+            webpush.setVapidDetails(
+                this.env.VAPID_SUBJECT,
+                this.env.VAPID_PUBLIC_KEY,
+                this.env.VAPID_PRIVATE_KEY
+            );
+
+            await webpush.sendNotification(
+                subscription,
+                JSON.stringify({
+                    title: alarm.title || "TimerHub",
+                    body: alarm.body || "Timer is still running.",
+                    tag: alarm.tag || "timerhub-timer"
+                })
+            );
+        } catch (error) {
+            const statusCode =
+                error instanceof webpush.WebPushError
+                    ? error.statusCode
+                    : 0;
+
+            if (statusCode === 404 || statusCode === 410) {
+                await this.state.storage.delete("subscription");
+                await this.state.storage.delete("alarm");
+                return;
+            }
+
+            console.error(
+                "TimerHub alarm push delivery failed:",
+                error
+            );
+        }
+
+        const currentAlarm = await this.state.storage.get("alarm");
+        if (!currentAlarm || currentAlarm.alarmId !== alarm.alarmId) return;
+
+        if (Number.isFinite(alarm.intervalMs) && alarm.intervalMs > 0) {
+            await this.state.storage.setAlarm(Date.now() + alarm.intervalMs);
+        }
+    }
+
+
+}
 export default {
     async fetch(request, env) {
         const url = new URL(request.url);
@@ -116,7 +182,9 @@ export default {
         if (
             url.pathname === "/api/push/subscribe" ||
             url.pathname === "/api/push/test" ||
-            url.pathname === "/api/push/status"
+            url.pathname === "/api/push/status" ||
+            url.pathname === "/api/push/schedule" ||
+            url.pathname === "/api/push/cancel"
         ) {
             const clientId = url.searchParams.get("clientId");
 
@@ -135,7 +203,11 @@ export default {
                     ? "/subscribe"
                     : url.pathname === "/api/push/test"
                       ? "/test"
-                      : "/status";
+                      : url.pathname === "/api/push/status"
+                        ? "/status"
+                        : url.pathname === "/api/push/schedule"
+                          ? "/schedule"
+                          : "/cancel";
 
             const targetUrl = new URL(request.url);
             targetUrl.pathname = targetPath;

@@ -1165,23 +1165,38 @@ class TimerHubApp {
                 entry.endTimestamp = now;
                 entry.updatedAt = now;
                 await this.storage.saveTimeEntry(entry);
+                try {
+                    const clientId = this.getPushClientId();
+                    await fetch(`/api/push/cancel?clientId=${encodeURIComponent(clientId)}`, {
+                        method: "POST"
+                    });
+                } catch (error) {
+                    console.error("TimerHub server alarm cancel error:", error);
+                }
                 this.activeActivityId = null;
                 this.renderMain();
             }
         } else {
             // Stop previous activity.
-            if (this.activeActivityId) {
-                const prevEntry = this.timeEntries.find(
-                    e => e.activityId === this.activeActivityId &&
-                         e.endTimestamp === null
-                );
-
-                if (prevEntry) {
-                    prevEntry.endTimestamp = now;
-                    prevEntry.updatedAt = now;
-                    await this.storage.saveTimeEntry(prevEntry);
+                if (this.activeActivityId) {
+                    const prevEntry = this.timeEntries.find(
+                        e => e.activityId === this.activeActivityId &&
+                             e.endTimestamp === null
+                    );
+                    if (prevEntry) {
+                        prevEntry.endTimestamp = now;
+                        prevEntry.updatedAt = now;
+                        await this.storage.saveTimeEntry(prevEntry);
+                    }
+                    try {
+                        const clientId = this.getPushClientId();
+                        await fetch(`/api/push/cancel?clientId=${encodeURIComponent(clientId)}`, {
+                            method: "POST"
+                        });
+                    } catch (error) {
+                        console.error("TimerHub server alarm cancel error:", error);
+                    }
                 }
-            }
 
             // Start new activity.
             const activity = this.activities.find(a => a.id === activityId);
@@ -1202,48 +1217,37 @@ class TimerHubApp {
                 this.activeActivityId = activityId;
                 this.renderMain();
 
-                // Schedule recurring local notifications while the timer runs.
+                // Schedule recurring background notifications on the server.
                 const intervalMinutes = Number(this.notificationInterval);
 
                 if (
                     intervalMinutes > 0 &&
-                    'Notification' in window &&
-                    Notification.permission === 'granted'
+                    "Notification" in window &&
+                    Notification.permission === "granted"
                 ) {
-                    const scheduleNotification = () => {
-                        this.notificationTimeout = setTimeout(async () => {
-                            // Timer may have been stopped while waiting.
-                            if (this.activeActivityId !== activityId) {
-                                this.notificationTimeout = null;
-                                return;
-                            }
+                    try {
+                        const clientId = this.getPushClientId();
+                        const intervalMs = intervalMinutes * 60 * 1000;
+                        const alarmId = activityId + "-" + now;
 
-                            try {
-                                const registration =
-                                    await navigator.serviceWorker.ready;
-
-                                await registration.showNotification('TimerHub', {
+                        await fetch(
+                            `/api/push/schedule?clientId=${encodeURIComponent(clientId)}`,
+                            {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                    alarmId,
+                                    timestamp: now + intervalMs,
+                                    intervalMs,
+                                    title: "TimerHub",
                                     body: `Timer is still running: ${activity.name}`,
-                                    tag: 'timerhub-timer',
-                                    renotify: true,
-                                    vibrate: [200, 100, 200]
-                                });
-                            } catch (error) {
-                                console.error(
-                                    'TimerHub notification error:',
-                                    error
-                                );
+                                    tag: "timerhub-timer"
+                                })
                             }
-
-                            if (this.activeActivityId === activityId) {
-                                scheduleNotification();
-                            } else {
-                                this.notificationTimeout = null;
-                            }
-                        }, intervalMinutes * 60 * 1000);
-                    };
-
-                    scheduleNotification();
+                        );
+                    } catch (error) {
+                        console.error("TimerHub server alarm error:", error);
+                    }
                 }
             }
         }
