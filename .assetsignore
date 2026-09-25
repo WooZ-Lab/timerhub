@@ -1,0 +1,6 @@
+.git/
+worker/
+*.backup*
+wrangler*.jsonc
+package.json
+node_modules/
