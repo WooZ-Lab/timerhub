@@ -19,6 +19,20 @@ export default {
             return stub.fetch(request);
         }
 
+        if (url.pathname === "/api/push/config") {
+            if (!env.VAPID_PUBLIC_KEY || !env.VAPID_SUBJECT) {
+                return Response.json(
+                    { error: "VAPID configuration is incomplete" },
+                    { status: 500 }
+                );
+            }
+
+            return Response.json({
+                publicKey: env.VAPID_PUBLIC_KEY,
+                subject: env.VAPID_SUBJECT
+            });
+        }
+
         return env.ASSETS.fetch(request);
     }
 };
