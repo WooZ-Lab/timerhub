@@ -438,6 +438,8 @@ class TimerHubApp {
         this.editingEntryId = null;
         this.deletedEntry = null;
         this.uiUpdateInterval = null;
+        this.notificationTimeout = null;
+        this.notificationTestMode = false;
         this.isDemoMode = this.isDevMode();
 
         this.COLORS = [
@@ -1013,9 +1015,17 @@ class TimerHubApp {
     async toggleActivity(activityId) {
         const now = Date.now();
 
+        // Cancel any previously scheduled local notification.
+        if (this.notificationTimeout) {
+            clearTimeout(this.notificationTimeout);
+            this.notificationTimeout = null;
+        }
+
         if (this.activeActivityId === activityId) {
-            // Stop activity
-            const entry = this.timeEntries.find(e => e.activityId === activityId && e.endTimestamp === null);
+            const entry = this.timeEntries.find(
+                e => e.activityId === activityId && e.endTimestamp === null
+            );
+
             if (entry) {
                 entry.endTimestamp = now;
                 entry.updatedAt = now;
@@ -1024,9 +1034,13 @@ class TimerHubApp {
                 this.renderMain();
             }
         } else {
-            // Stop previous activity
+            // Stop previous activity.
             if (this.activeActivityId) {
-                const prevEntry = this.timeEntries.find(e => e.activityId === this.activeActivityId && e.endTimestamp === null);
+                const prevEntry = this.timeEntries.find(
+                    e => e.activityId === this.activeActivityId &&
+                         e.endTimestamp === null
+                );
+
                 if (prevEntry) {
                     prevEntry.endTimestamp = now;
                     prevEntry.updatedAt = now;
@@ -1034,8 +1048,9 @@ class TimerHubApp {
                 }
             }
 
-            // Start new activity
+            // Start new activity.
             const activity = this.activities.find(a => a.id === activityId);
+
             if (activity) {
                 const entry = {
                     id: this.generateId(),
@@ -1046,10 +1061,55 @@ class TimerHubApp {
                     createdAt: now,
                     updatedAt: now
                 };
+
                 this.timeEntries.push(entry);
                 await this.storage.saveTimeEntry(entry);
                 this.activeActivityId = activityId;
                 this.renderMain();
+
+                // Schedule recurring local notifications while the timer runs.
+                const intervalMinutes = Number(this.notificationInterval);
+
+                if (
+                    intervalMinutes > 0 &&
+                    'Notification' in window &&
+                    Notification.permission === 'granted'
+                ) {
+                    const scheduleNotification = () => {
+                        this.notificationTimeout = setTimeout(async () => {
+                            // Timer may have been stopped while waiting.
+                            if (this.activeActivityId !== activityId) {
+                                this.notificationTimeout = null;
+                                return;
+                            }
+
+                            try {
+                                const registration =
+                                    await navigator.serviceWorker.ready;
+
+                                await registration.showNotification('TimerHub', {
+                                    body: `Timer is still running: ${activity.name}`,
+                                    tag: 'timerhub-timer',
+                                    renotify: true,
+                                    vibrate: [200, 100, 200]
+                                });
+                            } catch (error) {
+                                console.error(
+                                    'TimerHub notification error:',
+                                    error
+                                );
+                            }
+
+                            if (this.activeActivityId === activityId) {
+                                scheduleNotification();
+                            } else {
+                                this.notificationTimeout = null;
+                            }
+                        }, intervalMinutes * 60 * 1000);
+                    };
+
+                    scheduleNotification();
+                }
             }
         }
     }
