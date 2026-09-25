@@ -20,16 +20,10 @@ export default {
         }
 
         if (url.pathname === "/api/push/config") {
-            if (!env.VAPID_PUBLIC_KEY || !env.VAPID_SUBJECT) {
-                return Response.json(
-                    { error: "VAPID configuration is incomplete" },
-                    { status: 500 }
-                );
-            }
-
             return Response.json({
-                publicKey: env.VAPID_PUBLIC_KEY,
-                subject: env.VAPID_SUBJECT
+                publicKeyPresent: Boolean(env.VAPID_PUBLIC_KEY),
+                privateKeyPresent: Boolean(env.VAPID_PRIVATE_KEY),
+                subjectPresent: Boolean(env.VAPID_SUBJECT)
             });
         }
 
