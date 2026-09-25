@@ -96,9 +96,7 @@ export default {
         const url = new URL(request.url);
 
         if (url.pathname === "/api/test") {
-            const id = env.TIMER_HUB.idFromName("test");
-            const stub = env.TIMER_HUB.get(id);
-            return stub.fetch(request);
+            return new Response("TimerHub Web Push Worker OK");
         }
 
         if (url.pathname === "/api/push/config") {
