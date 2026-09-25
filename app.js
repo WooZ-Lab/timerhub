@@ -943,6 +943,114 @@ class TimerHubApp {
         }
     }
 
+    getPushClientId() {
+        let clientId = localStorage.getItem(timerhubPushClientId);
+
+        if (!clientId) {
+            clientId = crypto.randomUUID
+                ? crypto.randomUUID().replace(/-/g, )
+                : Date.now().toString(36) +
+                  Math.random().toString(36).slice(2) +
+                  Math.random().toString(36).slice(2);
+
+            localStorage.setItem(
+                timerhubPushClientId,
+                clientId
+            );
+        }
+
+        return clientId;
+    }
+
+    urlBase64ToUint8Array(base64String) {
+        const padding = =.repeat(
+            (4 - (base64String.length % 4)) % 4
+        );
+
+        const base64 = (
+            base64String + padding
+        )
+            .replace(/-/g, +)
+            .replace(/_/g, /);
+
+        const rawData = atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+
+        for (let i = 0; i < rawData.length; ++i) {
+            outputArray[i] = rawData.charCodeAt(i);
+        }
+
+        return outputArray;
+    }
+
+    async registerBackgroundPush() {
+        if (
+            !(serviceWorker in navigator) ||
+            !(PushManager in window)
+        ) {
+            throw new Error(
+                Background Push is not supported by this browser.
+            );
+        }
+
+        const configResponse =
+            await fetch(/api/push/config);
+
+        if (!configResponse.ok) {
+            throw new Error(
+                Could not load Push configuration.
+            );
+        }
+
+        const config = await configResponse.json();
+
+        if (!config.publicKey) {
+            throw new Error(
+                Push public key is missing.
+            );
+        }
+
+        const registration =
+            await navigator.serviceWorker.ready;
+
+        let subscription =
+            await registration.pushManager.getSubscription();
+
+        if (!subscription) {
+            subscription =
+                await registration.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey:
+                        this.urlBase64ToUint8Array(
+                            config.publicKey
+                        )
+                });
+        }
+
+        const response = await fetch(
+            /api/push/subscribe?clientId= +
+            encodeURIComponent(
+                this.getPushClientId()
+            ),
+            {
+                method: POST,
+                headers: {
+                    Content-Type: application/json
+                },
+                body: JSON.stringify(subscription)
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error(
+                Could not save Push subscription:  +
+                await response.text()
+            );
+        }
+
+        return subscription;
+    }
+
     async updateNotificationStatus() {
         const status = document.getElementById('notificationStatus');
         const button = document.getElementById('notificationEnableBtn');
@@ -977,36 +1085,64 @@ class TimerHubApp {
     }
 
     async requestNotificationPermission() {
-        if (!('Notification' in window)) {
-            alert('This browser does not support notifications.');
+        if (!(Notification in window)) {
+            alert(This browser does not support notifications.);
             return;
         }
 
-        if (!('serviceWorker' in navigator)) {
-            alert('Service Worker is not supported.');
+        if (!(serviceWorker in navigator)) {
+            alert(Service Worker is not supported.);
             return;
         }
 
         try {
-            alert('Notification API: ' + Notification.permission); const permission = await Notification.requestPermission();
+            const permission =
+                await Notification.requestPermission();
 
-            if (permission === 'granted') {
-                const registration = await navigator.serviceWorker.ready;
+            if (permission === granted) {
+                const registration =
+                    await navigator.serviceWorker.ready;
 
-                await registration.showNotification('TimerHub', {
-                    body:
-                        'Notifications are enabled. ' +
-                        'Background Push will be connected later.',
-                    tag: 'timerhub-test',
-                    renotify: true,
-                    vibrate: [200, 100, 200]
-                });
+                await registration.showNotification(
+                    TimerHub,
+                    {
+                        body:
+                            Notifications are enabled.,
+                        tag: timerhub-test,
+                        renotify: true,
+                        vibrate: [200, 100, 200]
+                    }
+                );
+
+                try {
+                    await this.registerBackgroundPush();
+
+                    console.log(
+                        TimerHub: Background Push subscription registered
+                    );
+                } catch (pushError) {
+                    console.error(
+                        TimerHub: Background Push registration failed:,
+                        pushError
+                    );
+
+                    const status =
+                        document.getElementById(
+                            notificationStatus
+                        );
+
+                    if (status) {
+                        status.textContent =
+                            Notifications enabled, but Background Push setup failed:  +
+                            pushError.message;
+                    }
+                }
             }
 
             this.updateNotificationStatus();
         } catch (error) {
             console.error(
-                'Notification permission error:',
+                Notification permission error:,
                 error
             );
         }
