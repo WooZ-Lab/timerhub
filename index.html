@@ -112,6 +112,41 @@
                         <option value="12h">12 Hour</option>
                     </select>
                 </div>
+
+                <div class="settings-group">
+                    <label for="notificationIntervalSelect">Timer Notifications</label>
+                    <select id="notificationIntervalSelect" class="setting-select">
+                        <option value="0">Off</option>
+                        <option value="5">Every 5 minutes</option>
+                        <option value="10">Every 10 minutes</option>
+                        <option value="20">Every 20 minutes</option>
+                        <option value="30">Every 30 minutes</option>
+                        <option value="60">Every 60 minutes</option>
+                        <option value="custom">Custom</option>
+                    </select>
+
+                    <input
+                        id="notificationCustomMinutes"
+                        type="number"
+                        min="1"
+                        max="1440"
+                        step="1"
+                        inputmode="numeric"
+                        placeholder="Minutes"
+                        style="display:none;margin-top:8px;width:100%;"
+                    >
+
+                    <button
+                        id="notificationEnableBtn" class="settings-btn"
+                        type="button"
+                        style="margin-top:8px;"
+                    >Enable notifications</button>
+
+                    <small
+                        id="notificationStatus"
+                        style="display:block;margin-top:6px;"
+                    ></small>
+                </div>
                 
                 <div class="settings-group">
                     <label for="firstDaySelect">First Day of Week</label>

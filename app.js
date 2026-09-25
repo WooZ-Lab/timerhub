@@ -489,6 +489,10 @@ class TimerHubApp {
             }
         } catch (error) {
             console.error('Init error:', error);
+            alert(
+                'TimerHub initialization error:\n\n' +
+                (error?.stack || error?.message || String(error))
+            );
         }
     }
 
@@ -498,6 +502,10 @@ class TimerHubApp {
         this.timeFormat = await this.storage.getSetting('timeFormat', '24h');
         this.firstDayOfWeek = await this.storage.getSetting('firstDayOfWeek', 1);
         this.confirmDelete = await this.storage.getSetting('confirmDelete', true);
+        this.notificationInterval =
+            await this.storage.getSetting('notificationInterval', 20);
+        this.notificationCustomMinutes =
+            await this.storage.getSetting('notificationCustomMinutes', 20);
     }
 
     async loadActivities() {
@@ -594,6 +602,82 @@ class TimerHubApp {
         sel('confirmDeleteCheckbox')?.addEventListener('change', (e) => {
             this.confirmDelete = e.target.checked;
             this.storage.setSetting('confirmDelete', this.confirmDelete);
+        });
+
+        sel('notificationIntervalSelect')?.addEventListener('change', async (e) => {
+            const value = e.target.value;
+            const input = document.getElementById('notificationCustomMinutes');
+
+            if (value === 'custom') {
+                const minutes = Math.max(
+                    1,
+                    Math.min(1440, parseInt(input?.value || '20', 10))
+                );
+
+                this.notificationCustomMinutes = minutes;
+                this.notificationInterval = minutes;
+
+                if (input) {
+                    input.value = minutes;
+                    input.style.display = 'block';
+                }
+
+                await this.storage.setSetting(
+                    'notificationCustomMinutes',
+                    minutes
+                );
+            } else {
+                this.notificationInterval = parseInt(value, 10);
+
+                if (input) {
+                    input.style.display = 'none';
+                }
+            }
+
+            await this.storage.setSetting(
+                'notificationInterval',
+                this.notificationInterval
+            );
+
+            this.updateNotificationStatus();
+        });
+
+        sel('notificationCustomMinutes')?.addEventListener('change', async (e) => {
+            const minutes = Math.max(
+                1,
+                Math.min(1440, parseInt(e.target.value || '20', 10))
+            );
+
+            this.notificationCustomMinutes = minutes;
+            this.notificationInterval = minutes;
+            e.target.value = minutes;
+
+            await this.storage.setSetting(
+                'notificationCustomMinutes',
+                minutes
+            );
+
+            await this.storage.setSetting(
+                'notificationInterval',
+                minutes
+            );
+
+            this.updateNotificationStatus();
+        });
+
+        sel('notificationEnableBtn')?.addEventListener('click', async () => {
+            const status = document.getElementById('notificationStatus');
+            if (status) status.textContent = 'CLICK RECEIVED';
+            console.log('TimerHub: notification button clicked');
+
+            try {
+                await this.requestNotificationPermission();
+            } catch (error) {
+                console.error('TimerHub notification error:', error);
+                if (status) {
+                    status.textContent = 'ERROR: ' + error.message;
+                }
+            }
         });
 
         sel('backupBtn')?.addEventListener('click', () => this.backupData());
@@ -854,6 +938,75 @@ class TimerHubApp {
 
             document.addEventListener('touchmove', moveHandler, { passive: true });
             document.addEventListener('touchend', endHandler);
+        }
+    }
+
+    async updateNotificationStatus() {
+        const status = document.getElementById('notificationStatus');
+        const button = document.getElementById('notificationEnableBtn');
+
+        if (!status || !button) return;
+
+        if (this.notificationInterval === 0) {
+            status.textContent = 'Notifications are off.';
+            button.textContent = 'Enable notifications';
+            return;
+        }
+
+        if (!('Notification' in window)) {
+            status.textContent =
+                'Notifications are not supported by this browser.';
+            return;
+        }
+
+        if (Notification.permission === 'granted') {
+            status.textContent =
+                `Permission granted. Interval: ${this.notificationInterval} min.`;
+            button.textContent = 'Notifications enabled';
+        } else if (Notification.permission === 'denied') {
+            status.textContent =
+                'Notifications are blocked in browser settings.';
+            button.textContent = 'Notifications blocked';
+        } else {
+            status.textContent =
+                `Interval: ${this.notificationInterval} min.`;
+            button.textContent = 'Enable notifications';
+        }
+    }
+
+    async requestNotificationPermission() {
+        if (!('Notification' in window)) {
+            alert('This browser does not support notifications.');
+            return;
+        }
+
+        if (!('serviceWorker' in navigator)) {
+            alert('Service Worker is not supported.');
+            return;
+        }
+
+        try {
+            alert('Notification API: ' + Notification.permission); const permission = await Notification.requestPermission();
+
+            if (permission === 'granted') {
+                const registration = await navigator.serviceWorker.ready;
+
+                await registration.showNotification('TimerHub', {
+                    body:
+                        'Notifications are enabled. ' +
+                        'Background Push will be connected later.',
+                    tag: 'timerhub-test',
+                    renotify: true,
+                    vibrate: [200, 100, 200]
+                });
+            }
+
+            this.updateNotificationStatus();
+        } catch (error) {
+            console.error(
+                'Notification permission error:',
+                error
+            );
         }
     }
 
@@ -1261,6 +1414,30 @@ class TimerHubApp {
         document.getElementById('timeFormatSelect').value = this.timeFormat;
         document.getElementById('firstDaySelect').value = this.firstDayOfWeek;
         document.getElementById('confirmDeleteCheckbox').checked = this.confirmDelete;
+        const notificationSelect =
+            document.getElementById('notificationIntervalSelect');
+
+        const notificationCustom =
+            document.getElementById('notificationCustomMinutes');
+
+        if (notificationSelect) {
+            const values = ['0', '5', '10', '20', '30', '60'];
+            notificationSelect.value =
+                values.includes(String(this.notificationInterval))
+                    ? String(this.notificationInterval)
+                    : 'custom';
+        }
+
+        if (notificationCustom) {
+            notificationCustom.value =
+                this.notificationCustomMinutes || 20;
+            notificationCustom.style.display =
+                notificationSelect?.value === 'custom'
+                    ? 'block'
+                    : 'none';
+        }
+
+        this.updateNotificationStatus();
     }
 
     populateActivityFilter() {

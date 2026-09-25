@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'timerhub-v1';
+const CACHE_VERSION = 'timerhub-v2';
 const CACHE_FILES = [
     '/',
     '/index.html',
@@ -70,4 +70,54 @@ self.addEventListener('message', (event) => {
     if (event.data && event.data.type === 'SKIP_WAITING') {
         self.skipWaiting();
     }
+});
+
+
+self.addEventListener('push', (event) => {
+    let data = {};
+
+    try {
+        data = event.data ? event.data.json() : {};
+    } catch (error) {
+        data = {
+            title: 'TimerHub',
+            body: event.data
+                ? event.data.text()
+                : 'Timer notification'
+        };
+    }
+
+    event.waitUntil(
+        self.registration.showNotification(
+            data.title || 'TimerHub',
+            {
+                body: data.body || 'Timer notification',
+                tag: data.tag || 'timerhub-timer',
+                renotify: true,
+                vibrate: [200, 100, 200],
+                data: { url: '/' }
+            }
+        )
+    );
+});
+
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+
+    event.waitUntil(
+        clients.matchAll({
+            type: 'window',
+            includeUncontrolled: true
+        }).then((clientList) => {
+            for (const client of clientList) {
+                if ('focus' in client) {
+                    return client.focus();
+                }
+            }
+
+            if (clients.openWindow) {
+                return clients.openWindow('/');
+            }
+        })
+    );
 });
