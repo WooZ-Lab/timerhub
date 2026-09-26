@@ -17,6 +17,9 @@ A lightweight, offline-first time tracking application optimized for constructio
 
 ## Installation
 
+For Codex command execution and npm limitations specific to Android/Termux, see
+[TERMUX.md](TERMUX.md).
+
 ### Option 1: Local Development (Recommended)
 
 1. **Extract the project files** to a directory
