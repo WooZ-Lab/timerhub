@@ -485,6 +485,15 @@ class TimerHubApp {
             this.startUIUpdateLoop();
             this.renderMain();
 
+            // Reconcile a timer restored from IndexedDB with its persisted
+            // server alarm so browser restarts do not silently lose reminders.
+            if (this.activeActivityId) {
+                this.reconcileBackgroundAlarm().catch(error => {
+                    console.error('TimerHub background alarm restore failed:', error);
+                    this.showPushStatus('Background reminders need attention: ' + error.message);
+                });
+            }
+
             // Show initial onboarding if no activities
             if (this.activities.length === 0) {
                 this.showOnboarding();
@@ -642,6 +651,10 @@ class TimerHubApp {
             );
 
             this.updateNotificationStatus();
+            this.reconcileBackgroundAlarm().catch(error => {
+                console.error('TimerHub alarm update failed:', error);
+                this.showPushStatus('Could not update background reminders: ' + error.message);
+            });
         });
 
         sel('notificationCustomMinutes')?.addEventListener('change', async (e) => {
@@ -665,11 +678,14 @@ class TimerHubApp {
             );
 
             this.updateNotificationStatus();
+            this.reconcileBackgroundAlarm().catch(error => {
+                console.error('TimerHub alarm update failed:', error);
+                this.showPushStatus('Could not update background reminders: ' + error.message);
+            });
         });
 
         sel('notificationEnableBtn')?.addEventListener('click', async () => {
             const status = document.getElementById('notificationStatus');
-            if (status) status.textContent = 'CLICK RECEIVED';
             console.log('TimerHub: notification button clicked');
 
             try {
@@ -679,6 +695,16 @@ class TimerHubApp {
                 if (status) {
                     status.textContent = 'ERROR: ' + error.message;
                 }
+            }
+        });
+
+        sel('notificationTestBtn')?.addEventListener('click', async () => {
+            try {
+                await this.sendBackgroundPushTest();
+                this.showPushStatus('Test push accepted. It should appear even with TimerHub closed.');
+            } catch (error) {
+                console.error('TimerHub test push failed:', error);
+                this.showPushStatus('Test push failed: ' + error.message);
             }
         });
 
@@ -944,17 +970,17 @@ class TimerHubApp {
     }
 
     getPushClientId() {
-        let clientId = localStorage.getItem(timerhubPushClientId);
+        let clientId = localStorage.getItem('timerhubPushClientId');
 
         if (!clientId) {
             clientId = crypto.randomUUID
-                ? crypto.randomUUID().replace(/-/g, )
+                ? crypto.randomUUID().replace(/-/g, '')
                 : Date.now().toString(36) +
                   Math.random().toString(36).slice(2) +
                   Math.random().toString(36).slice(2);
 
             localStorage.setItem(
-                timerhubPushClientId,
+                'timerhubPushClientId',
                 clientId
             );
         }
@@ -983,7 +1009,26 @@ class TimerHubApp {
         return outputArray;
     }
 
-    async registerBackgroundPush() {
+    showPushStatus(message) {
+        const status = document.getElementById('notificationStatus');
+        if (status) status.textContent = message;
+    }
+
+    async pushRequest(path, options = {}) {
+        const response = await fetch(path, options);
+        if (!response.ok) {
+            const detail = await response.text().catch(() => '');
+            const error = new Error(
+                `HTTP ${response.status}` + (detail ? `: ${detail}` : '')
+            );
+            error.status = response.status;
+            error.responseText = detail;
+            throw error;
+        }
+        return response;
+    }
+
+    async registerBackgroundPush({ createIfMissing = true } = {}) {
         if (
             !("serviceWorker" in navigator) ||
             !("PushManager" in window)
@@ -993,15 +1038,7 @@ class TimerHubApp {
             );
         }
 
-        const configResponse =
-            await fetch("/api/push/config");
-
-        if (!configResponse.ok) {
-            throw new Error(
-                "Could not load Push configuration."
-            );
-        }
-
+        const configResponse = await this.pushRequest("/api/push/config");
         const config = await configResponse.json();
 
         if (!config.publicKey) {
@@ -1013,25 +1050,62 @@ class TimerHubApp {
         const registration =
             await navigator.serviceWorker.ready;
 
+        const clientId = this.getPushClientId();
+        const serverStatusResponse = await this.pushRequest(
+            `/api/push/status?clientId=${encodeURIComponent(clientId)}`
+        );
+        const serverStatus = await serverStatusResponse.json();
+
         let subscription =
             await registration.pushManager.getSubscription();
 
+        const staleServerSubscription =
+            [404, 410].includes(serverStatus.lastDelivery?.statusCode);
+        if (serverStatus.lastDelivery && !serverStatus.lastDelivery.ok && !staleServerSubscription) {
+            const statusCode = serverStatus.lastDelivery.statusCode;
+            this.lastPushDeliveryError =
+                (statusCode ? `HTTP ${statusCode}: ` : '') +
+                (serverStatus.lastDelivery.error || 'Push service delivery failed');
+        } else if (staleServerSubscription) {
+            this.lastPushDeliveryError = null;
+        }
+        if (staleServerSubscription && subscription) {
+            await subscription.unsubscribe();
+            subscription = null;
+        }
+
+        const applicationServerKey =
+            this.urlBase64ToUint8Array(config.publicKey);
+
+        // A subscription is bound to the VAPID public key used to create it.
+        // Replace it when a deployment rotates keys instead of repeatedly
+        // sending requests that the push service will reject.
+        if (subscription) {
+            const existingKey = subscription.options?.applicationServerKey ||
+                subscription.getKey?.('applicationServerKey');
+            if (existingKey) {
+                const existingBytes = new Uint8Array(existingKey);
+                const keysMatch = existingBytes.length === applicationServerKey.length &&
+                    existingBytes.every((byte, index) => byte === applicationServerKey[index]);
+                if (!keysMatch) {
+                    await subscription.unsubscribe();
+                    subscription = null;
+                }
+            }
+        }
+
         if (!subscription) {
+            if (!createIfMissing) return null;
             subscription =
                 await registration.pushManager.subscribe({
                     userVisibleOnly: true,
-                    applicationServerKey:
-                        this.urlBase64ToUint8Array(
-                            config.publicKey
-                        )
+                    applicationServerKey
                 });
         }
 
-        const response = await fetch(
+        await this.pushRequest(
             "/api/push/subscribe?clientId=" +
-            encodeURIComponent(
-                this.getPushClientId()
-            ),
+            encodeURIComponent(clientId),
             {
                 method: "POST",
                 headers: {
@@ -1041,14 +1115,102 @@ class TimerHubApp {
             }
         );
 
-        if (!response.ok) {
-            throw new Error(
-                "Could not save Push subscription: " +
-                await response.text()
-            );
+        return subscription;
+    }
+
+    activeTimerEntry() {
+        return this.timeEntries.find(entry =>
+            entry.activityId === this.activeActivityId &&
+            entry.endTimestamp === null
+        );
+    }
+
+    async cancelBackgroundAlarm() {
+        await this.pushRequest(
+            `/api/push/cancel?clientId=${encodeURIComponent(this.getPushClientId())}`,
+            { method: 'POST' }
+        );
+    }
+
+    async scheduleBackgroundAlarm(entry, {
+        createIfMissing = true,
+        subscriptionRegistered = false
+    } = {}) {
+        const intervalMinutes = Number(this.notificationInterval);
+        if (!entry || !Number.isFinite(intervalMinutes) || intervalMinutes <= 0) {
+            await this.cancelBackgroundAlarm();
+            return false;
+        }
+        if (!('Notification' in window) || Notification.permission !== 'granted') {
+            await this.cancelBackgroundAlarm();
+            return false;
         }
 
-        return subscription;
+        const subscription = subscriptionRegistered
+            ? true
+            : await this.registerBackgroundPush({ createIfMissing });
+        if (!subscription) {
+            this.showPushStatus('Enable notifications to restore background reminders.');
+            return false;
+        }
+
+        const activity = this.activities.find(item => item.id === entry.activityId);
+        const intervalMs = intervalMinutes * 60 * 1000;
+        const timestamp = Date.now() + intervalMs;
+        await this.pushRequest(
+            `/api/push/schedule?clientId=${encodeURIComponent(this.getPushClientId())}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    alarmId: entry.id,
+                    timestamp,
+                    intervalMs,
+                    title: 'TimerHub',
+                    body: `Timer is still running: ${activity?.name || entry.activityNameSnapshot || 'Activity'}`,
+                    tag: 'timerhub-timer'
+                })
+            }
+        );
+        const deliveryError = this.lastPushDeliveryError;
+        this.lastPushDeliveryError = null;
+        this.showPushStatus(
+            `Background reminders active every ${intervalMinutes} minutes.` +
+            (deliveryError ? ` Previous delivery failed: ${deliveryError}` : '')
+        );
+        return true;
+    }
+
+    async reconcileBackgroundAlarm() {
+        const entry = this.activeTimerEntry();
+        if (!entry || Number(this.notificationInterval) <= 0) {
+            await this.cancelBackgroundAlarm();
+            return false;
+        }
+        if (!('Notification' in window) || Notification.permission !== 'granted') {
+            await this.cancelBackgroundAlarm();
+            this.showPushStatus('Enable notifications to receive reminders while TimerHub is closed.');
+            return false;
+        }
+
+        const subscription = await this.registerBackgroundPush({ createIfMissing: true });
+        if (!subscription) {
+            this.showPushStatus('No push subscription found. Tap Enable notifications to restore reminders.');
+            return false;
+        }
+        return this.scheduleBackgroundAlarm(entry, {
+            createIfMissing: true,
+            subscriptionRegistered: true
+        });
+    }
+
+    async sendBackgroundPushTest() {
+        const subscription = await this.registerBackgroundPush();
+        if (!subscription) throw new Error('No push subscription is available.');
+        await this.pushRequest(
+            `/api/push/test?clientId=${encodeURIComponent(this.getPushClientId())}`,
+            { method: 'POST' }
+        );
     }
 
     async updateNotificationStatus() {
@@ -1116,6 +1278,16 @@ class TimerHubApp {
                 try {
                     await this.registerBackgroundPush();
 
+                    const activeEntry = this.activeTimerEntry();
+                    if (activeEntry && Number(this.notificationInterval) > 0) {
+                        await this.scheduleBackgroundAlarm(activeEntry, {
+                            createIfMissing: false,
+                            subscriptionRegistered: true
+                        });
+                    } else {
+                        this.showPushStatus('Push is registered. Start a timer to schedule reminders.');
+                    }
+
                     console.log(
                         "TimerHub: Background Push subscription registered"
                     );
@@ -1136,9 +1308,9 @@ class TimerHubApp {
                             pushError.message;
                     }
                 }
+            } else {
+                this.updateNotificationStatus();
             }
-
-            this.updateNotificationStatus();
         } catch (error) {
             console.error(
                 "Notification permission error:",
@@ -1166,12 +1338,10 @@ class TimerHubApp {
                 entry.updatedAt = now;
                 await this.storage.saveTimeEntry(entry);
                 try {
-                    const clientId = this.getPushClientId();
-                    await fetch(`/api/push/cancel?clientId=${encodeURIComponent(clientId)}`, {
-                        method: "POST"
-                    });
+                    await this.cancelBackgroundAlarm();
                 } catch (error) {
                     console.error("TimerHub server alarm cancel error:", error);
+                    this.showPushStatus('Timer stopped, but its server reminder could not be cancelled: ' + error.message);
                 }
                 this.activeActivityId = null;
                 this.renderMain();
@@ -1189,12 +1359,10 @@ class TimerHubApp {
                         await this.storage.saveTimeEntry(prevEntry);
                     }
                     try {
-                        const clientId = this.getPushClientId();
-                        await fetch(`/api/push/cancel?clientId=${encodeURIComponent(clientId)}`, {
-                            method: "POST"
-                        });
+                        await this.cancelBackgroundAlarm();
                     } catch (error) {
                         console.error("TimerHub server alarm cancel error:", error);
+                        this.showPushStatus('Previous server reminder could not be cancelled: ' + error.message);
                     }
                 }
 
@@ -1217,36 +1385,13 @@ class TimerHubApp {
                 this.activeActivityId = activityId;
                 this.renderMain();
 
-                // Schedule recurring background notifications on the server.
-                const intervalMinutes = Number(this.notificationInterval);
-
-                if (
-                    intervalMinutes > 0 &&
-                    "Notification" in window &&
-                    Notification.permission === "granted"
-                ) {
+                // Schedule only after the push subscription has been saved.
+                if (Number(this.notificationInterval) > 0) {
                     try {
-                        const clientId = this.getPushClientId();
-                        const intervalMs = intervalMinutes * 60 * 1000;
-                        const alarmId = activityId + "-" + now;
-
-                        await fetch(
-                            `/api/push/schedule?clientId=${encodeURIComponent(clientId)}`,
-                            {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({
-                                    alarmId,
-                                    timestamp: now + intervalMs,
-                                    intervalMs,
-                                    title: "TimerHub",
-                                    body: `Timer is still running: ${activity.name}`,
-                                    tag: "timerhub-timer"
-                                })
-                            }
-                        );
+                        await this.scheduleBackgroundAlarm(entry);
                     } catch (error) {
                         console.error("TimerHub server alarm error:", error);
+                        this.showPushStatus('Timer is running, but its background reminder was not scheduled: ' + error.message);
                     }
                 }
             }

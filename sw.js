@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'timerhub-v2';
+const CACHE_VERSION = 'timerhub-v3';
 const CACHE_FILES = [
     '/',
     '/index.html',

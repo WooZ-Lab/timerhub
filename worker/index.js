@@ -15,9 +15,12 @@ export class TimerHubDurableObject {
             if (
                 !subscription ||
                 typeof subscription.endpoint !== "string" ||
+                !subscription.endpoint.startsWith("https://") ||
                 !subscription.keys ||
                 typeof subscription.keys.p256dh !== "string" ||
-                typeof subscription.keys.auth !== "string"
+                typeof subscription.keys.auth !== "string" ||
+                subscription.keys.p256dh.length > 256 ||
+                subscription.keys.auth.length > 256
             ) {
                 return Response.json(
                     { error: "Invalid push subscription" },
@@ -26,6 +29,7 @@ export class TimerHubDurableObject {
             }
 
             await this.state.storage.put("subscription", subscription);
+            await this.state.storage.delete("lastDelivery");
 
             return Response.json({ ok: true });
         }
@@ -79,19 +83,29 @@ export class TimerHubDurableObject {
         }
 
         if (url.pathname === "/status") {
+            const alarm = await this.state.storage.get("alarm");
             return Response.json({
-                subscriptionStored:
-                    Boolean(
-                        await this.state.storage.get("subscription")
-                    )
+                subscriptionStored: Boolean(await this.state.storage.get("subscription")),
+                alarmScheduled: Boolean(alarm),
+                nextNotificationAt: alarm?.timestamp || null,
+                lastDelivery: await this.state.storage.get("lastDelivery") || null
             });
         }
 
 
         if (request.method === "POST" && url.pathname === "/schedule") {
             const data = await request.json();
-            if (!data || typeof data.alarmId !== "string" || !Number.isFinite(data.timestamp) || data.timestamp <= Date.now()) {
+            if (!data || typeof data.alarmId !== "string" || !data.alarmId ||
+                !Number.isFinite(data.timestamp) || data.timestamp <= Date.now() ||
+                (data.intervalMs !== undefined &&
+                    (!Number.isFinite(data.intervalMs) || data.intervalMs < 60000 || data.intervalMs > 86400000))) {
                 return Response.json({ error: "Invalid alarm schedule" }, { status: 400 });
+            }
+            if (!await this.state.storage.get("subscription")) {
+                return Response.json(
+                    { error: "Register a push subscription before scheduling reminders" },
+                    { status: 409 }
+                );
             }
             await this.state.storage.put("alarm", data);
             await this.state.storage.setAlarm(data.timestamp);
@@ -112,7 +126,10 @@ export class TimerHubDurableObject {
         if (!alarm) return;
 
         const subscription = await this.state.storage.get("subscription");
-        if (!subscription) return;
+        if (!subscription) {
+            await this.state.storage.delete("alarm");
+            return;
+        }
 
         try {
             webpush.setVapidDetails(
@@ -129,11 +146,22 @@ export class TimerHubDurableObject {
                     tag: alarm.tag || "timerhub-timer"
                 })
             );
+            await this.state.storage.put("lastDelivery", {
+                ok: true,
+                at: Date.now()
+            });
         } catch (error) {
             const statusCode =
                 error instanceof webpush.WebPushError
                     ? error.statusCode
                     : 0;
+
+            await this.state.storage.put("lastDelivery", {
+                ok: false,
+                at: Date.now(),
+                statusCode,
+                error: String(error?.message || error).slice(0, 500)
+            });
 
             if (statusCode === 404 || statusCode === 410) {
                 await this.state.storage.delete("subscription");
@@ -148,10 +176,18 @@ export class TimerHubDurableObject {
         }
 
         const currentAlarm = await this.state.storage.get("alarm");
-        if (!currentAlarm || currentAlarm.alarmId !== alarm.alarmId) return;
+        if (!currentAlarm || currentAlarm.alarmId !== alarm.alarmId ||
+            currentAlarm.timestamp !== alarm.timestamp) return;
 
         if (Number.isFinite(alarm.intervalMs) && alarm.intervalMs > 0) {
-            await this.state.storage.setAlarm(Date.now() + alarm.intervalMs);
+            const nextTimestamp = Date.now() + alarm.intervalMs;
+            await this.state.storage.put("alarm", {
+                ...alarm,
+                timestamp: nextTimestamp
+            });
+            await this.state.storage.setAlarm(nextTimestamp);
+        } else {
+            await this.state.storage.delete("alarm");
         }
     }
 
@@ -166,10 +202,10 @@ export default {
         }
 
         if (url.pathname === "/api/push/config") {
-            if (!env.VAPID_PUBLIC_KEY || !env.VAPID_SUBJECT) {
+            if (!env.VAPID_PUBLIC_KEY || !env.VAPID_SUBJECT || !env.VAPID_PRIVATE_KEY) {
                 return Response.json(
                     { error: "VAPID configuration is incomplete" },
-                    { status: 500 }
+                    { status: 503 }
                 );
             }
 
