@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="TimerHub">
     
-    <title>TimerHub - Time Tracker</title>
+    <title data-i18n="documentTitle">TimerHub - Time Tracker</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%231a1a1a' width='180' height='180'/><circle cx='90' cy='90' r='70' fill='%234A90E2'/><text x='90' y='105' font-size='60' font-weight='bold' fill='white' text-anchor='middle' font-family='Arial'>T</text></svg>">
     <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%231a1a1a' width='180' height='180'/><circle cx='90' cy='90' r='70' fill='%234A90E2'/><text x='90' y='105' font-size='60' font-weight='bold' fill='white' text-anchor='middle' font-family='Arial'>T</text></svg>">
@@ -20,10 +20,10 @@
         <!-- Navigation -->
         <nav class="navbar">
             <div class="navbar-content">
-                <h1 class="navbar-title" id="navHome" role="button" tabindex="0" aria-label="Go to home screen">TimerHub</h1>
+                <h1 class="navbar-title" id="navHome" role="button" tabindex="0" aria-label="Go to home screen" data-i18n="appName" data-i18n-aria-label="homeScreen">TimerHub</h1>
                 <div class="navbar-actions">
-                    <button id="navLog" class="nav-btn" aria-label="View log">📋</button>
-                    <button id="navSettings" class="nav-btn" aria-label="Settings">⚙️</button>
+                    <button id="navLog" class="nav-btn" aria-label="View log" data-i18n-aria-label="viewLog">📋</button>
+                    <button id="navSettings" class="nav-btn" aria-label="Settings" data-i18n-aria-label="settings">⚙️</button>
                 </div>
             </div>
         </nav>
@@ -36,7 +36,7 @@
                 <!-- Activity buttons will be rendered here -->
             </div>
             
-            <button id="addActivityBtn" class="add-button" aria-label="Add new activity">+</button>
+            <button id="addActivityBtn" class="add-button" aria-label="Add new activity" data-i18n-aria-label="addActivity">+</button>
             
             <div class="safe-area-bottom"></div>
         </div>
@@ -44,19 +44,19 @@
         <!-- Log screen -->
         <div id="logScreen" class="screen">
             <div class="screen-header">
-                <h2>Time Log</h2>
+                <h2 data-i18n="timeLog">Time Log</h2>
             </div>
             
             <div class="log-filters">
                 <div class="filter-row">
                     <select id="logDateFilter" class="filter-select">
-                        <option value="today">Today</option>
-                        <option value="yesterday">Yesterday</option>
-                        <option value="range">Date Range</option>
-                        <option value="all">All Time</option>
+                        <option value="today" data-i18n="today">Today</option>
+                        <option value="yesterday" data-i18n="yesterday">Yesterday</option>
+                        <option value="range" data-i18n="dateRange">Date Range</option>
+                        <option value="all" data-i18n="allTime">All Time</option>
                     </select>
-                    <select id="logActivityFilter" class="filter-select">
-                        <option value="">All Activities</option>
+                    <select id="logActivityFilter" class="filter-select" aria-label="Activity filter" data-i18n-aria-label="activityFilter">
+                        <option value="" data-i18n="allActivities">All Activities</option>
                     </select>
                 </div>
                 <div id="dateRangeFilter" class="date-range-filter" style="display: none;">
@@ -66,11 +66,11 @@
             </div>
             
             <div class="log-actions">
-                <button id="copyLogBtn" class="action-btn">📋 Copy</button>
-                <button id="shareLogBtn" class="action-btn">📤 Share</button>
-                <button id="exportTxtBtn" class="action-btn">💾 TXT</button>
-                <button id="exportCsvBtn" class="action-btn">📊 CSV</button>
-                <button id="exportJsonBtn" class="action-btn">🔧 JSON</button>
+                <button id="copyLogBtn" class="action-btn"><span aria-hidden="true">📋</span> <span data-i18n="copy">Copy</span></button>
+                <button id="shareLogBtn" class="action-btn"><span aria-hidden="true">📤</span> <span data-i18n="share">Share</span></button>
+                <button id="exportTxtBtn" class="action-btn"><span aria-hidden="true">💾</span> <span data-i18n="exportTxt">Export TXT</span></button>
+                <button id="exportCsvBtn" class="action-btn"><span aria-hidden="true">📊</span> <span data-i18n="exportCsv">Export CSV</span></button>
+                <button id="exportJsonBtn" class="action-btn"><span aria-hidden="true">🔧</span> <span data-i18n="exportJson">Export JSON</span></button>
             </div>
 
             <div id="logContent" class="log-content">
@@ -83,46 +83,46 @@
         <!-- Settings screen -->
         <div id="settingsScreen" class="screen">
             <div class="screen-header">
-                <h2>Settings</h2>
+                <h2 data-i18n="settings">Settings</h2>
             </div>
             
             <div class="settings-content">
                 <div class="settings-group">
-                    <label for="themeSelect">Theme</label>
+                    <label for="themeSelect" data-i18n="theme">Theme</label>
                     <select id="themeSelect" class="setting-select">
-                        <option value="system">System</option>
-                        <option value="light">Light</option>
-                        <option value="dark">Dark</option>
+                        <option value="system" data-i18n="themeSystem">System</option>
+                        <option value="light" data-i18n="themeLight">Light</option>
+                        <option value="dark" data-i18n="themeDark">Dark</option>
                     </select>
                 </div>
                 
                 <div class="settings-group">
-                    <label for="languageSelect">Language</label>
+                    <label for="languageSelect" data-i18n="language">Language</label>
                     <select id="languageSelect" class="setting-select">
-                        <option value="en">English</option>
-                        <option value="de">German</option>
-                        <option value="ru">Russian</option>
+                        <option value="en" data-i18n="languageEnglish">English</option>
+                        <option value="de" data-i18n="languageGerman">German</option>
+                        <option value="ru" data-i18n="languageRussian">Russian</option>
                     </select>
                 </div>
                 
                 <div class="settings-group">
-                    <label for="timeFormatSelect">Time Format</label>
+                    <label for="timeFormatSelect" data-i18n="timeFormat">Time Format</label>
                     <select id="timeFormatSelect" class="setting-select">
-                        <option value="24h">24 Hour</option>
-                        <option value="12h">12 Hour</option>
+                        <option value="24h" data-i18n="timeFormat24h">24 Hour</option>
+                        <option value="12h" data-i18n="timeFormat12h">12 Hour</option>
                     </select>
                 </div>
 
                 <div class="settings-group">
-                    <label for="notificationIntervalSelect">Timer Notifications</label>
+                    <label for="notificationIntervalSelect" data-i18n="timerNotifications">Timer Notifications</label>
                     <select id="notificationIntervalSelect" class="setting-select">
-                        <option value="0">Off</option>
-                        <option value="5">Every 5 minutes</option>
-                        <option value="10">Every 10 minutes</option>
-                        <option value="20">Every 20 minutes</option>
-                        <option value="30">Every 30 minutes</option>
-                        <option value="60">Every 60 minutes</option>
-                        <option value="custom">Custom</option>
+                        <option value="0" data-i18n="notificationsOff">Off</option>
+                        <option value="5" data-i18n="every5Minutes">Every 5 minutes</option>
+                        <option value="10" data-i18n="every10Minutes">Every 10 minutes</option>
+                        <option value="20" data-i18n="every20Minutes">Every 20 minutes</option>
+                        <option value="30" data-i18n="every30Minutes">Every 30 minutes</option>
+                        <option value="60" data-i18n="every60Minutes">Every 60 minutes</option>
+                        <option value="custom" data-i18n="custom">Custom</option>
                     </select>
 
                     <input
@@ -133,6 +133,7 @@
                         step="1"
                         inputmode="numeric"
                         placeholder="Minutes"
+                        data-i18n-placeholder="minutes"
                         style="display:none;margin-top:8px;width:100%;"
                     >
 
@@ -140,13 +141,13 @@
                         id="notificationEnableBtn" class="settings-btn"
                         type="button"
                         style="margin-top:8px;"
-                    >Enable notifications</button>
+                    ><span data-i18n="enableNotifications">Enable notifications</span></button>
 
                     <button
                         id="notificationTestBtn" class="settings-btn"
                         type="button"
                         style="margin-top:8px;"
-                    >Send background push test</button>
+                    ><span data-i18n="sendPushTest">Send background push test</span></button>
 
                     <small
                         id="notificationStatus"
@@ -155,29 +156,29 @@
                 </div>
                 
                 <div class="settings-group">
-                    <label for="firstDaySelect">First Day of Week</label>
+                    <label for="firstDaySelect" data-i18n="firstDayOfWeek">First Day of Week</label>
                     <select id="firstDaySelect" class="setting-select">
-                        <option value="0">Sunday</option>
-                        <option value="1">Monday</option>
+                        <option value="0" data-i18n="firstDaySunday">Sunday</option>
+                        <option value="1" data-i18n="firstDayMonday">Monday</option>
                     </select>
                 </div>
                 
                 <div class="settings-group">
                     <label>
                         <input type="checkbox" id="confirmDeleteCheckbox">
-                        Confirm before delete
+                        <span data-i18n="confirmDelete">Confirm before delete</span>
                     </label>
                 </div>
                 
                 <div class="settings-divider"></div>
                 
-                <button id="backupBtn" class="settings-btn">💾 Backup Data</button>
-                <button id="restoreBtn" class="settings-btn">📥 Restore Data</button>
-                <button id="demoDataBtn" class="settings-btn demo-only">🎮 Load Demo Data</button>
+                <button id="backupBtn" class="settings-btn"><span aria-hidden="true">💾</span> <span data-i18n="backupData">Backup Data</span></button>
+                <button id="restoreBtn" class="settings-btn"><span aria-hidden="true">📥</span> <span data-i18n="restoreData">Restore Data</span></button>
+                <button id="demoDataBtn" class="settings-btn demo-only"><span aria-hidden="true">🎮</span> <span data-i18n="loadDemoData">Load Demo Data</span></button>
                 
                 <div class="settings-divider"></div>
                 <div class="settings-info">
-                    <p>Version 1.0 | Data stored locally</p>
+                    <p data-i18n="appVersionInfo">Version 1.0 | Data stored locally</p>
                 </div>
             </div>
             
@@ -188,43 +189,43 @@
         <div id="activityModal" class="modal">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h3 id="modalTitle">Create Activity</h3>
-                    <button id="modalCloseBtn" class="modal-close" aria-label="Close">✕</button>
+                    <h3 id="modalTitle" data-i18n="createActivity">Create Activity</h3>
+                    <button id="modalCloseBtn" class="modal-close" aria-label="Close" data-i18n-aria-label="close">✕</button>
                 </div>
                 
                 <div class="modal-body">
                     <div class="form-group">
-                        <label for="activityName">Name</label>
-                        <input type="text" id="activityName" class="form-input" placeholder="e.g., Abkleben" maxlength="30">
+                        <label for="activityName" data-i18n="name">Name</label>
+                        <input type="text" id="activityName" class="form-input" placeholder="e.g., Painting" data-i18n-placeholder="activityNamePlaceholder" maxlength="30">
                     </div>
                     
                     <div class="form-group">
-                        <label>Color</label>
-                        <div id="colorPicker" class="color-picker">
+                        <label data-i18n="color">Color</label>
+                        <div id="colorPicker" class="color-picker" role="group" aria-label="Choose a color" data-i18n-aria-label="colorPickerLabel">
                             <!-- Colors will be populated -->
                         </div>
                     </div>
                     
                     <div class="form-group">
-                        <label>Shape</label>
-                        <div id="shapePicker" class="shape-picker">
+                        <label data-i18n="shape">Shape</label>
+                        <div id="shapePicker" class="shape-picker" role="group" aria-label="Choose a shape" data-i18n-aria-label="shapePickerLabel">
                             <!-- Shapes will be populated -->
                         </div>
                     </div>
                     
                     <div class="form-group">
-                        <label>Size</label>
-                        <div class="size-picker">
-                            <button class="size-btn" data-size="small">Small</button>
-                            <button class="size-btn" data-size="medium">Medium</button>
-                            <button class="size-btn" data-size="large">Large</button>
+                        <label data-i18n="size">Size</label>
+                        <div class="size-picker" role="group" aria-label="Choose a size" data-i18n-aria-label="sizePickerLabel">
+                            <button class="size-btn" data-size="small" data-i18n="small">Small</button>
+                            <button class="size-btn" data-size="medium" data-i18n="medium">Medium</button>
+                            <button class="size-btn" data-size="large" data-i18n="large">Large</button>
                         </div>
                     </div>
                 </div>
                 
                 <div class="modal-footer">
-                    <button id="modalCancelBtn" class="btn-secondary">Cancel</button>
-                    <button id="modalSaveBtn" class="btn-primary">Save</button>
+                    <button id="modalCancelBtn" class="btn-secondary" data-i18n="cancel">Cancel</button>
+                    <button id="modalSaveBtn" class="btn-primary" data-i18n="save">Save</button>
                 </div>
             </div>
         </div>
@@ -233,14 +234,14 @@
         <div id="activityMenuModal" class="modal">
             <div class="modal-content modal-small">
                 <div class="modal-header">
-                    <h3 id="activityMenuTitle">Activity</h3>
-                    <button id="menuCloseBtn" class="modal-close" aria-label="Close">✕</button>
+                    <h3 id="activityMenuTitle" data-i18n="activity">Activity</h3>
+                    <button id="menuCloseBtn" class="modal-close" aria-label="Close" data-i18n-aria-label="close">✕</button>
                 </div>
                 
                 <div class="modal-body">
-                    <button id="menuEditBtn" class="menu-item">✏️ Edit</button>
-                    <button id="menuArchiveBtn" class="menu-item">📦 Archive</button>
-                    <button id="menuDeleteBtn" class="menu-item menu-danger">🗑️ Delete</button>
+                    <button id="menuEditBtn" class="menu-item"><span aria-hidden="true">✏️</span> <span data-i18n="edit">Edit</span></button>
+                    <button id="menuArchiveBtn" class="menu-item"><span aria-hidden="true">📦</span> <span data-i18n="archive">Archive</span></button>
+                    <button id="menuDeleteBtn" class="menu-item menu-danger"><span aria-hidden="true">🗑️</span> <span data-i18n="delete">Delete</span></button>
                 </div>
             </div>
         </div>
@@ -249,41 +250,41 @@
         <div id="entryEditModal" class="modal">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h3>Edit Entry</h3>
-                    <button id="entryEditCloseBtn" class="modal-close" aria-label="Close">✕</button>
+                    <h3 data-i18n="editEntry">Edit Entry</h3>
+                    <button id="entryEditCloseBtn" class="modal-close" aria-label="Close" data-i18n-aria-label="close">✕</button>
                 </div>
                 
                 <div class="modal-body">
                     <div class="form-group">
-                        <label for="entryEditActivity">Activity</label>
+                            <label for="entryEditActivity" data-i18n="activity">Activity</label>
                         <select id="entryEditActivity" class="form-input"></select>
                     </div>
                     
                     <div class="form-group">
-                        <label for="entryEditDate">Date</label>
+                        <label for="entryEditDate" data-i18n="date">Date</label>
                         <input type="date" id="entryEditDate" class="form-input">
                     </div>
                     
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="entryEditStart">Start Time</label>
+                            <label for="entryEditStart" data-i18n="startTime">Start Time</label>
                             <input type="time" id="entryEditStart" class="form-input">
                         </div>
                         <div class="form-group">
-                            <label for="entryEditEnd">End Time</label>
+                            <label for="entryEditEnd" data-i18n="endTime">End Time</label>
                             <input type="time" id="entryEditEnd" class="form-input">
                         </div>
                     </div>
                     
                     <div id="entryConflictWarning" class="warning" style="display: none;">
-                        ⚠️ This time overlaps with another entry
+                        <span aria-hidden="true">⚠️</span> <span data-i18n="overlappingEntry">This time overlaps with another entry</span>
                     </div>
                 </div>
                 
                 <div class="modal-footer">
-                    <button id="entryEditDeleteBtn" class="btn-danger">Delete</button>
-                    <button id="entryEditCancelBtn" class="btn-secondary">Cancel</button>
-                    <button id="entryEditSaveBtn" class="btn-primary">Save</button>
+                    <button id="entryEditDeleteBtn" class="btn-danger" data-i18n="deleteEntry">Delete</button>
+                    <button id="entryEditCancelBtn" class="btn-secondary" data-i18n="cancel">Cancel</button>
+                    <button id="entryEditSaveBtn" class="btn-primary" data-i18n="save">Save</button>
                 </div>
             </div>
         </div>

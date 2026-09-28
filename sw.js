@@ -1,4 +1,10 @@
-const CACHE_VERSION = 'timerhub-v3';
+const CACHE_VERSION = 'timerhub-v5';
+const LOCALE_CACHE_KEY = '/__timerhub_locale__';
+const PUSH_COPY = {
+    en: { title: 'TimerHub', body: 'Timer reminder' },
+    de: { title: 'TimerHub', body: 'Timer-Erinnerung' },
+    ru: { title: 'TimerHub', body: 'Напоминание таймера' }
+};
 const CACHE_FILES = [
     '/',
     '/index.html',
@@ -6,6 +12,30 @@ const CACHE_FILES = [
     '/app.js',
     '/manifest.json'
 ];
+
+function isSupportedLocale(locale) {
+    return Object.prototype.hasOwnProperty.call(PUSH_COPY, locale);
+}
+
+async function saveLocale(locale) {
+    if (!isSupportedLocale(locale)) return;
+    const cache = await caches.open(CACHE_VERSION);
+    await cache.put(
+        new URL(LOCALE_CACHE_KEY, self.location.origin).toString(),
+        new Response(locale, { headers: { 'Content-Type': 'text/plain' } })
+    );
+}
+
+async function getSavedLocale() {
+    try {
+        const cache = await caches.open(CACHE_VERSION);
+        const response = await cache.match(new URL(LOCALE_CACHE_KEY, self.location.origin).toString());
+        const locale = response ? await response.text() : 'en';
+        return isSupportedLocale(locale) ? locale : 'en';
+    } catch (error) {
+        return 'en';
+    }
+}
 
 // Install event
 self.addEventListener('install', (event) => {
@@ -69,35 +99,44 @@ self.addEventListener('fetch', (event) => {
 self.addEventListener('message', (event) => {
     if (event.data && event.data.type === 'SKIP_WAITING') {
         self.skipWaiting();
+    } else if (event.data && event.data.type === 'SET_LOCALE') {
+        event.waitUntil(saveLocale(event.data.locale));
     }
 });
 
 
 self.addEventListener('push', (event) => {
     let data = {};
+    let plainTextBody = '';
 
     try {
         data = event.data ? event.data.json() : {};
+        if (typeof data === 'string') {
+            plainTextBody = data;
+            data = {};
+        } else if (!data || typeof data !== 'object' || Array.isArray(data)) {
+            data = {};
+        }
     } catch (error) {
-        data = {
-            title: 'TimerHub',
-            body: event.data
-                ? event.data.text()
-                : 'Timer notification'
-        };
+        plainTextBody = event.data ? event.data.text() : '';
+        data = {};
     }
 
     event.waitUntil(
-        self.registration.showNotification(
-            data.title || 'TimerHub',
-            {
-                body: data.body || 'Timer notification',
-                tag: data.tag || 'timerhub-timer',
-                renotify: true,
-                vibrate: [200, 100, 200],
-                data: { url: '/' }
-            }
-        )
+        (async () => {
+            const locale = isSupportedLocale(data.locale) ? data.locale : await getSavedLocale();
+            const copy = PUSH_COPY[locale];
+            await self.registration.showNotification(
+                data.title || copy.title,
+                {
+                    body: data.body || plainTextBody || copy.body,
+                    tag: data.tag || 'timerhub-timer',
+                    renotify: true,
+                    vibrate: [200, 100, 200],
+                    data: { url: '/' }
+                }
+            );
+        })()
     );
 });
 

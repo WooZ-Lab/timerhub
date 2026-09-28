@@ -1,5 +1,22 @@
 import webpush from "web-push";
 
+const notificationCopy = {
+    en: { testTitle: "TimerHub notification test", testBody: "This is a background push test.", reminder: "Timer reminder" },
+    de: { testTitle: "TimerHub-Benachrichtigungstest", testBody: "Dies ist ein Push-Test im Hintergrund.", reminder: "Timer-Erinnerung" },
+    ru: { testTitle: "Проверка уведомлений TimerHub", testBody: "Это тестовое Push-уведомление.", reminder: "Напоминание таймера" }
+};
+
+function validLocale(locale, fallback = "en") {
+    if (Object.prototype.hasOwnProperty.call(notificationCopy, locale)) return locale;
+    return Object.prototype.hasOwnProperty.call(notificationCopy, fallback) ? fallback : "en";
+}
+
+function validText(value, fallback, maxLength) {
+    return typeof value === "string" && value.trim()
+        ? value.trim().slice(0, maxLength)
+        : fallback;
+}
+
 export class TimerHubDurableObject {
     constructor(state, env) {
         this.state = state;
@@ -29,6 +46,7 @@ export class TimerHubDurableObject {
             }
 
             await this.state.storage.put("subscription", subscription);
+            await this.state.storage.put("locale", validLocale(url.searchParams.get("locale")));
             await this.state.storage.delete("lastDelivery");
 
             return Response.json({ ok: true });
@@ -46,6 +64,10 @@ export class TimerHubDurableObject {
             }
 
             try {
+                const payload = await request.json().catch(() => ({}));
+                const storedLocale = validLocale(await this.state.storage.get("locale"));
+                const locale = validLocale(payload?.locale, storedLocale);
+                const copy = notificationCopy[locale];
                 webpush.setVapidDetails(
                     this.env.VAPID_SUBJECT,
                     this.env.VAPID_PUBLIC_KEY,
@@ -55,9 +77,10 @@ export class TimerHubDurableObject {
                 await webpush.sendNotification(
                     subscription,
                     JSON.stringify({
-                        title: "TimerHub",
-                        body: "Background Push funktioniert.",
-                        tag: "timerhub-push-test"
+                        title: validText(payload?.title, copy.testTitle, 100),
+                        body: validText(payload?.body, copy.testBody, 300),
+                        locale,
+                        tag: validText(payload?.tag, "timerhub-push-test", 100)
                     })
                 );
 
@@ -132,6 +155,8 @@ export class TimerHubDurableObject {
         }
 
         try {
+            const storedLocale = validLocale(await this.state.storage.get("locale"));
+            const locale = validLocale(alarm.locale, storedLocale);
             webpush.setVapidDetails(
                 this.env.VAPID_SUBJECT,
                 this.env.VAPID_PUBLIC_KEY,
@@ -141,8 +166,9 @@ export class TimerHubDurableObject {
             await webpush.sendNotification(
                 subscription,
                 JSON.stringify({
-                    title: alarm.title || "TimerHub",
-                    body: alarm.body || "Timer is still running.",
+                    title: validText(alarm.title, "TimerHub", 100),
+                    body: validText(alarm.body, notificationCopy[locale].reminder, 300),
+                    locale,
                     tag: alarm.tag || "timerhub-timer"
                 })
             );

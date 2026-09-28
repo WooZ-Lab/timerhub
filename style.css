@@ -27,6 +27,7 @@
     --danger-color: #E74C3C;
     --success-color: #27AE60;
     --warning-color: #F39C12;
+    --action-text: #111111;
     
     /* Spacing */
     --safe-top: max(12px, env(safe-area-inset-top, 0px));
@@ -201,7 +202,7 @@ html, body {
     height: 56px;
     border-radius: 50%;
     background-color: var(--color-blue);
-    color: white;
+    color: var(--action-text);
     border: none;
     font-size: 32px;
     font-weight: bold;
@@ -232,7 +233,8 @@ html, body {
     gap: 4px;
     font-size: 14px;
     font-weight: 600;
-    color: white;
+    color: var(--activity-text-color, #000000);
+    box-shadow: 0 0 0 1px var(--bg-primary), 0 0 0 2px var(--text-primary);
     transition: all 0.2s;
     user-select: none;
     overflow: visible;
@@ -269,7 +271,6 @@ html, body {
 .activity-btn .btn-time {
     font-size: 11px;
     font-weight: 500;
-    opacity: 0.9;
 }
 
 .activity-btn .btn-duration {
@@ -283,8 +284,18 @@ html, body {
 }
 
 .activity-btn.active {
-    box-shadow: 0 0 0 4px var(--active-glow), 0 4px 12px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 5px var(--text-primary), 0 4px 12px rgba(0, 0, 0, 0.2);
     transform: scale(1.02);
+}
+
+.activity-btn:focus-visible,
+.color-option:focus-visible,
+.shape-option:focus-visible,
+.size-btn:focus-visible,
+button:focus-visible,
+[role="button"]:focus-visible {
+    outline: 3px solid var(--color-blue);
+    outline-offset: 3px;
 }
 
 .activity-btn.dragging {
@@ -358,7 +369,7 @@ html, body {
 .action-btn {
     padding: 8px 12px;
     background-color: var(--color-blue);
-    color: white;
+    color: var(--action-text);
     border: none;
     border-radius: 6px;
     font-size: 12px;
@@ -486,7 +497,7 @@ html, body {
     padding: 12px;
     margin-bottom: 8px;
     background-color: var(--color-blue);
-    color: white;
+    color: var(--action-text);
     border: none;
     border-radius: 6px;
     font-size: 14px;
@@ -666,7 +677,7 @@ html, body {
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.2s;
-    box-shadow: inset 0 0 0 1px var(--border-color);
+    box-shadow: 0 0 0 1px var(--bg-primary), 0 0 0 2px var(--text-primary), inset 0 0 0 1px var(--border-color);
 }
 
 .color-option:active {
@@ -675,7 +686,7 @@ html, body {
 
 .color-option.selected {
     border-color: var(--text-primary);
-    box-shadow: inset 0 0 0 2px var(--bg-primary);
+    box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 4px var(--text-primary), inset 0 0 0 2px var(--bg-primary);
 }
 
 .color-option-custom {
@@ -683,11 +694,11 @@ html, body {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #fff;
+    color: #111;
     font-size: 20px;
     font-weight: 600;
     line-height: 1;
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+    text-shadow: 0 0 2px #fff, 0 1px 3px rgba(255, 255, 255, 0.7);
 }
 
 .custom-color-input {
@@ -753,13 +764,13 @@ html, body {
 .size-btn.selected {
     border-color: var(--color-blue);
     background-color: var(--color-blue);
-    color: white;
+    color: var(--action-text);
 }
 
 /* Buttons */
 .btn-primary {
     background-color: var(--color-blue);
-    color: white;
+    color: var(--action-text);
     border: none;
 }
 
@@ -779,7 +790,7 @@ html, body {
 
 .btn-danger {
     background-color: var(--danger-color);
-    color: white;
+    color: var(--action-text);
     border: none;
 }
 
@@ -796,6 +807,10 @@ html, body {
     font-weight: 600;
     cursor: pointer;
     transition: background-color 0.2s;
+}
+
+.add-button {
+    color: var(--action-text);
 }
 
 .menu-item {

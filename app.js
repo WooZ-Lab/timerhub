@@ -39,10 +39,6 @@ const translations = {
         confirmDelete: 'Confirm before delete',
         backupData: 'Backup Data',
         restoreData: 'Restore Data',
-        exportData: 'Export',
-        importData: 'Import',
-        version: 'Version',
-        dataStoredLocally: 'Data stored locally',
         noEntries: 'No entries found',
         since: 'since',
         deleteEntry: 'Delete Entry',
@@ -88,14 +84,10 @@ const translations = {
         theme: 'Design',
         language: 'Sprache',
         timeFormat: 'Zeitformat',
-        firstDayOfWeek: 'Erste Wochentag',
+        firstDayOfWeek: 'Erster Wochentag',
         confirmDelete: 'Vor dem Löschen bestätigen',
         backupData: 'Daten sichern',
         restoreData: 'Daten wiederherstellen',
-        exportData: 'Exportieren',
-        importData: 'Importieren',
-        version: 'Version',
-        dataStoredLocally: 'Daten werden lokal gespeichert',
         noEntries: 'Keine Einträge gefunden',
         since: 'seit',
         deleteEntry: 'Eintrag löschen',
@@ -116,8 +108,8 @@ const translations = {
     },
     ru: {
         appName: 'TimerHub',
-        createActivity: 'Создать деятельность',
-        editActivity: 'Редактировать деятельность',
+        createActivity: 'Создать занятие',
+        editActivity: 'Изменить занятие',
         name: 'Название',
         color: 'Цвет',
         customColor: 'Свой цвет',
@@ -134,7 +126,7 @@ const translations = {
         yesterday: 'Вчера',
         dateRange: 'Диапазон дат',
         allTime: 'За всё время',
-        allActivities: 'Все деятельности',
+        allActivities: 'Все занятия',
         copied: 'Скопировано в буфер обмена',
         total: 'Всего',
         settings: 'Настройки',
@@ -142,21 +134,17 @@ const translations = {
         language: 'Язык',
         timeFormat: 'Формат времени',
         firstDayOfWeek: 'Первый день недели',
-        confirmDelete: 'Подтверждать перед удалением',
+        confirmDelete: 'Подтверждать удаление',
         backupData: 'Резервная копия',
         restoreData: 'Восстановить данные',
-        exportData: 'Экспортировать',
-        importData: 'Импортировать',
-        version: 'Версия',
-        dataStoredLocally: 'Данные хранятся локально',
         noEntries: 'Записи не найдены',
         since: 'с',
         deleteEntry: 'Удалить запись',
-        editEntry: 'Редактировать запись',
+        editEntry: 'Изменить запись',
         startTime: 'Время начала',
         endTime: 'Время окончания',
         date: 'Дата',
-        activity: 'Деятельность',
+        activity: 'Занятие',
         duration: 'Длительность',
         overlappingEntry: 'Это время пересекается с другой записью',
         undo: 'Отменить',
@@ -168,6 +156,170 @@ const translations = {
         large: 'Большой',
     }
 };
+
+// Strings used by static HTML, validation, exports, and notification flows.
+// Keep this extension aligned across every supported locale.
+const extendedTranslations = {
+    en: {
+        activityFilter: 'Activity filter',
+        documentTitle: 'TimerHub - Time Tracker', homeScreen: 'Go to home screen',
+        viewLog: 'View log', addActivity: 'Add new activity', copy: 'Copy', share: 'Share',
+        exportTxt: 'Export TXT', exportCsv: 'Export CSV', exportJson: 'Export JSON',
+        themeSystem: 'System', themeLight: 'Light', themeDark: 'Dark',
+        languageEnglish: 'English', languageGerman: 'German', languageRussian: 'Russian',
+        timeFormat12h: '12 Hour', timeFormat24h: '24 Hour', timerNotifications: 'Timer Notifications',
+        notificationsOff: 'Off', every5Minutes: 'Every 5 minutes', every10Minutes: 'Every 10 minutes',
+        every20Minutes: 'Every 20 minutes', every30Minutes: 'Every 30 minutes', every60Minutes: 'Every 60 minutes',
+        custom: 'Custom', minutes: 'Minutes', enableNotifications: 'Enable notifications',
+        sendPushTest: 'Send background push test', firstDaySunday: 'Sunday', firstDayMonday: 'Monday',
+        loadDemoData: 'Load Demo Data', appVersionInfo: 'Version 1.0 | Data stored locally',
+        close: 'Close', activityNamePlaceholder: 'e.g., Painting',
+        shapeCircle: 'Circle', shapeSquare: 'Square', shapeRounded: 'Rounded', shapeDiamond: 'Diamond',
+        shapeTriangle: 'Triangle', shapeHexagon: 'Hexagon', shapeOctagon: 'Octagon', shapeStar: 'Star',
+        shapeHeart: 'Heart', shapeOval: 'Oval', colorSample: 'Color {color}',
+        pleaseEnterName: 'Please enter a name', pleaseFillAllFields: 'Please fill all fields',
+        startBeforeEnd: 'Start time must be before end time', failedToCopy: 'Failed to copy',
+        exportedAs: 'Exported as {format}', backupFailed: 'Backup failed', restoreFailed: 'Restore failed',
+        mergeExistingData: 'Merge with existing data? (Cancel to replace)', demoDataLoaded: 'Demo data loaded',
+        initFailed: 'TimerHub could not start. Reload the page or restore a backup.',
+        notificationOffStatus: 'Notifications are off.', notificationUnsupported: 'Notifications are not supported by this browser.',
+        notificationsEnabled: 'Notifications enabled', notificationsBlocked: 'Notifications blocked',
+        serviceWorkerUnsupported: 'Service Worker is not supported by this browser.',
+        notificationPermissionGranted: 'Permission granted. Interval: {minutes} min.',
+        notificationPermissionBlocked: 'Notifications are blocked in browser settings.',
+        notificationIntervalStatus: 'Interval: {minutes} min.', notificationEnabledBody: 'Notifications are enabled.',
+        notificationTestTitle: 'TimerHub notification test', notificationTestBody: 'This is a background push test.',
+        notificationTimerBody: 'Timer is still running: {activity}',
+        notificationNeedEnable: 'Enable notifications to restore background reminders.',
+        notificationNeedEnableClosed: 'Enable notifications to receive reminders while TimerHub is closed.',
+        notificationNoSubscription: 'No push subscription found. Tap Enable notifications to restore reminders.',
+        notificationBackgroundActive: 'Background reminders active every {minutes} minutes.',
+        notificationPreviousDeliveryFailed: 'Previous delivery failed: {status}',
+        notificationPushRegisteredStart: 'Push is registered. Start a timer to schedule reminders.',
+        notificationTestAccepted: 'Test push accepted. It should appear even with TimerHub closed.',
+        notificationTestFailed: 'Test push failed{status}. Check notification permission and try again.',
+        notificationSetupFailed: 'Notifications are enabled, but background push setup failed{status}.',
+        notificationNeedsAttention: 'Background reminders need attention{status}.',
+        notificationUpdateFailed: 'Could not update background reminders{status}.',
+        notificationScheduleFailed: 'The timer is running, but its background reminder was not scheduled{status}.',
+        notificationCancelFailed: 'The timer stopped, but its server reminder could not be cancelled{status}.',
+        notificationPreviousCancelFailed: 'The previous server reminder could not be cancelled{status}.',
+        notificationHttpStatus: ' (HTTP {status})',
+        notificationBackgroundFallbackTitle: 'TimerHub', notificationBackgroundFallbackBody: 'Timer reminder',
+        textLogTotal: 'Total', colorPickerLabel: 'Choose a color', shapePickerLabel: 'Choose a shape',
+        sizePickerLabel: 'Choose a size',
+        demoMasking: 'Masking', demoPainting: 'Painting', demoWallpapering: 'Wallpapering',
+        demoUnloading: 'Unloading', demoTravel: 'Travel', demoBreak: 'Break',
+        logFilename: 'timelog', backupFilename: 'timerhub_backup',
+    },
+    de: {
+        activityFilter: 'Aktivitätsfilter',
+        documentTitle: 'TimerHub - Zeiterfassung', homeScreen: 'Zum Startbildschirm',
+        viewLog: 'Zeitprotokoll anzeigen', addActivity: 'Aktivität hinzufügen', copy: 'Kopieren', share: 'Teilen',
+        exportTxt: 'TXT exportieren', exportCsv: 'CSV exportieren', exportJson: 'JSON exportieren',
+        themeSystem: 'System', themeLight: 'Hell', themeDark: 'Dunkel',
+        languageEnglish: 'Englisch', languageGerman: 'Deutsch', languageRussian: 'Russisch',
+        timeFormat12h: '12-Stunden-Format', timeFormat24h: '24-Stunden-Format', timerNotifications: 'Timer-Benachrichtigungen',
+        notificationsOff: 'Aus', every5Minutes: 'Alle 5 Minuten', every10Minutes: 'Alle 10 Minuten',
+        every20Minutes: 'Alle 20 Minuten', every30Minutes: 'Alle 30 Minuten', every60Minutes: 'Alle 60 Minuten',
+        custom: 'Benutzerdefiniert', minutes: 'Minuten', enableNotifications: 'Benachrichtigungen aktivieren',
+        sendPushTest: 'Push-Test im Hintergrund senden', firstDaySunday: 'Sonntag', firstDayMonday: 'Montag',
+        loadDemoData: 'Demodaten laden', appVersionInfo: 'Version 1.0 | Daten lokal gespeichert',
+        close: 'Schließen', activityNamePlaceholder: 'z. B. Streichen',
+        shapeCircle: 'Kreis', shapeSquare: 'Quadrat', shapeRounded: 'Abgerundet', shapeDiamond: 'Raute',
+        shapeTriangle: 'Dreieck', shapeHexagon: 'Sechseck', shapeOctagon: 'Achteck', shapeStar: 'Stern',
+        shapeHeart: 'Herz', shapeOval: 'Oval', colorSample: 'Farbe {color}',
+        pleaseEnterName: 'Bitte einen Namen eingeben', pleaseFillAllFields: 'Bitte alle Felder ausfüllen',
+        startBeforeEnd: 'Die Startzeit muss vor der Endzeit liegen', failedToCopy: 'Kopieren fehlgeschlagen',
+        exportedAs: 'Als {format} exportiert', backupFailed: 'Sicherung fehlgeschlagen', restoreFailed: 'Wiederherstellung fehlgeschlagen',
+        mergeExistingData: 'Mit vorhandenen Daten zusammenführen? (Abbrechen, um sie zu ersetzen)', demoDataLoaded: 'Demodaten geladen',
+        initFailed: 'TimerHub konnte nicht gestartet werden. Lade die Seite neu oder stelle eine Sicherung wieder her.',
+        notificationOffStatus: 'Benachrichtigungen sind ausgeschaltet.', notificationUnsupported: 'Dieser Browser unterstützt keine Benachrichtigungen.',
+        notificationsEnabled: 'Benachrichtigungen aktiviert', notificationsBlocked: 'Benachrichtigungen blockiert',
+        serviceWorkerUnsupported: 'Dieser Browser unterstützt keine Service Worker.',
+        notificationPermissionGranted: 'Berechtigung erteilt. Intervall: {minutes} Min.',
+        notificationPermissionBlocked: 'Benachrichtigungen sind in den Browsereinstellungen blockiert.',
+        notificationIntervalStatus: 'Intervall: {minutes} Min.', notificationEnabledBody: 'Benachrichtigungen sind aktiviert.',
+        notificationTestTitle: 'TimerHub-Benachrichtigungstest', notificationTestBody: 'Dies ist ein Push-Test im Hintergrund.',
+        notificationTimerBody: 'Der Timer läuft noch: {activity}',
+        notificationNeedEnable: 'Aktiviere Benachrichtigungen, um Erinnerungen im Hintergrund wiederherzustellen.',
+        notificationNeedEnableClosed: 'Aktiviere Benachrichtigungen für Erinnerungen, wenn TimerHub geschlossen ist.',
+        notificationNoSubscription: 'Kein Push-Abonnement gefunden. Tippe auf „Benachrichtigungen aktivieren“, um Erinnerungen wiederherzustellen.',
+        notificationBackgroundActive: 'Hintergrunderinnerungen alle {minutes} Minuten aktiv.',
+        notificationPreviousDeliveryFailed: 'Vorherige Zustellung fehlgeschlagen: {status}',
+        notificationPushRegisteredStart: 'Push ist eingerichtet. Starte einen Timer, um Erinnerungen zu planen.',
+        notificationTestAccepted: 'Push-Test angenommen. Er sollte auch bei geschlossenem TimerHub erscheinen.',
+        notificationTestFailed: 'Push-Test fehlgeschlagen{status}. Prüfe die Benachrichtigungsberechtigung und versuche es erneut.',
+        notificationSetupFailed: 'Benachrichtigungen sind aktiviert, aber Push im Hintergrund konnte nicht eingerichtet werden{status}.',
+        notificationNeedsAttention: 'Bei den Hintergrunderinnerungen ist ein Problem aufgetreten{status}.',
+        notificationUpdateFailed: 'Hintergrunderinnerungen konnten nicht aktualisiert werden{status}.',
+        notificationScheduleFailed: 'Der Timer läuft, aber die Hintergrunderinnerung wurde nicht geplant{status}.',
+        notificationCancelFailed: 'Der Timer wurde gestoppt, aber die Servererinnerung konnte nicht abgebrochen werden{status}.',
+        notificationPreviousCancelFailed: 'Die vorherige Servererinnerung konnte nicht abgebrochen werden{status}.',
+        notificationHttpStatus: ' (HTTP {status})',
+        notificationBackgroundFallbackTitle: 'TimerHub', notificationBackgroundFallbackBody: 'Timer-Erinnerung',
+        textLogTotal: 'Gesamt', colorPickerLabel: 'Farbe auswählen', shapePickerLabel: 'Form auswählen',
+        sizePickerLabel: 'Größe auswählen',
+        demoMasking: 'Abkleben', demoPainting: 'Streichen', demoWallpapering: 'Tapezieren',
+        demoUnloading: 'Entladen', demoTravel: 'Anfahrt', demoBreak: 'Pause',
+        logFilename: 'zeitprotokoll', backupFilename: 'timerhub_sicherung',
+    },
+    ru: {
+        activityFilter: 'Фильтр занятий',
+        documentTitle: 'TimerHub — учёт времени', homeScreen: 'На главный экран',
+        viewLog: 'Открыть журнал времени', addActivity: 'Добавить занятие', copy: 'Копировать', share: 'Поделиться',
+        exportTxt: 'Экспорт TXT', exportCsv: 'Экспорт CSV', exportJson: 'Экспорт JSON',
+        themeSystem: 'Системная', themeLight: 'Светлая', themeDark: 'Тёмная',
+        languageEnglish: 'Английский', languageGerman: 'Немецкий', languageRussian: 'Русский',
+        timeFormat12h: '12-часовой формат', timeFormat24h: '24-часовой формат', timerNotifications: 'Напоминания таймера',
+        notificationsOff: 'Выключены', every5Minutes: 'Каждые 5 минут', every10Minutes: 'Каждые 10 минут',
+        every20Minutes: 'Каждые 20 минут', every30Minutes: 'Каждые 30 минут', every60Minutes: 'Каждые 60 минут',
+        custom: 'Свой интервал', minutes: 'Минуты', enableNotifications: 'Включить уведомления',
+        sendPushTest: 'Отправить тестовое Push-уведомление', firstDaySunday: 'Воскресенье', firstDayMonday: 'Понедельник',
+        loadDemoData: 'Загрузить демонстрационные данные', appVersionInfo: 'Версия 1.0 | Данные хранятся локально',
+        close: 'Закрыть', activityNamePlaceholder: 'Например, покраска',
+        shapeCircle: 'Круг', shapeSquare: 'Квадрат', shapeRounded: 'Скруглённая', shapeDiamond: 'Ромб',
+        shapeTriangle: 'Треугольник', shapeHexagon: 'Шестиугольник', shapeOctagon: 'Восьмиугольник', shapeStar: 'Звезда',
+        shapeHeart: 'Сердце', shapeOval: 'Овал', colorSample: 'Цвет {color}',
+        pleaseEnterName: 'Введите название', pleaseFillAllFields: 'Заполните все поля',
+        startBeforeEnd: 'Время начала должно быть раньше времени окончания', failedToCopy: 'Не удалось скопировать',
+        exportedAs: 'Экспортировано в формате {format}', backupFailed: 'Не удалось создать резервную копию', restoreFailed: 'Не удалось восстановить данные',
+        mergeExistingData: 'Объединить с существующими данными? (Отмена — заменить данные)', demoDataLoaded: 'Демонстрационные данные загружены',
+        initFailed: 'Не удалось запустить TimerHub. Перезагрузите страницу или восстановите резервную копию.',
+        notificationOffStatus: 'Уведомления выключены.', notificationUnsupported: 'Этот браузер не поддерживает уведомления.',
+        notificationsEnabled: 'Уведомления включены', notificationsBlocked: 'Уведомления заблокированы',
+        serviceWorkerUnsupported: 'Этот браузер не поддерживает Service Worker.',
+        notificationPermissionGranted: 'Разрешение получено. Интервал: {minutes} мин.',
+        notificationPermissionBlocked: 'Уведомления заблокированы в настройках браузера.',
+        notificationIntervalStatus: 'Интервал: {minutes} мин.', notificationEnabledBody: 'Уведомления включены.',
+        notificationTestTitle: 'Проверка уведомлений TimerHub', notificationTestBody: 'Это тестовое Push-уведомление.',
+        notificationTimerBody: 'Таймер всё ещё работает: {activity}',
+        notificationNeedEnable: 'Включите уведомления, чтобы восстановить фоновые напоминания.',
+        notificationNeedEnableClosed: 'Включите уведомления, чтобы получать напоминания при закрытом TimerHub.',
+        notificationNoSubscription: 'Подписка Push не найдена. Нажмите «Включить уведомления», чтобы восстановить напоминания.',
+        notificationBackgroundActive: 'Фоновые напоминания включены: каждые {minutes} мин.',
+        notificationPreviousDeliveryFailed: 'Предыдущее уведомление не доставлено: {status}',
+        notificationPushRegisteredStart: 'Push настроен. Запустите таймер, чтобы включить напоминания.',
+        notificationTestAccepted: 'Тестовое Push-уведомление отправлено. Оно должно прийти и при закрытом TimerHub.',
+        notificationTestFailed: 'Не удалось отправить тестовое Push-уведомление{status}. Проверьте разрешение и попробуйте снова.',
+        notificationSetupFailed: 'Уведомления включены, но Push в фоне настроить не удалось{status}.',
+        notificationNeedsAttention: 'Проверьте настройки фоновых напоминаний{status}.',
+        notificationUpdateFailed: 'Не удалось обновить фоновые напоминания{status}.',
+        notificationScheduleFailed: 'Таймер запущен, но фоновое напоминание не создано{status}.',
+        notificationCancelFailed: 'Таймер остановлен, но серверное напоминание не удалось отменить{status}.',
+        notificationPreviousCancelFailed: 'Не удалось отменить предыдущее серверное напоминание{status}.',
+        notificationHttpStatus: ' (HTTP {status})',
+        notificationBackgroundFallbackTitle: 'TimerHub', notificationBackgroundFallbackBody: 'Напоминание таймера',
+        textLogTotal: 'Всего', colorPickerLabel: 'Выбрать цвет', shapePickerLabel: 'Выбрать форму',
+        sizePickerLabel: 'Выбрать размер',
+        demoMasking: 'Заклеивание', demoPainting: 'Покраска', demoWallpapering: 'Поклейка обоев',
+        demoUnloading: 'Разгрузка', demoTravel: 'Дорога', demoBreak: 'Перерыв',
+        logFilename: 'журнал-времени', backupFilename: 'timerhub-копия',
+    }
+};
+for (const language of Object.keys(translations)) {
+    Object.assign(translations[language], extendedTranslations[language]);
+}
 
 // ============================================================================
 // STORAGE REPOSITORY
@@ -439,6 +591,7 @@ class TimerHubApp {
         this.deletedEntry = null;
         this.uiUpdateInterval = null;
         this.notificationTimeout = null;
+        this.toastTimeout = null;
         this.notificationTestMode = false;
         this.isDemoMode = this.isDevMode();
 
@@ -451,16 +604,16 @@ class TimerHubApp {
         ];
 
         this.SHAPES = [
-            { id: 'circle', label: '●', svg: 'M 50 50 C 50 77.6 27.6 100 0 100 C -27.6 100 -50 77.6 -50 50 C -50 22.4 -27.6 0 0 0 C 27.6 0 50 22.4 50 50' },
-            { id: 'square', label: '■', svg: 'M -50 -50 L 50 -50 L 50 50 L -50 50 Z' },
-            { id: 'rounded', label: '▬', svg: 'M -50 -30 L 50 -30 Q 50 -50 30 -50 L -30 -50 Q -50 -50 -50 -30 L -50 30 Q -50 50 -30 50 L 30 50 Q 50 50 50 30 L 50 -30 Z' },
-            { id: 'diamond', label: '◆', svg: 'M 0 -50 L 50 0 L 0 50 L -50 0 Z' },
-            { id: 'triangle', label: '▲', svg: 'M 0 -50 L 50 50 L -50 50 Z' },
-            { id: 'hexagon', label: '⬡', svg: 'M 0 -50 L 43.3 -25 L 43.3 25 L 0 50 L -43.3 25 L -43.3 -25 Z' },
-            { id: 'octagon', label: '⬢', svg: 'M -29.29 -50 L 29.29 -50 L 50 -29.29 L 50 29.29 L 29.29 50 L -29.29 50 L -50 29.29 L -50 -29.29 Z' },
-            { id: 'star', label: '★', svg: 'M 0 -50 L 15 -20 L 50 -20 L 25 5 L 40 40 L 0 15 L -40 40 L -25 5 L -50 -20 L -15 -20 Z' },
-            { id: 'heart', label: '♥', svg: 'M 0 10 C -30 -20 -50 -10 -50 -20 C -50 -40 -30 -50 -15 -50 C 0 -60 15 -50 15 -50 C 30 -50 50 -40 50 -20 C 50 -10 30 -20 0 10' },
-            { id: 'oval', label: '⬭', svg: 'M -50 0 A 50 30 0 0 1 50 0 A 50 30 0 0 1 -50 0' }
+            { id: 'circle', key: 'shapeCircle', label: '●', svg: 'M 50 50 C 50 77.6 27.6 100 0 100 C -27.6 100 -50 77.6 -50 50 C -50 22.4 -27.6 0 0 0 C 27.6 0 50 22.4 50 50' },
+            { id: 'square', key: 'shapeSquare', label: '■', svg: 'M -50 -50 L 50 -50 L 50 50 L -50 50 Z' },
+            { id: 'rounded', key: 'shapeRounded', label: '▬', svg: 'M -50 -30 L 50 -30 Q 50 -50 30 -50 L -30 -50 Q -50 -50 -50 -30 L -50 30 Q -50 50 -30 50 L 30 50 Q 50 50 50 30 L 50 -30 Z' },
+            { id: 'diamond', key: 'shapeDiamond', label: '◆', svg: 'M 0 -50 L 50 0 L 0 50 L -50 0 Z' },
+            { id: 'triangle', key: 'shapeTriangle', label: '▲', svg: 'M 0 -50 L 50 50 L -50 50 Z' },
+            { id: 'hexagon', key: 'shapeHexagon', label: '⬡', svg: 'M 0 -50 L 43.3 -25 L 43.3 25 L 0 50 L -43.3 25 L -43.3 -25 Z' },
+            { id: 'octagon', key: 'shapeOctagon', label: '⬢', svg: 'M -29.29 -50 L 29.29 -50 L 50 -29.29 L 50 29.29 L 29.29 50 L -29.29 50 L -50 29.29 L -50 -29.29 Z' },
+            { id: 'star', key: 'shapeStar', label: '★', svg: 'M 0 -50 L 15 -20 L 50 -20 L 25 5 L 40 40 L 0 15 L -40 40 L -25 5 L -50 -20 L -15 -20 Z' },
+            { id: 'heart', key: 'shapeHeart', label: '♥', svg: 'M 0 10 C -30 -20 -50 -10 -50 -20 C -50 -40 -30 -50 -15 -50 C 0 -60 15 -50 15 -50 C 30 -50 50 -40 50 -20 C 50 -10 30 -20 0 10' },
+            { id: 'oval', key: 'shapeOval', label: '⬭', svg: 'M -50 0 A 50 30 0 0 1 50 0 A 50 30 0 0 1 -50 0' }
         ];
     }
 
@@ -470,8 +623,56 @@ class TimerHubApp {
                window.location.hostname === '';
     }
 
-    t(key) {
-        return translations[this.currentLanguage]?.[key] || translations.en[key] || key;
+    t(key, params = {}) {
+        const template = translations[this.currentLanguage]?.[key] || translations.en[key] || key;
+        return String(template).replace(/\{([\w]+)\}/g, (match, name) =>
+            Object.prototype.hasOwnProperty.call(params, name)
+                ? String(params[name])
+                : match
+        );
+    }
+
+    applyTranslations(root = document) {
+        const language = Object.prototype.hasOwnProperty.call(translations, this.currentLanguage)
+            ? this.currentLanguage
+            : 'en';
+        this.currentLanguage = language;
+        if (document.documentElement) document.documentElement.lang = language;
+        if (typeof document.title === 'string') document.title = this.t('documentTitle');
+
+        root.querySelectorAll?.('[data-i18n]').forEach(element => {
+            element.textContent = this.t(element.dataset.i18n);
+        });
+        root.querySelectorAll?.('[data-i18n-placeholder]').forEach(element => {
+            element.placeholder = this.t(element.dataset.i18nPlaceholder);
+        });
+        root.querySelectorAll?.('[data-i18n-title]').forEach(element => {
+            element.title = this.t(element.dataset.i18nTitle);
+        });
+        root.querySelectorAll?.('[data-i18n-aria-label]').forEach(element => {
+            element.setAttribute('aria-label', this.t(element.dataset.i18nAriaLabel));
+        });
+
+        document.querySelectorAll('.color-option[data-color]').forEach(element => {
+            element.setAttribute('aria-label', this.t('colorSample', { color: element.dataset.color }));
+        });
+    }
+
+    notificationError(key, error) {
+        const status = error?.status
+            ? this.t('notificationHttpStatus', { status: error.status })
+            : '';
+        return this.t(key, { status });
+    }
+
+    syncServiceWorkerLocale() {
+        if (!('serviceWorker' in navigator)) return;
+        return navigator.serviceWorker.ready
+            .then(registration => {
+                const worker = registration.active || navigator.serviceWorker.controller;
+                worker?.postMessage({ type: 'SET_LOCALE', locale: this.currentLanguage });
+            })
+            .catch(error => console.warn('TimerHub could not sync Service Worker locale:', error));
     }
 
     async init() {
@@ -480,8 +681,10 @@ class TimerHubApp {
             await this.loadSettings();
             await this.loadActivities();
             await this.loadTimeEntries();
+            this.applyTranslations();
             this.setupUI();
             this.applyTheme();
+            this.syncServiceWorkerLocale();
             this.startUIUpdateLoop();
             this.renderMain();
 
@@ -490,7 +693,7 @@ class TimerHubApp {
             if (this.activeActivityId) {
                 this.reconcileBackgroundAlarm().catch(error => {
                     console.error('TimerHub background alarm restore failed:', error);
-                    this.showPushStatus('Background reminders need attention: ' + error.message);
+                    this.showPushStatus(this.notificationError('notificationNeedsAttention', error));
                 });
             }
 
@@ -500,18 +703,19 @@ class TimerHubApp {
             }
         } catch (error) {
             console.error('Init error:', error);
-            alert(
-                'TimerHub initialization error:\n\n' +
-                (error?.stack || error?.message || String(error))
-            );
+            alert(this.t('initFailed'));
         }
     }
 
     async loadSettings() {
-        this.currentLanguage = await this.storage.getSetting('language', 'en');
-        this.currentTheme = await this.storage.getSetting('theme', 'system');
-        this.timeFormat = await this.storage.getSetting('timeFormat', '24h');
-        this.firstDayOfWeek = await this.storage.getSetting('firstDayOfWeek', 1);
+        const language = await this.storage.getSetting('language', 'en');
+        this.currentLanguage = Object.prototype.hasOwnProperty.call(translations, language) ? language : 'en';
+        const theme = await this.storage.getSetting('theme', 'system');
+        this.currentTheme = ['system', 'light', 'dark'].includes(theme) ? theme : 'system';
+        const timeFormat = await this.storage.getSetting('timeFormat', '24h');
+        this.timeFormat = ['12h', '24h'].includes(timeFormat) ? timeFormat : '24h';
+        const firstDay = Number(await this.storage.getSetting('firstDayOfWeek', 1));
+        this.firstDayOfWeek = [0, 1].includes(firstDay) ? firstDay : 1;
         this.confirmDelete = await this.storage.getSetting('confirmDelete', true);
         this.notificationInterval =
             await this.storage.getSetting('notificationInterval', 20);
@@ -591,11 +795,30 @@ class TimerHubApp {
             this.storage.setSetting('theme', this.currentTheme);
             this.applyTheme();
         });
+        if (window.matchMedia) {
+            const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');
+            systemTheme.addEventListener?.('change', () => {
+                if (this.currentTheme === 'system') this.applyTheme();
+            });
+            systemTheme.addListener?.(() => {
+                if (this.currentTheme === 'system') this.applyTheme();
+            });
+        }
 
         sel('languageSelect')?.addEventListener('change', (e) => {
-            this.currentLanguage = e.target.value;
+            this.currentLanguage = Object.prototype.hasOwnProperty.call(translations, e.target.value) ? e.target.value : 'en';
+            e.target.value = this.currentLanguage;
             this.storage.setSetting('language', this.currentLanguage);
+            this.applyTranslations();
             this.renderAll();
+            this.clearToast();
+            this.syncServiceWorkerLocale();
+            if (this.activeTimerEntry()) {
+                this.reconcileBackgroundAlarm().catch(error => {
+                    console.error('TimerHub alarm language update failed:', error);
+                    this.showPushStatus(this.notificationError('notificationUpdateFailed', error));
+                });
+            }
         });
 
         sel('timeFormatSelect')?.addEventListener('change', (e) => {
@@ -653,7 +876,7 @@ class TimerHubApp {
             this.updateNotificationStatus();
             this.reconcileBackgroundAlarm().catch(error => {
                 console.error('TimerHub alarm update failed:', error);
-                this.showPushStatus('Could not update background reminders: ' + error.message);
+                this.showPushStatus(this.notificationError('notificationUpdateFailed', error));
             });
         });
 
@@ -680,7 +903,7 @@ class TimerHubApp {
             this.updateNotificationStatus();
             this.reconcileBackgroundAlarm().catch(error => {
                 console.error('TimerHub alarm update failed:', error);
-                this.showPushStatus('Could not update background reminders: ' + error.message);
+                this.showPushStatus(this.notificationError('notificationUpdateFailed', error));
             });
         });
 
@@ -693,7 +916,7 @@ class TimerHubApp {
             } catch (error) {
                 console.error('TimerHub notification error:', error);
                 if (status) {
-                    status.textContent = 'ERROR: ' + error.message;
+                    status.textContent = this.notificationError('notificationSetupFailed', error);
                 }
             }
         });
@@ -701,10 +924,10 @@ class TimerHubApp {
         sel('notificationTestBtn')?.addEventListener('click', async () => {
             try {
                 await this.sendBackgroundPushTest();
-                this.showPushStatus('Test push accepted. It should appear even with TimerHub closed.');
+                this.showPushStatus(this.t('notificationTestAccepted'));
             } catch (error) {
                 console.error('TimerHub test push failed:', error);
-                this.showPushStatus('Test push failed: ' + error.message);
+                this.showPushStatus(this.notificationError('notificationTestFailed', error));
             }
         });
 
@@ -750,7 +973,8 @@ class TimerHubApp {
             btn.type = 'button';
             btn.className = 'color-option';
             btn.style.backgroundColor = color;
-            btn.setAttribute('aria-label', color);
+            btn.dataset.color = color;
+            btn.setAttribute('aria-label', this.t('colorSample', { color }));
             btn.addEventListener('click', () => {
                 document.querySelectorAll('.color-option').forEach(b => b.classList.remove('selected'));
                 btn.classList.add('selected');
@@ -764,7 +988,9 @@ class TimerHubApp {
         customBtn.id = 'customColorSwatch';
         customBtn.className = 'color-option color-option-custom';
         customBtn.textContent = '+';
-        customBtn.title = this.t('customColor') || 'Custom color';
+        customBtn.title = this.t('customColor');
+        customBtn.dataset.i18nTitle = 'customColor';
+        customBtn.dataset.i18nAriaLabel = 'customColor';
         customBtn.setAttribute('aria-label', customBtn.title);
 
         const customInput = document.createElement('input');
@@ -772,11 +998,14 @@ class TimerHubApp {
         customInput.id = 'customColorInput';
         customInput.className = 'custom-color-input';
         customInput.value = '#4A90E2';
+        customBtn.dataset.color = customInput.value;
 
         customBtn.addEventListener('click', () => customInput.click());
         customInput.addEventListener('input', () => {
             customBtn.style.backgroundColor = customInput.value;
             customBtn.style.backgroundImage = 'none';
+            customBtn.dataset.color = customInput.value;
+            customBtn.setAttribute('aria-label', this.t('colorSample', { color: customInput.value }));
             customBtn.textContent = '';
             document.querySelectorAll('.color-option').forEach(b => b.classList.remove('selected'));
             customBtn.classList.add('selected');
@@ -790,10 +1019,27 @@ class TimerHubApp {
     // into a "#rrggbb" hex string for use with <input type="color">
     rgbStringToHex(rgb) {
         if (!rgb) return '#000000';
-        if (rgb.startsWith('#')) return rgb;
-        const nums = rgb.match(/\d+/g);
-        if (!nums) return '#000000';
-        return '#' + nums.slice(0, 3).map(n => Number(n).toString(16).padStart(2, '0')).join('');
+        if (typeof rgb !== 'string') return '#000000';
+        const hex = rgb.trim();
+        if (/^#[0-9a-f]{6}$/i.test(hex)) return hex;
+        const shortHex = hex.match(/^#([0-9a-f])([0-9a-f])([0-9a-f])$/i);
+        if (shortHex) return `#${shortHex[1]}${shortHex[1]}${shortHex[2]}${shortHex[2]}${shortHex[3]}${shortHex[3]}`;
+        const rgbMatch = hex.match(/^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\)$/i);
+        if (!rgbMatch || rgbMatch.slice(1, 4).some(channel => Number(channel) > 255)) return '#000000';
+        return '#' + rgbMatch.slice(1, 4).map(channel => Number(channel).toString(16).padStart(2, '0')).join('');
+    }
+
+    contrastingTextColor(color) {
+        const hex = this.rgbStringToHex(color).replace('#', '');
+        if (!/^[0-9a-f]{6}$/i.test(hex)) return '#000000';
+        const channels = [0, 2, 4].map(index => parseInt(hex.slice(index, index + 2), 16) / 255);
+        const linear = channels.map(value => value <= 0.04045
+            ? value / 12.92
+            : ((value + 0.055) / 1.055) ** 2.4);
+        const luminance = 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+        const contrastWithBlack = (luminance + 0.05) / 0.05;
+        const contrastWithWhite = 1.05 / (luminance + 0.05);
+        return contrastWithBlack >= contrastWithWhite ? '#000000' : '#ffffff';
     }
 
     populateShapePicker() {
@@ -803,6 +1049,10 @@ class TimerHubApp {
             btn.className = 'shape-option';
             btn.textContent = shape.label;
             btn.dataset.shape = shape.id;
+            btn.dataset.i18nTitle = shape.key;
+            btn.dataset.i18nAriaLabel = shape.key;
+            btn.setAttribute('aria-label', this.t(shape.key));
+            btn.title = this.t(shape.key);
             btn.addEventListener('click', () => {
                 document.querySelectorAll('.shape-option').forEach(b => b.classList.remove('selected'));
                 btn.classList.add('selected');
@@ -817,6 +1067,11 @@ class TimerHubApp {
             html.removeAttribute('data-theme');
         } else {
             html.setAttribute('data-theme', this.currentTheme);
+        }
+        const themeColor = document.querySelector('meta[name="theme-color"]');
+        if (themeColor) {
+            const background = getComputedStyle(html).getPropertyValue('--bg-primary').trim();
+            if (background) themeColor.setAttribute('content', background);
         }
     }
 
@@ -859,9 +1114,26 @@ class TimerHubApp {
     }
 
     renderAll() {
+        this.applyTranslations();
         this.renderMain();
         this.renderLog();
         this.renderSettings();
+        this.refreshTranslatedDynamicText();
+    }
+
+    refreshTranslatedDynamicText() {
+        const activityModal = document.getElementById('activityModal');
+        if (activityModal?.classList.contains('active')) {
+            const title = document.getElementById('modalTitle');
+            if (title) title.textContent = this.t(this.editingActivityId ? 'editActivity' : 'createActivity');
+        }
+
+        const activityMenu = document.getElementById('activityMenuModal');
+        if (activityMenu?.classList.contains('active')) {
+            const activity = this.activities.find(item => item.id === this.editingActivityId);
+            const title = document.getElementById('activityMenuTitle');
+            if (title) title.textContent = activity?.name || this.t('activity');
+        }
     }
 
     renderMain() {
@@ -875,7 +1147,9 @@ class TimerHubApp {
                 btn.classList.add('active');
             }
             btn.dataset.activityId = activity.id;
+            btn.setAttribute('aria-label', activity.name);
             btn.style.backgroundColor = activity.color;
+            btn.style.setProperty('--activity-text-color', this.contrastingTextColor(activity.color));
 
             // Apply shape if needed (for now using border-radius)
             if (activity.shape === 'circle') {
@@ -989,6 +1263,10 @@ class TimerHubApp {
     }
 
     urlBase64ToUint8Array(base64String) {
+        if (typeof base64String !== 'string' || !base64String.trim()) {
+            throw new Error('Push public key is invalid.');
+        }
+        base64String = base64String.trim();
         const padding = "=".repeat(
             (4 - (base64String.length % 4)) % 4
         );
@@ -1004,6 +1282,11 @@ class TimerHubApp {
 
         for (let i = 0; i < rawData.length; ++i) {
             outputArray[i] = rawData.charCodeAt(i);
+        }
+
+        // A VAPID P-256 public key is an uncompressed point: 0x04 + 32 + 32 bytes.
+        if (outputArray.length !== 65 || outputArray[0] !== 4) {
+            throw new Error('Push public key must be a valid VAPID public key.');
         }
 
         return outputArray;
@@ -1105,7 +1388,8 @@ class TimerHubApp {
 
         await this.pushRequest(
             "/api/push/subscribe?clientId=" +
-            encodeURIComponent(clientId),
+            encodeURIComponent(clientId) +
+            "&locale=" + encodeURIComponent(this.currentLanguage),
             {
                 method: "POST",
                 headers: {
@@ -1150,7 +1434,7 @@ class TimerHubApp {
             ? true
             : await this.registerBackgroundPush({ createIfMissing });
         if (!subscription) {
-            this.showPushStatus('Enable notifications to restore background reminders.');
+            this.showPushStatus(this.t('notificationNeedEnable'));
             return false;
         }
 
@@ -1166,18 +1450,19 @@ class TimerHubApp {
                     alarmId: entry.id,
                     timestamp,
                     intervalMs,
-                    title: 'TimerHub',
-                    body: `Timer is still running: ${activity?.name || entry.activityNameSnapshot || 'Activity'}`,
+                    title: this.t('notificationBackgroundFallbackTitle'),
+                    body: this.t('notificationTimerBody', {
+                        activity: activity?.name || entry.activityNameSnapshot || this.t('activity')
+                    }),
+                    locale: this.currentLanguage,
                     tag: 'timerhub-timer'
                 })
             }
         );
         const deliveryError = this.lastPushDeliveryError;
         this.lastPushDeliveryError = null;
-        this.showPushStatus(
-            `Background reminders active every ${intervalMinutes} minutes.` +
-            (deliveryError ? ` Previous delivery failed: ${deliveryError}` : '')
-        );
+        this.showPushStatus(this.t('notificationBackgroundActive', { minutes: intervalMinutes }) +
+            (deliveryError ? ` ${this.t('notificationPreviousDeliveryFailed', { status: deliveryError })}` : ''));
         return true;
     }
 
@@ -1189,13 +1474,13 @@ class TimerHubApp {
         }
         if (!('Notification' in window) || Notification.permission !== 'granted') {
             await this.cancelBackgroundAlarm();
-            this.showPushStatus('Enable notifications to receive reminders while TimerHub is closed.');
+            this.showPushStatus(this.t('notificationNeedEnableClosed'));
             return false;
         }
 
         const subscription = await this.registerBackgroundPush({ createIfMissing: true });
         if (!subscription) {
-            this.showPushStatus('No push subscription found. Tap Enable notifications to restore reminders.');
+            this.showPushStatus(this.t('notificationNoSubscription'));
             return false;
         }
         return this.scheduleBackgroundAlarm(entry, {
@@ -1206,10 +1491,19 @@ class TimerHubApp {
 
     async sendBackgroundPushTest() {
         const subscription = await this.registerBackgroundPush();
-        if (!subscription) throw new Error('No push subscription is available.');
+        if (!subscription) throw new Error(this.t('notificationNoSubscription'));
         await this.pushRequest(
             `/api/push/test?clientId=${encodeURIComponent(this.getPushClientId())}`,
-            { method: 'POST' }
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    locale: this.currentLanguage,
+                    title: this.t('notificationTestTitle'),
+                    body: this.t('notificationTestBody'),
+                    tag: 'timerhub-push-test'
+                })
+            }
         );
     }
 
@@ -1220,40 +1514,36 @@ class TimerHubApp {
         if (!status || !button) return;
 
         if (this.notificationInterval === 0) {
-            status.textContent = 'Notifications are off.';
-            button.textContent = 'Enable notifications';
+            status.textContent = this.t('notificationOffStatus');
+            button.textContent = this.t('enableNotifications');
             return;
         }
 
         if (!('Notification' in window)) {
-            status.textContent =
-                'Notifications are not supported by this browser.';
+            status.textContent = this.t('notificationUnsupported');
             return;
         }
 
         if (Notification.permission === 'granted') {
-            status.textContent =
-                `Permission granted. Interval: ${this.notificationInterval} min.`;
-            button.textContent = 'Notifications enabled';
+            status.textContent = this.t('notificationPermissionGranted', { minutes: this.notificationInterval });
+            button.textContent = this.t('notificationsEnabled');
         } else if (Notification.permission === 'denied') {
-            status.textContent =
-                'Notifications are blocked in browser settings.';
-            button.textContent = 'Notifications blocked';
+            status.textContent = this.t('notificationPermissionBlocked');
+            button.textContent = this.t('notificationsBlocked');
         } else {
-            status.textContent =
-                `Interval: ${this.notificationInterval} min.`;
-            button.textContent = 'Enable notifications';
+            status.textContent = this.t('notificationIntervalStatus', { minutes: this.notificationInterval });
+            button.textContent = this.t('enableNotifications');
         }
     }
 
     async requestNotificationPermission() {
         if (!("Notification" in window)) {
-            alert("This browser does not support notifications.");
+            alert(this.t('notificationUnsupported'));
             return;
         }
 
         if (!("serviceWorker" in navigator)) {
-            alert("Service Worker is not supported.");
+            alert(this.t('serviceWorkerUnsupported'));
             return;
         }
 
@@ -1268,7 +1558,7 @@ class TimerHubApp {
                 await registration.showNotification(
                     "TimerHub",
                     {
-                        body: "Notifications are enabled.",
+                        body: this.t('notificationEnabledBody'),
                         tag: "timerhub-test",
                         renotify: true,
                         vibrate: [200, 100, 200]
@@ -1285,7 +1575,7 @@ class TimerHubApp {
                             subscriptionRegistered: true
                         });
                     } else {
-                        this.showPushStatus('Push is registered. Start a timer to schedule reminders.');
+                        this.showPushStatus(this.t('notificationPushRegisteredStart'));
                     }
 
                     console.log(
@@ -1303,9 +1593,7 @@ class TimerHubApp {
                         );
 
                     if (status) {
-                        status.textContent =
-                            "Notifications enabled, but Background Push setup failed: " +
-                            pushError.message;
+                        status.textContent = this.notificationError('notificationSetupFailed', pushError);
                     }
                 }
             } else {
@@ -1316,6 +1604,7 @@ class TimerHubApp {
                 "Notification permission error:",
                 error
             );
+            this.showPushStatus(this.notificationError('notificationSetupFailed', error));
         }
     }
 
@@ -1341,7 +1630,7 @@ class TimerHubApp {
                     await this.cancelBackgroundAlarm();
                 } catch (error) {
                     console.error("TimerHub server alarm cancel error:", error);
-                    this.showPushStatus('Timer stopped, but its server reminder could not be cancelled: ' + error.message);
+                    this.showPushStatus(this.notificationError('notificationCancelFailed', error));
                 }
                 this.activeActivityId = null;
                 this.renderMain();
@@ -1362,7 +1651,7 @@ class TimerHubApp {
                         await this.cancelBackgroundAlarm();
                     } catch (error) {
                         console.error("TimerHub server alarm cancel error:", error);
-                        this.showPushStatus('Previous server reminder could not be cancelled: ' + error.message);
+                        this.showPushStatus(this.notificationError('notificationPreviousCancelFailed', error));
                     }
                 }
 
@@ -1391,7 +1680,7 @@ class TimerHubApp {
                         await this.scheduleBackgroundAlarm(entry);
                     } catch (error) {
                         console.error("TimerHub server alarm error:", error);
-                        this.showPushStatus('Timer is running, but its background reminder was not scheduled: ' + error.message);
+                        this.showPushStatus(this.notificationError('notificationScheduleFailed', error));
                     }
                 }
             }
@@ -1405,13 +1694,14 @@ class TimerHubApp {
 
         if (activityId) {
             const activity = this.activities.find(a => a.id === activityId);
+            if (!activity) return;
             title.textContent = this.t('editActivity');
             document.getElementById('activityName').value = activity.name;
 
             // Select color
             document.querySelectorAll('.color-option').forEach(opt => opt.classList.remove('selected'));
             const colorOpt = Array.from(document.querySelectorAll('.color-option:not(.color-option-custom)'))
-                .find(opt => opt.style.backgroundColor === activity.color);
+                .find(opt => this.rgbStringToHex(opt.style.backgroundColor).toLowerCase() === this.rgbStringToHex(activity.color).toLowerCase());
             if (colorOpt) {
                 colorOpt.classList.add('selected');
             } else {
@@ -1423,6 +1713,8 @@ class TimerHubApp {
                     customInput.value = hex;
                     customBtn.style.backgroundColor = activity.color;
                     customBtn.style.backgroundImage = 'none';
+                    customBtn.dataset.color = hex;
+                    customBtn.setAttribute('aria-label', this.t('colorSample', { color: hex }));
                     customBtn.textContent = '';
                     customBtn.classList.add('selected');
                 }
@@ -1449,7 +1741,11 @@ class TimerHubApp {
                 customBtn.style.backgroundColor = '';
                 customBtn.style.backgroundImage = '';
                 customBtn.textContent = '+';
+                customBtn.dataset.color = '#4A90E2';
+                customBtn.setAttribute('aria-label', this.t('customColor'));
             }
+            const customInput = document.getElementById('customColorInput');
+            if (customInput) customInput.value = '#4A90E2';
             document.querySelectorAll('.shape-option').forEach(opt => opt.classList.remove('selected'));
             document.querySelectorAll('.shape-option')[0]?.classList.add('selected');
             document.querySelectorAll('.size-btn').forEach(opt => opt.classList.remove('selected'));
@@ -1468,7 +1764,7 @@ class TimerHubApp {
     async saveActivity() {
         const name = document.getElementById('activityName').value.trim();
         if (!name) {
-            this.showToast('Please enter a name');
+            this.showToast(this.t('pleaseEnterName'));
             return;
         }
 
@@ -1567,13 +1863,8 @@ class TimerHubApp {
         let entries = this.timeEntries.filter(e => {
             if (e.endTimestamp === null) return false;
             const date = new Date(e.startTimestamp);
-            if (e.endTimestamp) {
-                const end = new Date(e.endTimestamp);
-                const hasOverlapStart = date >= dateRange[0] && date < dateRange[1];
-                const hasOverlapEnd = end > dateRange[0] && end <= dateRange[1];
-                return hasOverlapStart || hasOverlapEnd;
-            }
-            return date >= dateRange[0] && date < dateRange[1];
+            const end = new Date(e.endTimestamp);
+            return date < dateRange[1] && end > dateRange[0];
         });
 
         if (filterActivity) {
@@ -1588,15 +1879,15 @@ class TimerHubApp {
         }
 
         // Group by day
-        const byDay = {};
+        const byDay = new Map();
         entries.forEach(entry => {
-            const date = this.getDateString(entry.startTimestamp);
-            if (!byDay[date]) byDay[date] = [];
-            byDay[date].push(entry);
+            const date = this.toDateString(new Date(entry.startTimestamp));
+            if (!byDay.has(date)) byDay.set(date, []);
+            byDay.get(date).push(entry);
         });
 
         let html = '';
-        for (const [date, dayEntries] of Object.entries(byDay).sort().reverse()) {
+        for (const [date, dayEntries] of [...byDay.entries()].sort(([a], [b]) => b.localeCompare(a))) {
             const dayTotal = dayEntries.reduce((sum, e) => sum + (e.endTimestamp - e.startTimestamp), 0);
             const activityTotals = {};
             
@@ -1606,13 +1897,13 @@ class TimerHubApp {
             });
 
             html += `<div class="log-day">
-                <div class="log-day-header">${date}</div>
+                <div class="log-day-header">${this.escapeHtml(this.getDateString(new Date(`${date}T00:00:00`).getTime()))}</div>
                 <div class="log-day-stats">
                     <div class="log-day-total">${this.t('total')}: ${this.formatDuration(dayTotal)}</div>
                     ${Object.entries(activityTotals).map(([actId, total]) => {
                         const act = this.activities.find(a => a.id === actId);
                         const snapshot = dayEntries.find(e => e.activityId === actId)?.activityNameSnapshot;
-                        return `<div class="log-activity-stat">${snapshot} — ${this.formatDuration(total)}</div>`;
+                        return `<div class="log-activity-stat">${this.escapeHtml(snapshot)} — ${this.formatDuration(total)}</div>`;
                     }).join('')}
                 </div>`;
 
@@ -1622,9 +1913,9 @@ class TimerHubApp {
                 const start = this.formatDateTime(entry.startTimestamp);
                 const end = this.formatDateTime(entry.endTimestamp);
 
-                html += `<div class="log-entry" data-entry-id="${entry.id}">
+                html += `<div class="log-entry" data-entry-id="${this.escapeHtml(entry.id)}">
                     <div class="log-entry-time">${start} – ${end}</div>
-                    <div class="log-entry-activity">${snapshot}</div>
+                    <div class="log-entry-activity">${this.escapeHtml(snapshot)}</div>
                     <div class="log-entry-duration">${this.formatDuration(duration)}</div>
                 </div>`;
             });
@@ -1687,7 +1978,7 @@ class TimerHubApp {
         const activityId = document.getElementById('entryEditActivity').value;
 
         if (!date || !startTime || !endTime) {
-            this.showToast('Please fill all fields');
+            this.showToast(this.t('pleaseFillAllFields'));
             return;
         }
 
@@ -1695,7 +1986,7 @@ class TimerHubApp {
         const end = new Date(`${date}T${endTime}`).getTime();
 
         if (start >= end) {
-            this.showToast('Start time must be before end time');
+            this.showToast(this.t('startBeforeEnd'));
             return;
         }
 
@@ -1803,7 +2094,7 @@ class TimerHubApp {
             await navigator.clipboard.writeText(logText);
             this.showToast(this.t('copied'));
         } catch (err) {
-            this.showToast('Failed to copy');
+            this.showToast(this.t('failedToCopy'));
         }
     }
 
@@ -1812,7 +2103,7 @@ class TimerHubApp {
         if (navigator.share) {
             try {
                 await navigator.share({
-                    title: 'Time Log',
+                    title: this.t('timeLog'),
                     text: logText
                 });
             } catch (err) {
@@ -1826,7 +2117,7 @@ class TimerHubApp {
     exportLog(format) {
         const entries = [...this.timeEntries].filter(e => e.endTimestamp !== null).sort((a, b) => a.startTimestamp - b.startTimestamp);
         let content = '';
-        let filename = `timelog_${Date.now()}`;
+        let filename = `${this.t('logFilename')}_${Date.now()}`;
 
         if (format === 'txt') {
             content = this.getLogAsText();
@@ -1849,24 +2140,24 @@ class TimerHubApp {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
 
-        this.showToast(`Exported as ${format.toUpperCase()}`);
+        this.showToast(this.t('exportedAs', { format: format.toUpperCase() }));
     }
 
     getLogAsText() {
         const entries = [...this.timeEntries].filter(e => e.endTimestamp !== null).sort((a, b) => a.startTimestamp - b.startTimestamp);
         
         let text = '';
-        const byDay = {};
+        const byDay = new Map();
         entries.forEach(entry => {
-            const date = this.getDateString(entry.startTimestamp);
-            if (!byDay[date]) byDay[date] = [];
-            byDay[date].push(entry);
+            const date = this.toDateString(new Date(entry.startTimestamp));
+            if (!byDay.has(date)) byDay.set(date, []);
+            byDay.get(date).push(entry);
         });
 
-        for (const [date, dayEntries] of Object.entries(byDay).sort()) {
+        for (const [date, dayEntries] of [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b))) {
             const dayTotal = dayEntries.reduce((sum, e) => sum + (e.endTimestamp - e.startTimestamp), 0);
-            text += `\n${date}\n`;
-            text += `Total: ${this.formatDuration(dayTotal)}\n\n`;
+            text += `\n${this.getDateString(new Date(`${date}T00:00:00`).getTime())}\n`;
+            text += `${this.t('textLogTotal')}: ${this.formatDuration(dayTotal)}\n\n`;
 
             dayEntries.forEach(entry => {
                 const start = this.formatDateTime(entry.startTimestamp);
@@ -1882,13 +2173,17 @@ class TimerHubApp {
     getLogAsCSV() {
         const entries = [...this.timeEntries].filter(e => e.endTimestamp !== null).sort((a, b) => a.startTimestamp - b.startTimestamp);
         
-        let csv = 'Date,Start Time,End Time,Activity,Duration\n';
+        const csvCell = value => `"${String(value ?? '').replace(/"/g, '""')}"`;
+        let csv = [
+            this.t('date'), this.t('startTime'), this.t('endTime'),
+            this.t('activity'), this.t('duration')
+        ].map(csvCell).join(',') + '\n';
         entries.forEach(entry => {
             const date = this.getDateString(entry.startTimestamp);
-            const start = this.formatDateTime(entry.startTimestamp).split(' ')[1];
-            const end = this.formatDateTime(entry.endTimestamp).split(' ')[1];
+            const start = this.formatTime(entry.startTimestamp);
+            const end = this.formatTime(entry.endTimestamp);
             const duration = this.formatDuration(entry.endTimestamp - entry.startTimestamp);
-            csv += `"${date}","${start}","${end}","${entry.activityNameSnapshot}","${duration}"\n`;
+            csv += [date, start, end, entry.activityNameSnapshot, duration].map(csvCell).join(',') + '\n';
         });
 
         return csv;
@@ -1902,14 +2197,14 @@ class TimerHubApp {
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `timerhub_backup_${Date.now()}.json`;
+            a.download = `${this.t('backupFilename')}_${Date.now()}.json`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
             this.showToast(this.t('backupSuccess'));
         } catch (error) {
-            this.showToast('Backup failed');
+            this.showToast(this.t('backupFailed'));
             console.error(error);
         }
     }
@@ -1927,7 +2222,7 @@ class TimerHubApp {
                 try {
                     const data = JSON.parse(event.target.result);
                     
-                    const merge = confirm('Merge with existing data? (Cancel to replace)');
+                    const merge = confirm(this.t('mergeExistingData'));
                     
                     await this.storage.importAll(data, merge);
                     
@@ -1937,7 +2232,7 @@ class TimerHubApp {
                     
                     this.showToast(this.t('restoreSuccess'));
                 } catch (error) {
-                    this.showToast('Restore failed');
+                    this.showToast(this.t('restoreFailed'));
                     console.error(error);
                 }
             };
@@ -1952,12 +2247,12 @@ class TimerHubApp {
         today.setHours(0, 0, 0, 0);
 
         const demoActivities = [
-            { name: 'Abkleben', color: '#E74C3C', shape: 'square' },
-            { name: 'Malen', color: '#3498DB', shape: 'circle' },
-            { name: 'Tapezieren', color: '#9B59B6', shape: 'rounded' },
-            { name: 'Entladen', color: '#E67E22', shape: 'square' },
-            { name: 'Anfahrt', color: '#27AE60', shape: 'rectangle' },
-            { name: 'Pause', color: '#95A5A6', shape: 'oval' }
+            { name: this.t('demoMasking'), color: '#E74C3C', shape: 'square' },
+            { name: this.t('demoPainting'), color: '#3498DB', shape: 'circle' },
+            { name: this.t('demoWallpapering'), color: '#9B59B6', shape: 'rounded' },
+            { name: this.t('demoUnloading'), color: '#E67E22', shape: 'square' },
+            { name: this.t('demoTravel'), color: '#27AE60', shape: 'square' },
+            { name: this.t('demoBreak'), color: '#95A5A6', shape: 'oval' }
         ];
 
         // Clear existing
@@ -2018,7 +2313,7 @@ class TimerHubApp {
         }
 
         this.renderAll();
-        this.showToast('Demo data loaded');
+        this.showToast(this.t('demoDataLoaded'));
     }
 
     showOnboarding() {
@@ -2030,6 +2325,12 @@ class TimerHubApp {
 
     generateId() {
         return `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
+
+    escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, character => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        })[character]);
     }
 
     getActiveDuration() {
@@ -2047,27 +2348,26 @@ class TimerHubApp {
     }
 
     formatTime(timestamp) {
-        const date = new Date(timestamp);
-        const hours = date.getHours().toString().padStart(2, '0');
-        const minutes = date.getMinutes().toString().padStart(2, '0');
-        return `${hours}:${minutes}`;
+        const locale = { en: 'en-US', de: 'de-DE', ru: 'ru-RU' }[this.currentLanguage] || 'en-US';
+        return new Intl.DateTimeFormat(locale, {
+            hour: '2-digit', minute: '2-digit',
+            hourCycle: this.timeFormat === '12h' ? 'h12' : 'h23'
+        }).format(new Date(timestamp));
     }
 
     formatDateTime(timestamp) {
-        const date = new Date(timestamp);
-        const dateStr = this.getDateString(timestamp);
-        const hours = date.getHours().toString().padStart(2, '0');
-        const minutes = date.getMinutes().toString().padStart(2, '0');
-        const seconds = date.getSeconds().toString().padStart(2, '0');
-        return `${dateStr} ${hours}:${minutes}:${seconds}`;
+        const locale = { en: 'en-US', de: 'de-DE', ru: 'ru-RU' }[this.currentLanguage] || 'en-US';
+        return new Intl.DateTimeFormat(locale, {
+            dateStyle: 'short', timeStyle: 'medium',
+            hourCycle: this.timeFormat === '12h' ? 'h12' : 'h23'
+        }).format(new Date(timestamp));
     }
 
     getDateString(timestamp) {
-        const date = new Date(timestamp);
-        const day = date.getDate().toString().padStart(2, '0');
-        const month = (date.getMonth() + 1).toString().padStart(2, '0');
-        const year = date.getFullYear();
-        return `${day}.${month}.${year}`;
+        const locale = { en: 'en-US', de: 'de-DE', ru: 'ru-RU' }[this.currentLanguage] || 'en-US';
+        return new Intl.DateTimeFormat(locale, {
+            year: 'numeric', month: '2-digit', day: '2-digit'
+        }).format(new Date(timestamp));
     }
 
     toDateString(date) {
@@ -2119,6 +2419,7 @@ class TimerHubApp {
 
     showToast(message, duration = 3000, action = null) {
         const toast = document.getElementById('toast');
+        if (this.toastTimeout) clearTimeout(this.toastTimeout);
         toast.textContent = message;
         toast.classList.add('show');
 
@@ -2135,9 +2436,20 @@ class TimerHubApp {
             toast.appendChild(btn);
         }
 
-        setTimeout(() => {
+        this.toastTimeout = setTimeout(() => {
             toast.classList.remove('show');
+            toast.replaceChildren();
+            this.toastTimeout = null;
         }, duration);
+    }
+
+    clearToast() {
+        const toast = document.getElementById('toast');
+        if (this.toastTimeout) clearTimeout(this.toastTimeout);
+        this.toastTimeout = null;
+        if (!toast) return;
+        toast.classList.remove('show');
+        toast.replaceChildren();
     }
 }
 

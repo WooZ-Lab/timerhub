@@ -9,7 +9,10 @@ import webpush from 'web-push';
 import worker, { TimerHubDurableObject } from '../worker/index.js';
 
 const source = await readFile(new URL('../app.js', import.meta.url), 'utf8');
+const htmlSource = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+const styleSource = await readFile(new URL('../style.css', import.meta.url), 'utf8');
 const serviceWorkerSource = await readFile(new URL('../sw.js', import.meta.url), 'utf8');
+const testsSource = await readFile(new URL(import.meta.url), 'utf8');
 const vapid = webpush.generateVAPIDKeys();
 const clientEcdh = createECDH('prime256v1');
 const subscriptionJson = {
@@ -20,6 +23,26 @@ const subscriptionJson = {
         auth: randomBytes(16).toString('base64url')
     }
 };
+
+function translationObjectSource(name) {
+    const start = source.indexOf(`const ${name} = `) + `const ${name} = `.length;
+    let depth = 0;
+    let quote = null;
+    let escaped = false;
+    for (let i = start; i < source.length; i += 1) {
+        const character = source[i];
+        if (quote) {
+            if (escaped) escaped = false;
+            else if (character === '\\') escaped = true;
+            else if (character === quote) quote = null;
+            continue;
+        }
+        if (character === "'" || character === '"' || character === '`') quote = character;
+        else if (character === '{') depth += 1;
+        else if (character === '}' && --depth === 0) return source.slice(start, i + 1);
+    }
+    throw new Error(`Could not read translation object ${name}`);
+}
 
 function makeBackend() {
     const records = new Map();
@@ -76,6 +99,12 @@ function makeBackend() {
 function makeBrowserHarness(backend, initialSubscription = null) {
     const localStorageValues = new Map();
     const statusNode = { textContent: '' };
+    const document = {
+        title: '',
+        documentElement: { lang: '' },
+        getElementById: id => id === 'notificationStatus' ? statusNode : null,
+        querySelectorAll: () => []
+    };
     let subscription = initialSubscription;
     let subscribeCount = 0;
     const subscribedApplicationServerKeys = [];
@@ -111,7 +140,7 @@ function makeBrowserHarness(backend, initialSubscription = null) {
     };
     const context = vm.createContext({
         window,
-        document: { getElementById: id => id === 'notificationStatus' ? statusNode : null },
+        document,
         navigator: { serviceWorker: { ready: Promise.resolve(registration) } },
         localStorage: {
             getItem: key => localStorageValues.has(key) ? localStorageValues.get(key) : null,
@@ -129,6 +158,8 @@ function makeBrowserHarness(backend, initialSubscription = null) {
         Date,
         Number,
         Math,
+        setTimeout,
+        clearTimeout,
         console
     });
     vm.runInContext(source, context, { filename: 'app.js' });
@@ -147,6 +178,8 @@ function makeBrowserHarness(backend, initialSubscription = null) {
     });
     return {
         app,
+        context,
+        document,
         statusNode,
         localStorageValues,
         notificationDisplays,
@@ -154,11 +187,353 @@ function makeBrowserHarness(backend, initialSubscription = null) {
         get subscribeCount() { return subscribeCount; },
         get subscription() { return subscription; }
     };
-}
+};
+
+test('all supported languages update translated UI text and color contrast stays legible', async () => {
+    const browser = makeBrowserHarness(makeBackend());
+    const dictionaries = vm.runInContext('translations', browser.context);
+    const baseDictionaries = vm.runInNewContext(`(${translationObjectSource('translations')})`);
+    const extensionDictionaries = vm.runInNewContext(`(${translationObjectSource('extendedTranslations')})`);
+    const languageKeys = Object.keys(dictionaries.en).sort();
+    assert.deepEqual(Object.keys(dictionaries.de).sort(), languageKeys);
+    assert.deepEqual(Object.keys(dictionaries.ru).sort(), languageKeys);
+    const references = new Set([
+        ...[...htmlSource.matchAll(/data-i18n(?:-[\w-]+)?="([\w]+)"/g)].map(match => match[1]),
+        ...[...source.matchAll(/this\.t\(['"]([\w]+)['"]/g)].map(match => match[1]),
+        ...[...source.matchAll(/notificationError\(['"]([\w]+)['"]/g)].map(match => match[1]),
+        ...[...source.matchAll(/key:\s*['"]([\w]+)['"]/g)].map(match => match[1]),
+        ...[...testsSource.matchAll(/dictionaries\[language\]\.([\w]+)/g)].map(match => match[1])
+    ]);
+    for (const language of ['en', 'de', 'ru']) {
+        const overlap = Object.keys(baseDictionaries[language]).filter(key => Object.hasOwn(extensionDictionaries[language], key));
+        assert.deepEqual(overlap, [], `${language} has duplicate base/extension translation keys`);
+    }
+    assert.deepEqual([...Object.keys(dictionaries.en)].sort(), [...new Set(references)].sort(), 'translation dictionary has missing or unused keys');
+    for (const language of ['en', 'de', 'ru']) {
+        for (const key of references) assert.ok(Object.hasOwn(dictionaries[language], key), `${language} is missing ${key}`);
+    }
+    const swHarness = captureServiceWorkerNotifications();
+    const swCopy = vm.runInContext('PUSH_COPY', swHarness.context);
+    for (const language of ['en', 'de', 'ru']) {
+        assert.equal(swCopy[language].title, dictionaries[language].notificationBackgroundFallbackTitle);
+        assert.equal(swCopy[language].body, dictionaries[language].notificationBackgroundFallbackBody);
+    }
+    const nodes = [
+        { dataset: { i18n: 'timerNotifications' } },
+        { dataset: { i18n: 'confirmDelete' } },
+        { dataset: { i18nPlaceholder: 'activityNamePlaceholder' } },
+        { dataset: { i18nTitle: 'shapePickerLabel' } },
+        { dataset: { i18nAriaLabel: 'homeScreen' }, setAttribute(name, value) { this[name] = value; } }
+    ];
+    const root = {
+        querySelectorAll(selector) {
+            const attr = selector.match(/\[data-i18n(?:-([\w-]+))?\]/)?.[1];
+            const property = attr ? `i18n${attr.split('-').map(part => part[0].toUpperCase() + part.slice(1)).join('')}` : 'i18n';
+            return nodes.filter(node => node.dataset[property]);
+        }
+    };
+
+    for (const [language, expected] of Object.entries({
+        en: ['Timer Notifications', 'Confirm before delete'],
+        de: ['Timer-Benachrichtigungen', 'Vor dem Löschen bestätigen'],
+        ru: ['Напоминания таймера', 'Подтверждать удаление']
+    })) {
+        browser.app.currentLanguage = language;
+        browser.app.applyTranslations(root);
+        assert.equal(browser.document.documentElement.lang, language);
+        assert.equal(nodes[0].textContent, expected[0]);
+        assert.equal(nodes[1].textContent, expected[1]);
+        assert.ok(nodes[2].placeholder);
+        assert.ok(nodes[3].title);
+        assert.ok(nodes[4]['aria-label']);
+    }
+
+    for (const [color, expected] of [
+        ['#ffffff', '#000000'], ['#fff', '#000000'],
+        ['#000000', '#ffffff'], ['#000', '#ffffff']
+    ]) {
+        assert.equal(browser.app.contrastingTextColor(color), expected);
+    }
+    assert.match(styleSource, /\.activity-btn\s*\{[^}]*box-shadow:[^;}]*var\(--text-primary\)/s);
+    assert.match(styleSource, /\.activity-btn\.active\s*\{[^}]*box-shadow:[^;}]*var\(--text-primary\)/s);
+    assert.match(styleSource, /\.color-option\s*\{[^}]*box-shadow:[^;}]*var\(--text-primary\)/s);
+    assert.match(styleSource, /\.color-option\.selected\s*\{[^}]*box-shadow:[^;}]*var\(--text-primary\)/s);
+    for (const color of ['#4A90E2', '#808080', '#F1C40F']) {
+        assert.ok(['#000000', '#ffffff'].includes(browser.app.contrastingTextColor(color)));
+    }
+
+    const activeModal = { classList: { contains: name => name === 'active' } };
+    const modalTitle = { textContent: '' };
+    const activeMenu = { classList: { contains: name => name === 'active' } };
+    const menuTitle = { textContent: '' };
+    const transientToast = {
+        classList: { remove(name) { this.removed = name; } },
+        replaceChildren() { this.cleared = true; }
+    };
+    const dynamicNodes = {
+        activityModal: activeModal,
+        modalTitle,
+        activityMenuModal: activeMenu,
+        activityMenuTitle: menuTitle,
+        toast: transientToast
+    };
+    browser.document.getElementById = id => dynamicNodes[id] || null;
+    browser.app.activities = [{ id: 'editing-activity', name: 'Workshop' }];
+    browser.app.editingActivityId = 'editing-activity';
+    browser.app.currentLanguage = 'ru';
+    browser.app.refreshTranslatedDynamicText();
+    assert.equal(modalTitle.textContent, 'Изменить занятие');
+    assert.equal(menuTitle.textContent, 'Workshop');
+    browser.app.toastTimeout = setTimeout(() => {}, 10000);
+    browser.app.clearToast();
+    assert.equal(browser.app.toastTimeout, null);
+    assert.equal(transientToast.cleared, true);
+
+    const postedMessages = [];
+    browser.context.navigator.serviceWorker.ready = Promise.resolve({
+        active: { postMessage: message => postedMessages.push(message) }
+    });
+    await browser.app.syncServiceWorkerLocale();
+    assert.equal(postedMessages.length, 1);
+    assert.equal(postedMessages[0].type, 'SET_LOCALE');
+    assert.equal(postedMessages[0].locale, 'ru');
+});
+
+test('custom activity colors persist without changing the selected color', async () => {
+    const browser = makeBrowserHarness(makeBackend());
+    const saved = [];
+    const colorOption = { style: { backgroundColor: 'rgb(255, 255, 255)' } };
+    const activityName = { value: 'White activity' };
+    const activityModal = { classList: { remove() {} } };
+    const nodes = { activityName, activityModal };
+    browser.document.getElementById = id => nodes[id] || null;
+    browser.document.querySelector = selector => selector === '.color-option.selected' ? colorOption : null;
+    browser.app.storage = { saveActivity: async activity => saved.push({ ...activity }) };
+    browser.app.generateId = () => 'custom-color-activity';
+    browser.app.renderMain = () => {};
+
+    await browser.app.saveActivity();
+    assert.equal(browser.app.rgbStringToHex(saved.at(-1).color), '#ffffff');
+
+    browser.app.editingActivityId = 'custom-color-activity';
+    activityName.value = 'Black activity';
+    colorOption.style.backgroundColor = 'rgb(0, 0, 0)';
+    await browser.app.saveActivity();
+    assert.equal(browser.app.rgbStringToHex(saved.at(-1).color), '#000000');
+    assert.equal(browser.app.activities.find(activity => activity.id === 'custom-color-activity').color, 'rgb(0, 0, 0)');
+});
+
+test('date/time and CSV formatting follow locale and quote activity values', () => {
+    const browser = makeBrowserHarness(makeBackend());
+    const timestamp = new Date(2025, 0, 2, 0, 5).getTime();
+    browser.app.timeFormat = '12h';
+    browser.app.currentLanguage = 'en';
+    assert.match(browser.app.getDateString(timestamp), /01\/02\/2025/);
+    assert.match(browser.app.formatTime(timestamp), /12:05.*AM/);
+    browser.app.currentLanguage = 'de';
+    browser.app.timeFormat = '24h';
+    assert.match(browser.app.getDateString(timestamp), /02\.01\.2025/);
+    assert.match(browser.app.formatTime(timestamp), /00:05/);
+    browser.app.timeEntries = [{
+        id: 'log-entry', activityId: 'activity-1', activityNameSnapshot: 'Desk, "blue"',
+        startTimestamp: timestamp, endTimestamp: timestamp + 60000
+    }];
+    const csv = browser.app.getLogAsCSV();
+    assert.match(csv, /"Desk, ""blue"""/);
+    assert.match(csv.split('\n')[0], /"Datum","Startzeit","Endzeit","Aktivität","Dauer"/);
+});
+
+test('log rendering escapes imported entry identifiers and activity names', () => {
+    const browser = makeBrowserHarness(makeBackend());
+    const logContent = { innerHTML: '' };
+    browser.document.getElementById = id => ({
+        logDateFilter: { value: 'all' },
+        logActivityFilter: { value: '' },
+        logContent
+    })[id] || null;
+    browser.document.querySelectorAll = () => [];
+    browser.app.timeEntries = [{
+        id: 'entry"><img src=x onerror=alert(1)>', activityId: 'activity-1',
+        activityNameSnapshot: '<script>alert(1)</script>',
+        startTimestamp: Date.now() - 60000, endTimestamp: Date.now()
+    }];
+    browser.app.renderLog();
+    assert.ok(!logContent.innerHTML.includes('<script>alert(1)</script>'));
+    assert.ok(!logContent.innerHTML.includes('<img src=x onerror=alert(1)>'));
+    assert.ok(logContent.innerHTML.includes('&lt;script&gt;'));
+    assert.ok(logContent.innerHTML.includes('&lt;img'));
+});
+
+test('date-range filtering includes entries that overlap the selected range', () => {
+    const browser = makeBrowserHarness(makeBackend());
+    const rangeStart = new Date(2025, 4, 2).getTime();
+    const logContent = { innerHTML: '' };
+    const controls = {
+        logDateFilter: { value: 'range' },
+        logActivityFilter: { value: '' },
+        dateFrom: { value: '2025-05-02' },
+        dateTo: { value: '2025-05-02' },
+        logContent
+    };
+    browser.document.getElementById = id => controls[id] || null;
+    browser.document.querySelectorAll = () => [];
+    browser.app.timeEntries = [
+        { id: 'crossing', activityId: 'a', activityNameSnapshot: 'Crossing', startTimestamp: rangeStart - 1800000, endTimestamp: rangeStart + 1800000 },
+        { id: 'outside', activityId: 'a', activityNameSnapshot: 'Outside', startTimestamp: rangeStart - 10800000, endTimestamp: rangeStart - 7200000 }
+    ];
+    browser.app.renderLog();
+    assert.ok(logContent.innerHTML.includes('data-entry-id="crossing"'));
+    assert.ok(!logContent.innerHTML.includes('data-entry-id="outside"'));
+});
+
+test('test and fallback push notifications use the requested English, German, and Russian locale', async t => {
+    const backend = makeBackend();
+    const sent = [];
+    const originalSend = webpush.sendNotification;
+    const originalSetVapid = webpush.setVapidDetails;
+    webpush.sendNotification = async (subscription, payload) => {
+        sent.push(JSON.parse(payload));
+        return { statusCode: 201 };
+    };
+    webpush.setVapidDetails = () => {};
+    t.after(() => {
+        webpush.sendNotification = originalSend;
+        webpush.setVapidDetails = originalSetVapid;
+    });
+
+    await backend.request('/api/push/subscribe?clientId=locale-test-identifier&locale=en', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(subscriptionJson)
+    });
+    const expected = {
+        en: 'This is a background push test.',
+        de: 'Dies ist ein Push-Test im Hintergrund.',
+        ru: 'Это тестовое Push-уведомление.'
+    };
+    const expectedTitles = {
+        en: 'TimerHub notification test',
+        de: 'TimerHub-Benachrichtigungstest',
+        ru: 'Проверка уведомлений TimerHub'
+    };
+    for (const [locale, body] of Object.entries(expected)) {
+        const response = await backend.request('/api/push/test?clientId=locale-test-identifier', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ locale })
+        });
+        assert.equal(response.status, 200);
+        assert.equal(sent.at(-1).locale, locale);
+        assert.equal(sent.at(-1).title, expectedTitles[locale]);
+        assert.equal(sent.at(-1).body, body);
+
+        const sw = captureServiceWorkerNotifications();
+        const waits = [];
+        sw.handlers.push({
+            data: { json: () => ({ locale }) },
+            waitUntil: promise => waits.push(promise)
+        });
+        await Promise.all(waits);
+        assert.equal(sw.shown[0].options.body, locale === 'en'
+            ? 'Timer reminder'
+            : locale === 'de' ? 'Timer-Erinnerung' : 'Напоминание таймера');
+
+        await backend.request('/api/push/schedule?clientId=locale-test-identifier', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ alarmId: `fallback-${locale}`, timestamp: Date.now() + 60000, locale })
+        });
+        await backend.fireAlarm('locale-test-identifier');
+        assert.equal(sent.at(-1).locale, locale);
+        assert.equal(sent.at(-1).body, locale === 'en'
+            ? 'Timer reminder'
+            : locale === 'de' ? 'Timer-Erinnerung' : 'Напоминание таймера');
+    }
+
+    await backend.request('/api/push/subscribe?clientId=locale-ru-identifier&locale=ru', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(subscriptionJson)
+    });
+    await backend.request('/api/push/test?clientId=locale-ru-identifier', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ locale: 'unsupported-locale' })
+    });
+    assert.equal(sent.at(-1).locale, 'ru');
+    assert.equal(sent.at(-1).body, expected.ru);
+    await backend.request('/api/push/schedule?clientId=locale-ru-identifier', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ alarmId: 'fallback-invalid-locale', timestamp: Date.now() + 60000, locale: 'unsupported-locale' })
+    });
+    await backend.fireAlarm('locale-ru-identifier');
+    assert.equal(sent.at(-1).locale, 'ru');
+    assert.equal(sent.at(-1).body, 'Напоминание таймера');
+});
+
+test('application test pushes and scheduled reminders carry localized copy for every supported language', async t => {
+    const backend = makeBackend();
+    const browser = makeBrowserHarness(backend);
+    const sent = [];
+    const originalSend = webpush.sendNotification;
+    const originalSetVapid = webpush.setVapidDetails;
+    webpush.sendNotification = async (subscription, payload) => {
+        sent.push(JSON.parse(payload));
+        return { statusCode: 201 };
+    };
+    webpush.setVapidDetails = () => {};
+    t.after(() => {
+        webpush.sendNotification = originalSend;
+        webpush.setVapidDetails = originalSetVapid;
+    });
+
+    const expected = {
+        en: { title: 'TimerHub notification test', test: 'This is a background push test.', reminder: 'Timer is still running: Painting' },
+        de: { title: 'TimerHub-Benachrichtigungstest', test: 'Dies ist ein Push-Test im Hintergrund.', reminder: 'Der Timer läuft noch: Painting' },
+        ru: { title: 'Проверка уведомлений TimerHub', test: 'Это тестовое Push-уведомление.', reminder: 'Таймер всё ещё работает: Painting' }
+    };
+    for (const [locale, copy] of Object.entries(expected)) {
+        browser.app.currentLanguage = locale;
+        await browser.app.sendBackgroundPushTest();
+        assert.equal(sent.at(-1).locale, locale);
+        assert.equal(sent.at(-1).title, copy.title);
+        assert.equal(sent.at(-1).body, copy.test);
+
+        const entry = {
+            id: `entry-${locale}`, activityId: 'activity-1',
+            activityNameSnapshot: 'Watercolor', startTimestamp: Date.now(), endTimestamp: null
+        };
+        await browser.app.scheduleBackgroundAlarm(entry);
+        const clientId = browser.localStorageValues.get('timerhubPushClientId');
+        await backend.fireAlarm(clientId);
+        assert.equal(sent.at(-1).locale, locale);
+        assert.equal(sent.at(-1).body, copy.reminder);
+    }
+});
+
+test('Service Worker remembers the selected locale for malformed and locale-less pushes', async () => {
+    const sw = captureServiceWorkerNotifications();
+    const messageWaits = [];
+    sw.handlers.message({
+        data: { type: 'SET_LOCALE', locale: 'ru' },
+        waitUntil: promise => messageWaits.push(promise)
+    });
+    await Promise.all(messageWaits);
+
+    const pushWaits = [];
+    sw.handlers.push({
+        data: { json: () => { throw new SyntaxError('invalid JSON'); }, text: () => 'Custom push body' },
+        waitUntil: promise => pushWaits.push(promise)
+    });
+    sw.handlers.push({
+        data: { json: () => ({}) },
+        waitUntil: promise => pushWaits.push(promise)
+    });
+    await Promise.all(pushWaits);
+    assert.equal(sw.shown[0].options.body, 'Custom push body');
+    assert.equal(sw.shown[1].options.body, 'Напоминание таймера');
+});
 
 function captureServiceWorkerNotifications() {
     const handlers = {};
     const shown = [];
+    const cacheEntries = new Map();
+    const cache = {
+        addAll: async () => {},
+        put: async (key, value) => cacheEntries.set(String(key), value.clone()),
+        match: async key => cacheEntries.get(String(key))?.clone()
+    };
     const self = {
         location: { origin: 'https://timerhub.example.test' },
         registration: {
@@ -171,17 +546,19 @@ function captureServiceWorkerNotifications() {
     const context = vm.createContext({
         self,
         caches: {
-            open: async () => ({ addAll: async () => {}, put: async () => {} }),
+            open: async () => cache,
             keys: async () => [],
             delete: async () => {},
             match: async () => undefined
         },
         fetch,
         console,
-        Promise
+        Promise,
+        URL,
+        Response
     });
     vm.runInContext(serviceWorkerSource, context, { filename: 'sw.js' });
-    return { handlers, shown };
+    return { handlers, shown, context };
 }
 
 test('push registration, persistent alarm, closed-page delivery, restart, reschedule, and cancellation', async t => {
