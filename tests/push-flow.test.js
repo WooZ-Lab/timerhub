@@ -70,6 +70,9 @@ function makeBackend() {
                     put: async (key, value) => values.set(key, structuredClone(value)),
                     get: async key => structuredClone(values.get(key)),
                     delete: async key => values.delete(key),
+                    list: async ({ prefix = '' } = {}) => new Map([...values.entries()]
+                        .filter(([key]) => key.startsWith(prefix))
+                        .map(([key, value]) => [key, structuredClone(value)])),
                     setAlarm: async timestamp => alarmTimes.set(id, timestamp),
                     deleteAlarm: async () => alarmTimes.delete(id)
                 }
@@ -754,4 +757,100 @@ test('missing VAPID secrets fail config before subscription is created', async (
     );
     assert.equal(response.status, 503);
     assert.match((await response.json()).error, /VAPID/);
+});
+
+test('Clockodo Worker stores credentials encrypted, proxies documented operations, and deduplicates creates', async t => {
+    const backend = makeBackend();
+    const originalFetch = globalThis.fetch;
+    const requests = [];
+    globalThis.fetch = async (url, init) => {
+        requests.push({ url: String(url), init });
+        if (String(url).endsWith('/v2/aggregates/users/me')) return Response.json({ user: { id: 7 } });
+        return Response.json({ entry: { id: 8765 } });
+    };
+    t.after(() => { globalThis.fetch = originalFetch; });
+
+    const clientId = 'clockodo_client_1234567890';
+    const token = 'clockodo-access-token-'.padEnd(48, 'x');
+    const apiKey = 'never-store-this-api-key';
+    const auth = { Authorization: `Bearer ${token}` };
+    const configured = await backend.request(`/api/clockodo/config?clientId=${clientId}`, {
+        method: 'PUT', headers: { ...auth, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiUser: 'person@example.test', apiKey })
+    });
+    assert.equal(configured.status, 200);
+    assert.deepEqual(await configured.json(), { configured: true });
+    const stored = backend.records.get(clientId);
+    assert.equal(JSON.stringify([...stored.entries()]).includes(apiKey), false);
+    assert.equal(stored.get('clockodoCredentials').apiUser, 'person@example.test');
+
+    const unauthorized = await backend.request(`/api/clockodo/config?clientId=${clientId}`, {
+        headers: { Authorization: `Bearer ${'z'.repeat(48)}` }
+    });
+    assert.equal(unauthorized.status, 401);
+    const config = await backend.request(`/api/clockodo/config?clientId=${clientId}`, { headers: auth });
+    assert.deepEqual(await config.json(), { configured: true, apiUser: 'person@example.test' });
+
+    const tested = await backend.request(`/api/clockodo/test?clientId=${clientId}`, {
+        method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' }, body: '{}'
+    });
+    assert.deepEqual(await tested.json(), { connected: true });
+    assert.equal(requests[0].init.headers['X-ClockodoApiUser'], 'person@example.test');
+    assert.equal(requests[0].init.headers['X-ClockodoApiKey'], apiKey);
+    assert.equal(requests[0].init.headers['X-Clockodo-External-Application'], 'TimerHub;person@example.test');
+
+    const payload = {
+        time_since: '2026-09-28T08:00:00.000Z', time_until: '2026-09-28T09:00:00.000Z',
+        customers_id: 3, services_id: 9, projects_id: 4, billable: 1, text: 'Painting'
+    };
+    const headers = { ...auth, 'Content-Type': 'application/json', 'Idempotency-Key': 'batch:entry:1' };
+    const createPath = `/api/clockodo/entries?clientId=${clientId}`;
+    const create = () => backend.request(createPath, { method: 'POST', headers, body: JSON.stringify(payload) });
+    assert.deepEqual(await (await create()).json(), { created: true, entryId: 8765 });
+    assert.deepEqual(await (await create()).json(), { created: true, entryId: 8765, duplicate: true });
+    assert.equal(requests.length, 2);
+    assert.equal(JSON.parse(requests[1].init.body).customers_id, 3);
+
+    const update = await backend.request(`/api/clockodo/entries/8765?clientId=${clientId}`, {
+        method: 'PUT', headers: { ...auth, 'Content-Type': 'application/json', 'Idempotency-Key': 'batch:entry:update' },
+        body: JSON.stringify(payload)
+    });
+    assert.deepEqual(await update.json(), { updated: true, entryId: 8765 });
+    assert.equal(requests[2].url, 'https://my.clockodo.com/api/v2/entries/8765');
+    assert.equal(requests[2].init.method, 'PUT');
+});
+
+test('Clockodo Worker reports authentication and uncertain malformed-create outcomes safely', async t => {
+    const backend = makeBackend();
+    const originalFetch = globalThis.fetch;
+    let externalResponse = Response.json({ error: 'private API details must not reach the browser' }, { status: 401 });
+    let calls = 0;
+    globalThis.fetch = async () => { calls += 1; return externalResponse; };
+    t.after(() => { globalThis.fetch = originalFetch; });
+
+    const clientId = 'clockodo_error_test_123456';
+    const token = 'another-long-access-token'.padEnd(48, 'q');
+    const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+    await backend.request(`/api/clockodo/config?clientId=${clientId}`, {
+        method: 'PUT', headers: auth, body: JSON.stringify({ apiUser: 'person@example.test', apiKey: 'private-key' })
+    });
+    const payload = {
+        time_since: '2026-09-28T08:00:00.000Z', time_until: '2026-09-28T09:00:00.000Z',
+        customers_id: 3, services_id: 9, billable: 1
+    };
+    const send = key => backend.request(`/api/clockodo/entries?clientId=${clientId}`, {
+        method: 'POST', headers: { ...auth, 'Idempotency-Key': key }, body: JSON.stringify(payload)
+    });
+    const unauthorized = await send('batch:auth-error:1');
+    assert.equal(unauthorized.status, 401);
+    assert.equal(JSON.stringify(await unauthorized.json()).includes('private API details'), false);
+
+    externalResponse = Response.json({ unexpected: true });
+    const malformed = await send('batch:malformed:1');
+    assert.equal(malformed.status, 502);
+    assert.deepEqual(await malformed.json(), { error: 'malformed_response' });
+    const duplicate = await send('batch:malformed:1');
+    assert.equal(duplicate.status, 409);
+    assert.deepEqual(await duplicate.json(), { error: 'operation_outcome_unknown' });
+    assert.equal(calls, 2);
 });

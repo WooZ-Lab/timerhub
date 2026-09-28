@@ -211,6 +211,68 @@ const extendedTranslations = {
         demoMasking: 'Masking', demoPainting: 'Painting', demoWallpapering: 'Wallpapering',
         demoUnloading: 'Unloading', demoTravel: 'Travel', demoBreak: 'Break',
         logFilename: 'timelog', backupFilename: 'timerhub_backup',
+        endOfDayReview: 'End-of-Day Review', dayReview: 'Day Review',
+        reviewDate: 'Review date', previousDay: 'Previous day', nextDay: 'Next day',
+        reviewAndSync: 'Review & Sync', addEntry: 'Add Entry',
+        noEntriesForDay: 'No time entries recorded for this day.',
+        totalTrackedTime: 'Total Tracked Time', entriesCount: '{count} entries', gap: 'Gap',
+        syncedCount: '{count} synced', unsyncedCount: '{count} unsynced',
+        statusSynced: 'Synced', statusUnsynced: 'Unsynced',
+        statusPending: 'Pending', statusSyncing: 'Syncing...', statusFailed: 'Sync failed',
+        statusUnknown: 'Outcome unknown',
+        statusPartial: 'Partially synchronized',
+        syncProgress: '{done} of {total} entries processed',
+        syncOutcomeUnknown: 'Clockodo may have accepted this entry. Check Clockodo before attempting a manual resend.',
+        confirmSyncDescLocal: 'Review {count} entries. Confirming saves them locally; configure Clockodo later to send.',
+        clockodoBillable: 'Default billable status', clockodoBillableYes: 'Billable', clockodoBillableNo: 'Not billable',
+        suspiciousNotice: '{count} entries require attention',
+        issueRunning: 'Timer currently running',
+        issueZeroDuration: 'Zero or negative duration',
+        issueOverlapping: 'Overlaps with another entry',
+        issueUnusuallyLong: 'Unusually long (>16h)',
+        notes: 'Notes', project: 'Project', service: 'Service', endDate: 'End Date',
+        entryTooLong: 'An entry cannot be longer than 24 hours.',
+        confirmSyncTitle: 'Confirm Clockodo Synchronization',
+        confirmSyncDesc: 'Review these {count} entries. Confirming saves a fixed local snapshot for Clockodo; nothing is sent yet.',
+        confirmSyncBtn: 'Confirm & Send',
+        confirmDayBtn: 'Confirm Day for Clockodo',
+        dayReviewConfirmed: 'Day confirmed and saved for Clockodo synchronization.',
+        dayReviewInvalid: 'Resolve incomplete or invalid entries before confirming this day.',
+        confirmedEntryLocked: 'This entry is frozen in a confirmed Clockodo batch.',
+        syncSummaryTotal: 'Total duration',
+        alreadySyncedNotice: '{count} already synced entries will not be sent again',
+        noEntriesToSync: 'No unsynced entries to synchronize.',
+        clockodoSettings: 'Clockodo Integration',
+        clockodoApiKey: 'Clockodo API Key',
+        clockodoApiUser: 'Clockodo Email',
+        clockodoCustomerId: 'Default Customer ID',
+        clockodoProjectId: 'Default Project ID',
+        clockodoServiceId: 'Default Service ID',
+        clockodoSaveConfig: 'Save Clockodo Settings',
+        clockodoConfigSaved: 'Clockodo settings saved',
+        clockodoConfigMissing: 'Please configure Clockodo API key and email in Settings.',
+        clockodoSecurityNote: 'The API key is encrypted in TimerHub Cloudflare storage and is never saved in this browser. A local access token protects this device connection.',
+        clockodoApiKeyPlaceholder: 'Enter key to set or replace',
+        clockodoTestConnection: 'Test connection',
+        clockodoRemoveConfig: 'Remove Clockodo configuration',
+        clockodoConnectionStatus: 'Connection status',
+        clockodoConfigRemoved: 'Clockodo configuration removed.',
+        clockodoTestSuccess: 'Clockodo connection verified.',
+        clockodoRequiredFields: 'Enter a valid Clockodo email, API key, customer ID, and service ID.',
+        clockodoInvalidIds: 'Customer, project, and service IDs must be whole numbers.',
+        clockodoNetworkError: 'Could not reach the TimerHub service. Check your connection and retry.',
+        clockodoTimeout: 'Clockodo did not respond before the request timed out.',
+        clockodoInvalidCredentials: 'Clockodo rejected these credentials. Check the email and API key.',
+        clockodoRateLimited: 'Clockodo is receiving too many requests. Wait and retry.',
+        clockodoServiceError: 'Clockodo is temporarily unavailable. Retry later.',
+        clockodoRequestRejected: 'Clockodo rejected the request. Check the selected IDs and permissions.',
+        projectPlaceholder: 'Project name or ID', servicePlaceholder: 'Service name or ID', notesPlaceholder: 'Description of work done',
+        customerIdPlaceholder: 'Clockodo customer ID', projectIdPlaceholder: 'Clockodo project ID', serviceIdPlaceholder: 'Clockodo service ID',
+        showSecret: 'Show', hideSecret: 'Hide',
+        syncSuccessToast: 'Successfully synchronized {count} entries to Clockodo',
+        syncPartialFailureToast: '{success} entries synced, {failed} failed. Failed entries can be retried.',
+        syncFailedToast: 'Clockodo synchronization failed: {error}',
+        retry: 'Retry',
     },
     de: {
         activityFilter: 'Aktivitätsfilter',
@@ -263,6 +325,68 @@ const extendedTranslations = {
         demoMasking: 'Abkleben', demoPainting: 'Streichen', demoWallpapering: 'Tapezieren',
         demoUnloading: 'Entladen', demoTravel: 'Anfahrt', demoBreak: 'Pause',
         logFilename: 'zeitprotokoll', backupFilename: 'timerhub_sicherung',
+        endOfDayReview: 'Tagesabschluss-Prüfung', dayReview: 'Tagesübersicht',
+        reviewDate: 'Datum der Prüfung', previousDay: 'Vorheriger Tag', nextDay: 'Nächster Tag',
+        reviewAndSync: 'Prüfen & Synchronisieren', addEntry: 'Eintrag hinzufügen',
+        noEntriesForDay: 'Keine Zeiteinträge für diesen Tag aufgezeichnet.',
+        totalTrackedTime: 'Gesamte erfasste Zeit', entriesCount: '{count} Einträge', gap: 'Lücke',
+        syncedCount: '{count} synchronisiert', unsyncedCount: '{count} nicht synchronisiert',
+        statusSynced: 'Synchronisiert', statusUnsynced: 'Nicht synchronisiert',
+        statusPending: 'Ausstehend', statusSyncing: 'Synchronisiere...', statusFailed: 'Fehlgeschlagen',
+        statusUnknown: 'Ergebnis unklar',
+        statusPartial: 'Teilweise synchronisiert',
+        syncProgress: '{done} von {total} Einträgen verarbeitet',
+        syncOutcomeUnknown: 'Clockodo könnte den Eintrag angenommen haben. Prüfe Clockodo vor einem erneuten manuellen Versand.',
+        confirmSyncDescLocal: 'Prüfe {count} Einträge. Die Bestätigung speichert sie lokal; Clockodo kann später konfiguriert werden.',
+        clockodoBillable: 'Standard-Abrechenbarkeit', clockodoBillableYes: 'Abrechenbar', clockodoBillableNo: 'Nicht abrechenbar',
+        suspiciousNotice: '{count} Einträge erfordern Aufmerksamkeit',
+        issueRunning: 'Timer läuft noch',
+        issueZeroDuration: 'Keine oder negative Dauer',
+        issueOverlapping: 'Überlappt mit einem anderen Eintrag',
+        issueUnusuallyLong: 'Ungewöhnlich lang (>16h)',
+        notes: 'Notizen', project: 'Projekt', service: 'Leistung', endDate: 'Enddatum',
+        entryTooLong: 'Ein Eintrag darf nicht länger als 24 Stunden sein.',
+        confirmSyncTitle: 'Clockodo-Synchronisation bestätigen',
+        confirmSyncDesc: 'Prüfe diese {count} Einträge. Die Bestätigung speichert einen festen lokalen Datensatz für Clockodo; es wird noch nichts gesendet.',
+        confirmSyncBtn: 'Bestätigen & Senden',
+        confirmDayBtn: 'Tag für Clockodo bestätigen',
+        dayReviewConfirmed: 'Tag bestätigt und für die Clockodo-Synchronisierung gespeichert.',
+        dayReviewInvalid: 'Unvollständige oder ungültige Einträge müssen vor der Bestätigung behoben werden.',
+        confirmedEntryLocked: 'Dieser Eintrag ist in einem bestätigten Clockodo-Datensatz eingefroren.',
+        syncSummaryTotal: 'Gesamtdauer',
+        alreadySyncedNotice: '{count} bereits synchronisierte Einträge werden nicht erneut gesendet',
+        noEntriesToSync: 'Keine ungesendeten Einträge zum Synchronisieren.',
+        clockodoSettings: 'Clockodo-Integration',
+        clockodoApiKey: 'Clockodo-API-Schlüssel',
+        clockodoApiUser: 'Clockodo-E-Mail',
+        clockodoCustomerId: 'Standard-Kunden-ID',
+        clockodoProjectId: 'Standard-Projekt-ID',
+        clockodoServiceId: 'Standard-Leistungs-ID',
+        clockodoSaveConfig: 'Clockodo-Einstellungen speichern',
+        clockodoConfigSaved: 'Clockodo-Einstellungen gespeichert',
+        clockodoConfigMissing: 'Bitte Clockodo-API-Schlüssel und E-Mail in den Einstellungen konfigurieren.',
+        clockodoSecurityNote: 'Der API-Schlüssel wird verschlüsselt in TimerHubs Cloudflare-Speicher abgelegt und nie in diesem Browser gespeichert. Ein lokales Zugriffstoken schützt die Geräteverbindung.',
+        clockodoApiKeyPlaceholder: 'Schlüssel eingeben zum Speichern oder Ersetzen',
+        clockodoTestConnection: 'Verbindung testen',
+        clockodoRemoveConfig: 'Clockodo-Konfiguration entfernen',
+        clockodoConnectionStatus: 'Verbindungsstatus',
+        clockodoConfigRemoved: 'Clockodo-Konfiguration entfernt.',
+        clockodoTestSuccess: 'Clockodo-Verbindung bestätigt.',
+        clockodoRequiredFields: 'Gib eine gültige Clockodo-E-Mail, einen API-Schlüssel sowie Kunden- und Leistungs-ID ein.',
+        clockodoInvalidIds: 'Kunden-, Projekt- und Leistungs-IDs müssen ganze Zahlen sein.',
+        clockodoNetworkError: 'TimerHub ist nicht erreichbar. Prüfe die Verbindung und versuche es erneut.',
+        clockodoTimeout: 'Clockodo hat vor Ablauf der Zeitüberschreitung nicht geantwortet.',
+        clockodoInvalidCredentials: 'Clockodo hat die Zugangsdaten abgelehnt. Prüfe E-Mail und API-Schlüssel.',
+        clockodoRateLimited: 'Clockodo erhält zu viele Anfragen. Warte kurz und versuche es erneut.',
+        clockodoServiceError: 'Clockodo ist vorübergehend nicht verfügbar. Versuche es später erneut.',
+        clockodoRequestRejected: 'Clockodo hat die Anfrage abgelehnt. Prüfe IDs und Berechtigungen.',
+        projectPlaceholder: 'Projektname oder ID', servicePlaceholder: 'Leistungsname oder ID', notesPlaceholder: 'Beschreibung der ausgeführten Arbeit',
+        customerIdPlaceholder: 'Clockodo-Kunden-ID', projectIdPlaceholder: 'Clockodo-Projekt-ID', serviceIdPlaceholder: 'Clockodo-Leistungs-ID',
+        showSecret: 'Anzeigen', hideSecret: 'Verbergen',
+        syncSuccessToast: '{count} Einträge erfolgreich nach Clockodo synchronisiert',
+        syncPartialFailureToast: '{success} Einträge synchronisiert, {failed} fehlgeschlagen. Fehlgeschlagene können wiederholt werden.',
+        syncFailedToast: 'Clockodo-Synchronisation fehlgeschlagen: {error}',
+        retry: 'Wiederholen',
     },
     ru: {
         activityFilter: 'Фильтр занятий',
@@ -315,11 +439,87 @@ const extendedTranslations = {
         demoMasking: 'Заклеивание', demoPainting: 'Покраска', demoWallpapering: 'Поклейка обоев',
         demoUnloading: 'Разгрузка', demoTravel: 'Дорога', demoBreak: 'Перерыв',
         logFilename: 'журнал-времени', backupFilename: 'timerhub-копия',
+        endOfDayReview: 'Итоги дня', dayReview: 'Обзор дня',
+        reviewDate: 'Дата проверки', previousDay: 'Предыдущий день', nextDay: 'Следующий день',
+        reviewAndSync: 'Проверить и синхронизировать', addEntry: 'Добавить запись',
+        noEntriesForDay: 'Нет записей времени за этот день.',
+        totalTrackedTime: 'Всего учтено времени', entriesCount: '{count} записей', gap: 'Перерыв',
+        syncedCount: '{count} синхронизировано', unsyncedCount: '{count} не синхронизировано',
+        statusSynced: 'Синхронизировано', statusUnsynced: 'Не синхронизировано',
+        statusPending: 'В ожидании', statusSyncing: 'Синхронизация...', statusFailed: 'Ошибка синхронизации',
+        statusUnknown: 'Результат неизвестен',
+        statusPartial: 'Синхронизировано частично',
+        syncProgress: 'Обработано записей: {done} из {total}',
+        syncOutcomeUnknown: 'Clockodo мог принять запись. Проверьте Clockodo перед повторной отправкой вручную.',
+        confirmSyncDescLocal: 'Проверьте записи ({count}). Подтверждение сохранит их локально; Clockodo можно настроить позже.',
+        clockodoBillable: 'Стандартная оплачиваемость', clockodoBillableYes: 'Оплачиваемая', clockodoBillableNo: 'Неоплачиваемая',
+        suspiciousNotice: '{count} записей требуют внимания',
+        issueRunning: 'Таймер ещё работает',
+        issueZeroDuration: 'Нулевая или отрицательная длительность',
+        issueOverlapping: 'Пересекается с другой записью',
+        issueUnusuallyLong: 'Необычно долго (>16 ч)',
+        notes: 'Заметки', project: 'Проект', service: 'Услуга', endDate: 'Дата окончания',
+        entryTooLong: 'Запись не может длиться более 24 часов.',
+        confirmSyncTitle: 'Подтверждение синхронизации с Clockodo',
+        confirmSyncDesc: 'Проверьте эти записи ({count}). Подтверждение сохранит локальный снимок для Clockodo; отправки пока не будет.',
+        confirmSyncBtn: 'Подтвердить и отправить',
+        confirmDayBtn: 'Подтвердить день для Clockodo',
+        dayReviewConfirmed: 'День подтверждён и сохранён для синхронизации с Clockodo.',
+        dayReviewInvalid: 'Перед подтверждением исправьте незавершённые или недопустимые записи.',
+        confirmedEntryLocked: 'Запись заморожена в подтверждённом пакете Clockodo.',
+        syncSummaryTotal: 'Общая длительность',
+        alreadySyncedNotice: '{count} уже синхронизированных записей не будут отправлены повторно',
+        noEntriesToSync: 'Нет несинхронизированных записей для отправки.',
+        clockodoSettings: 'Интеграция с Clockodo',
+        clockodoApiKey: 'API-ключ Clockodo',
+        clockodoApiUser: 'Эл. почта Clockodo',
+        clockodoCustomerId: 'ID клиента по умолчанию',
+        clockodoProjectId: 'ID проекта по умолчанию',
+        clockodoServiceId: 'ID услуги по умолчанию',
+        clockodoSaveConfig: 'Сохранить настройки Clockodo',
+        clockodoConfigSaved: 'Настройки Clockodo сохранены',
+        clockodoConfigMissing: 'Пожалуйста, укажите API-ключ и email Clockodo в Настройках.',
+        clockodoSecurityNote: 'API-ключ хранится в зашифрованном виде в Cloudflare-хранилище TimerHub и не сохраняется в браузере. Локальный токен защищает подключение устройства.',
+        clockodoApiKeyPlaceholder: 'Введите ключ для сохранения или замены',
+        clockodoTestConnection: 'Проверить соединение',
+        clockodoRemoveConfig: 'Удалить настройки Clockodo',
+        clockodoConnectionStatus: 'Состояние соединения',
+        clockodoConfigRemoved: 'Настройки Clockodo удалены.',
+        clockodoTestSuccess: 'Соединение с Clockodo подтверждено.',
+        clockodoRequiredFields: 'Укажите действующий email Clockodo, API-ключ, ID клиента и услуги.',
+        clockodoInvalidIds: 'ID клиента, проекта и услуги должны быть целыми числами.',
+        clockodoNetworkError: 'Не удалось связаться с TimerHub. Проверьте подключение и повторите.',
+        clockodoTimeout: 'Clockodo не ответил до истечения времени ожидания.',
+        clockodoInvalidCredentials: 'Clockodo отклонил данные. Проверьте email и API-ключ.',
+        clockodoRateLimited: 'Слишком много запросов к Clockodo. Подождите и повторите.',
+        clockodoServiceError: 'Clockodo временно недоступен. Повторите позже.',
+        clockodoRequestRejected: 'Clockodo отклонил запрос. Проверьте ID и права доступа.',
+        projectPlaceholder: 'Название или ID проекта', servicePlaceholder: 'Название или ID услуги', notesPlaceholder: 'Описание выполненной работы',
+        customerIdPlaceholder: 'ID клиента Clockodo', projectIdPlaceholder: 'ID проекта Clockodo', serviceIdPlaceholder: 'ID услуги Clockodo',
+        showSecret: 'Показать', hideSecret: 'Скрыть',
+        syncSuccessToast: 'Успешно синхронизировано записей в Clockodo: {count}',
+        syncPartialFailureToast: 'Синхронизировано: {success}, с ошибкой: {failed}. Записи с ошибкой можно отправить повторно.',
+        syncFailedToast: 'Ошибка синхронизации с Clockodo: {error}',
+        retry: 'Повторить',
     }
 };
 for (const language of Object.keys(translations)) {
     Object.assign(translations[language], extendedTranslations[language]);
 }
+
+// ============================================================================
+// SYNCHRONIZATION STATUS CONSTANTS
+// ============================================================================
+
+const SYNC_STATUS = Object.freeze({
+    UNSYNCED: 'unsynced',
+    PENDING: 'pending',
+    CONFIRMED: 'confirmed',
+    SYNCING: 'syncing',
+    SYNCED: 'synced',
+    FAILED: 'failed',
+    UNKNOWN: 'unknown'
+});
 
 // ============================================================================
 // STORAGE REPOSITORY
@@ -328,7 +528,7 @@ for (const language of Object.keys(translations)) {
 class StorageRepository {
     constructor() {
         this.dbName = 'TimerHubDB';
-        this.version = 1;
+        this.version = 2;
         this.db = null;
     }
 
@@ -366,6 +566,10 @@ class StorageRepository {
                 // Layout store (button positions)
                 if (!db.objectStoreNames.contains('layout')) {
                     db.createObjectStore('layout', { keyPath: 'activityId' });
+                }
+                if (!db.objectStoreNames.contains('syncBatches')) {
+                    const batchStore = db.createObjectStore('syncBatches', { keyPath: 'id' });
+                    batchStore.createIndex('date', 'date', { unique: false });
                 }
             };
         });
@@ -453,6 +657,31 @@ class StorageRepository {
         });
     }
 
+    async getSyncBatches() {
+        const tx = this.db.transaction(['syncBatches'], 'readonly');
+        return new Promise((resolve, reject) => {
+            const request = tx.objectStore('syncBatches').getAll();
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async saveConfirmedBatch(batch, entries) {
+        const tx = this.db.transaction(['syncBatches', 'timeEntries'], 'readwrite');
+        tx.objectStore('syncBatches').put(batch);
+        const entryStore = tx.objectStore('timeEntries');
+        entries.forEach(entry => entryStore.put(entry));
+        return new Promise((resolve, reject) => {
+            tx.oncomplete = () => resolve(batch);
+            tx.onerror = () => reject(tx.error);
+            tx.onabort = () => reject(tx.error || new Error('Unable to save confirmed day batch'));
+        });
+    }
+
+    async saveSyncProgress(batch, entries) {
+        return this.saveConfirmedBatch(batch, entries);
+    }
+
     // Settings
     async getSetting(key, defaultValue) {
         const tx = this.db.transaction(['settings'], 'readonly');
@@ -500,16 +729,18 @@ class StorageRepository {
 
     // Bulk export/import
     async exportAll() {
-        const [activities, timeEntries, settings] = await Promise.all([
+        const [activities, timeEntries, settings, syncBatches] = await Promise.all([
             this.getActivities(),
             this.getTimeEntries(),
-            this.db.transaction(['settings'], 'readonly').objectStore('settings').getAll()
+            this.db.transaction(['settings'], 'readonly').objectStore('settings').getAll(),
+            this.getSyncBatches()
         ]);
 
         return {
             activities,
             timeEntries,
-            settings: Object.fromEntries(settings.map(s => [s.key, s.value])),
+            syncBatches,
+            settings: Object.fromEntries(settings.filter(s => s.key !== 'clockodoApiKey').map(s => [s.key, s.value])),
             exportedAt: Date.now()
         };
     }
@@ -555,11 +786,31 @@ class StorageRepository {
             });
         }
 
+        if (this.db.objectStoreNames.contains('syncBatches')) {
+            const txBatches = this.db.transaction(['syncBatches'], 'readwrite');
+            const storeBatches = txBatches.objectStore('syncBatches');
+            if (!merge) {
+                await new Promise((resolve, reject) => {
+                    const request = storeBatches.clear();
+                    request.onsuccess = () => resolve();
+                    request.onerror = () => reject(request.error);
+                });
+            }
+            for (const batch of data.syncBatches || []) {
+                await new Promise((resolve, reject) => {
+                    const request = storeBatches.put(batch);
+                    request.onsuccess = () => resolve();
+                    request.onerror = () => reject(request.error);
+                });
+            }
+        }
+
         // Settings
         const txSettings = this.db.transaction(['settings'], 'readwrite');
         const storeSettings = txSettings.objectStore('settings');
         
-        for (const [key, value] of Object.entries(data.settings)) {
+        for (const [key, value] of Object.entries(data.settings || {})) {
+            if (key === 'clockodoApiKey') continue;
             await new Promise((resolve, reject) => {
                 const request = storeSettings.put({ key, value });
                 request.onsuccess = () => resolve();
@@ -574,6 +825,10 @@ class StorageRepository {
 // ============================================================================
 
 class TimerHubApp {
+    static get SYNC_STATUS() {
+        return SYNC_STATUS;
+    }
+
     constructor() {
         this.storage = new StorageRepository();
         this.activities = [];
@@ -594,6 +849,18 @@ class TimerHubApp {
         this.toastTimeout = null;
         this.notificationTestMode = false;
         this.isDemoMode = this.isDevMode();
+        this.reviewDate = this.toDateString(new Date());
+        this.clockodoEmail = '';
+        this.clockodoCustomerId = '';
+        this.clockodoProjectId = '';
+        this.clockodoServiceId = '';
+        this.clockodoBillable = true;
+        this.clockodoConfigured = false;
+        this.confirmedSyncEntries = [];
+        this.syncConfirmationOpen = false;
+        this.syncBatches = [];
+        this.syncOperations = new Map();
+        this.clockodoClient = window.ClockodoClient ? new window.ClockodoClient() : null;
 
         this.COLORS = [
             '#E74C3C', '#C0392B', '#E67E22', '#D35400', '#F39C12',
@@ -679,6 +946,7 @@ class TimerHubApp {
         try {
             await this.storage.init();
             await this.loadSettings();
+            await this.refreshClockodoConfigurationStatus();
             await this.loadActivities();
             await this.loadTimeEntries();
             this.applyTranslations();
@@ -721,6 +989,12 @@ class TimerHubApp {
             await this.storage.getSetting('notificationInterval', 20);
         this.notificationCustomMinutes =
             await this.storage.getSetting('notificationCustomMinutes', 20);
+        await this.storage.setSetting('clockodoApiKey', '');
+        this.clockodoEmail = await this.storage.getSetting('clockodoEmail', '');
+        this.clockodoCustomerId = await this.storage.getSetting('clockodoCustomerId', '');
+        this.clockodoProjectId = await this.storage.getSetting('clockodoProjectId', '');
+        this.clockodoServiceId = await this.storage.getSetting('clockodoServiceId', '');
+        this.clockodoBillable = await this.storage.getSetting('clockodoBillable', true);
     }
 
     async loadActivities() {
@@ -729,8 +1003,237 @@ class TimerHubApp {
             .sort((a, b) => (a.position || 0) - (b.position || 0));
     }
 
+    normalizeTimeEntry(raw = {}) {
+        if (!raw || typeof raw !== 'object') {
+            raw = {};
+        }
+        const now = Date.now();
+        const startTimestamp = Number.isFinite(Number(raw.startTimestamp))
+            ? Number(raw.startTimestamp)
+            : now;
+        const endTimestamp = raw.endTimestamp !== null && raw.endTimestamp !== undefined && Number.isFinite(Number(raw.endTimestamp))
+            ? Number(raw.endTimestamp)
+            : null;
+
+        const allowedStatuses = Object.values(SYNC_STATUS);
+        let syncStatus = typeof raw.syncStatus === 'string' ? raw.syncStatus.toLowerCase() : '';
+        if (!allowedStatuses.includes(syncStatus)) {
+            syncStatus = raw.clockodoEntryId ? SYNC_STATUS.SYNCED : SYNC_STATUS.UNSYNCED;
+        }
+
+        const clockodoEntryId = raw.clockodoEntryId !== null && raw.clockodoEntryId !== undefined && raw.clockodoEntryId !== ''
+            ? (Number.isFinite(Number(raw.clockodoEntryId)) ? Number(raw.clockodoEntryId) : String(raw.clockodoEntryId))
+            : null;
+
+        return {
+            id: String(raw.id || this.generateId()),
+            activityId: String(raw.activityId || ''),
+            activityNameSnapshot: String(raw.activityNameSnapshot || ''),
+            startTimestamp,
+            endTimestamp,
+            createdAt: Number.isFinite(Number(raw.createdAt)) ? Number(raw.createdAt) : startTimestamp,
+            updatedAt: Number.isFinite(Number(raw.updatedAt)) ? Number(raw.updatedAt) : now,
+            notes: typeof raw.notes === 'string' ? raw.notes : (typeof raw.note === 'string' ? raw.note : ''),
+            project: typeof raw.project === 'string' ? raw.project : '',
+            service: typeof raw.service === 'string' ? raw.service : '',
+            source: raw.source === 'manual' ? 'manual' : 'timer',
+            isEdited: raw.isEdited === true || (raw.editedAt !== null && raw.editedAt !== undefined && Number.isFinite(Number(raw.editedAt)) && Number(raw.editedAt) > 0),
+            editedAt: raw.editedAt !== null && raw.editedAt !== undefined && Number.isFinite(Number(raw.editedAt)) && Number(raw.editedAt) > 0 ? Number(raw.editedAt) : null,
+            syncStatus,
+            syncBatchId: raw.syncBatchId ? String(raw.syncBatchId) : null,
+            clockodoEntryId,
+            clockodoSyncedAt: raw.clockodoSyncedAt && Number.isFinite(Number(raw.clockodoSyncedAt)) ? Number(raw.clockodoSyncedAt) : null,
+            clockodoError: raw.clockodoError ? String(raw.clockodoError) : null
+        };
+    }
+
+    createTimeEntry(data = {}) {
+        const now = Date.now();
+        const base = {
+            id: data.id || this.generateId(),
+            activityId: data.activityId || '',
+            activityNameSnapshot: data.activityNameSnapshot || '',
+            startTimestamp: data.startTimestamp !== undefined ? Number(data.startTimestamp) : now,
+            endTimestamp: data.endTimestamp !== undefined && data.endTimestamp !== null ? Number(data.endTimestamp) : null,
+            createdAt: data.createdAt ? Number(data.createdAt) : now,
+            updatedAt: data.updatedAt ? Number(data.updatedAt) : now,
+            notes: data.notes || data.note || '',
+            project: data.project || '',
+            service: data.service || '',
+            source: data.source || (data.endTimestamp !== null ? 'manual' : 'timer'),
+            isEdited: data.isEdited === true,
+            editedAt: data.editedAt || null,
+            syncStatus: data.syncStatus || SYNC_STATUS.UNSYNCED,
+            syncBatchId: data.syncBatchId || null,
+            clockodoEntryId: data.clockodoEntryId || null,
+            clockodoSyncedAt: data.clockodoSyncedAt || null,
+            clockodoError: data.clockodoError || null
+        };
+        return this.normalizeTimeEntry(base);
+    }
+
+    validateTimeEntry(entry) {
+        if (!entry || typeof entry !== 'object') {
+            return { valid: false, error: 'invalidEntryObject' };
+        }
+        if (!entry.activityId || typeof entry.activityId !== 'string' || !entry.activityId.trim()) {
+            return { valid: false, error: 'missingActivity' };
+        }
+        if (!Number.isFinite(entry.startTimestamp) || entry.startTimestamp <= 0) {
+            return { valid: false, error: 'invalidStartTime' };
+        }
+        if (entry.endTimestamp !== null && entry.endTimestamp !== undefined) {
+            if (!Number.isFinite(entry.endTimestamp) || entry.endTimestamp <= 0) {
+                return { valid: false, error: 'invalidEndTime' };
+            }
+            if (entry.endTimestamp <= entry.startTimestamp) {
+                return { valid: false, error: 'startBeforeEnd' };
+            }
+            if (entry.endTimestamp - entry.startTimestamp > 24 * 60 * 60 * 1000) {
+                return { valid: false, error: 'durationTooLong' };
+            }
+        }
+        const allowedStatuses = Object.values(SYNC_STATUS);
+        if (entry.syncStatus && !allowedStatuses.includes(entry.syncStatus)) {
+            return { valid: false, error: 'invalidSyncStatus' };
+        }
+        return { valid: true };
+    }
+
+    getEntryDuration(entry, now = Date.now()) {
+        if (!entry) return 0;
+        const start = Number(entry.startTimestamp) || 0;
+        const end = entry.endTimestamp !== null && entry.endTimestamp !== undefined
+            ? Number(entry.endTimestamp)
+            : now;
+        return Math.max(0, end - start);
+    }
+
+    getEntryDate(entry) {
+        if (!entry || !entry.startTimestamp) return this.toDateString(new Date());
+        return this.toDateString(new Date(entry.startTimestamp));
+    }
+
+    getDayEntries(dateString) {
+        if (!dateString) dateString = this.toDateString(new Date());
+        return this.timeEntries
+            .filter(entry => this.getEntryDate(entry) === dateString)
+            .sort((a, b) => a.startTimestamp - b.startTimestamp);
+    }
+
+    calculateDayTotal(dateString) {
+        const entries = this.getDayEntries(dateString);
+        return entries.reduce((sum, entry) => sum + this.getEntryDuration(entry), 0);
+    }
+
+    getSuspiciousEntries(dateString) {
+        const entries = this.getDayEntries(dateString);
+        const suspicious = [];
+
+        for (let i = 0; i < entries.length; i++) {
+            const entry = entries[i];
+            const issues = [];
+
+            if (entry.endTimestamp === null) {
+                issues.push('running');
+            } else {
+                const duration = entry.endTimestamp - entry.startTimestamp;
+                if (duration <= 0) {
+                    issues.push('zeroDuration');
+                } else if (duration > 16 * 60 * 60 * 1000) {
+                    issues.push('unusuallyLong');
+                }
+
+                for (let j = 0; j < entries.length; j++) {
+                    if (i === j) continue;
+                    const other = entries[j];
+                    if (other.endTimestamp !== null) {
+                        const hasOverlap = !(entry.endTimestamp <= other.startTimestamp || entry.startTimestamp >= other.endTimestamp);
+                        if (hasOverlap) {
+                            issues.push('overlapping');
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (issues.length > 0) {
+                suspicious.push({ entry, issues });
+            }
+        }
+
+        return suspicious;
+    }
+
+    async addEntry(data) {
+        const entry = this.createTimeEntry(data);
+        const validation = this.validateTimeEntry(entry);
+        if (!validation.valid) {
+            throw new Error(`Invalid entry: ${validation.error}`);
+        }
+        this.timeEntries.push(entry);
+        await this.storage.saveTimeEntry(entry);
+        return entry;
+    }
+
+    async updateEntry(id, updates = {}) {
+        const index = this.timeEntries.findIndex(e => e.id === id);
+        if (index === -1) {
+            throw new Error(`Entry not found: ${id}`);
+        }
+        const existing = this.timeEntries[index];
+        const merged = { ...existing, ...updates, updatedAt: Date.now() };
+
+        // Post-sync edit detection:
+        // Any material change resets syncStatus to 'unsynced' so explicit re-confirmation is required.
+        const workFieldsChanged =
+            merged.startTimestamp !== existing.startTimestamp ||
+            merged.endTimestamp !== existing.endTimestamp ||
+            merged.activityId !== existing.activityId ||
+            merged.notes !== existing.notes ||
+            merged.project !== existing.project ||
+            merged.service !== existing.service;
+
+        if (workFieldsChanged) {
+            if ([SYNC_STATUS.CONFIRMED, SYNC_STATUS.SYNCING].includes(existing.syncStatus)) {
+                throw new Error('Confirmed time entry is frozen until synchronization resolves');
+            }
+            merged.isEdited = true;
+            merged.editedAt = Date.now();
+            if (existing.syncStatus === SYNC_STATUS.SYNCED || existing.syncStatus === SYNC_STATUS.CONFIRMED) {
+                merged.syncStatus = SYNC_STATUS.UNSYNCED;
+                merged.clockodoError = null;
+            }
+        }
+
+        const normalized = this.normalizeTimeEntry(merged);
+        const validation = this.validateTimeEntry(normalized);
+        if (!validation.valid) {
+            throw new Error(`Invalid entry update: ${validation.error}`);
+        }
+
+        this.timeEntries[index] = normalized;
+        await this.storage.saveTimeEntry(normalized);
+        return normalized;
+    }
+
+    async deleteEntry(id) {
+        const index = this.timeEntries.findIndex(e => e.id === id);
+        if (index === -1) return null;
+        if ([SYNC_STATUS.CONFIRMED, SYNC_STATUS.SYNCING].includes(this.timeEntries[index].syncStatus)) {
+            throw new Error('Confirmed time entry is frozen until synchronization resolves');
+        }
+        const [removed] = this.timeEntries.splice(index, 1);
+        await this.storage.deleteTimeEntry(id);
+        return removed;
+    }
+
     async loadTimeEntries() {
-        this.timeEntries = await this.storage.getTimeEntries();
+        const rawEntries = await this.storage.getTimeEntries() || [];
+        this.timeEntries = rawEntries.map(e => this.normalizeTimeEntry(e));
+        this.syncBatches = this.storage.getSyncBatches
+            ? await this.storage.getSyncBatches()
+            : [];
         // Find active entry
         const activeEntry = this.timeEntries.find(e => e.endTimestamp === null);
         if (activeEntry) {
@@ -747,6 +1250,7 @@ class TimerHubApp {
         };
 
         // Navigation
+        sel('navReview')?.addEventListener('click', () => this.switchScreen('review'));
         sel('navLog')?.addEventListener('click', () => this.switchScreen('log'));
         sel('navSettings')?.addEventListener('click', () => this.switchScreen('settings'));
         sel('navHome')?.addEventListener('click', () => this.switchScreen('main'));
@@ -756,6 +1260,25 @@ class TimerHubApp {
                 this.switchScreen('main');
             }
         });
+
+        // Day Review controls
+        sel('reviewPrevDayBtn')?.addEventListener('click', () => this.changeReviewDay(-1));
+        sel('reviewNextDayBtn')?.addEventListener('click', () => this.changeReviewDay(1));
+        sel('reviewTodayBtn')?.addEventListener('click', () => this.setReviewDay(this.toDateString(new Date())));
+        sel('reviewDateInput')?.addEventListener('change', (e) => this.setReviewDay(e.target.value));
+        sel('reviewAddEntryBtn')?.addEventListener('click', () => this.showAddEntryModal());
+        sel('reviewConfirmSyncBtn')?.addEventListener('click', () => this.showSyncConfirmationModal());
+
+        // Sync confirmation modal
+        sel('syncConfirmCloseBtn')?.addEventListener('click', () => this.closeSyncConfirmationModal());
+        sel('syncConfirmCancelBtn')?.addEventListener('click', () => this.closeSyncConfirmationModal());
+        sel('syncConfirmSubmitBtn')?.addEventListener('click', () => this.confirmAndSyncClockodo());
+
+        // Clockodo settings
+        sel('clockodoToggleKeyBtn')?.addEventListener('click', () => this.toggleClockodoKeyVisibility());
+        sel('clockodoSaveBtn')?.addEventListener('click', () => this.saveClockodoSettings());
+        sel('clockodoTestBtn')?.addEventListener('click', () => this.testClockodoConnection());
+        sel('clockodoRemoveBtn')?.addEventListener('click', () => this.removeClockodoSettings());
 
         // Add activity button
         sel('addActivityBtn')?.addEventListener('click', () => this.showActivityModal());
@@ -1099,23 +1622,324 @@ class TimerHubApp {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
         
         switch (screen) {
+            case 'review':
+                document.getElementById('reviewScreen')?.classList.add('active');
+                this.renderReview();
+                break;
             case 'log':
-                document.getElementById('logScreen').classList.add('active');
+                document.getElementById('logScreen')?.classList.add('active');
                 this.renderLog();
                 break;
             case 'settings':
-                document.getElementById('settingsScreen').classList.add('active');
+                document.getElementById('settingsScreen')?.classList.add('active');
                 this.renderSettings();
                 break;
             default:
-                document.getElementById('mainScreen').classList.add('active');
+                document.getElementById('mainScreen')?.classList.add('active');
                 this.renderMain();
         }
+    }
+
+    changeReviewDay(offset) {
+        const date = new Date(`${this.reviewDate}T12:00:00`);
+        date.setDate(date.getDate() + offset);
+        this.setReviewDay(this.toDateString(date));
+    }
+
+    setReviewDay(dateString) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(dateString)) return;
+        const parsed = new Date(`${dateString}T12:00:00`);
+        if (Number.isNaN(parsed.getTime()) || this.toDateString(parsed) !== dateString) return;
+        this.reviewDate = dateString;
+        this.renderReview();
+    }
+
+    renderReview() {
+        const dateInput = document.getElementById('reviewDateInput');
+        const summary = document.getElementById('reviewSummaryBar');
+        const list = document.getElementById('reviewEntriesList');
+        const banner = document.getElementById('reviewSuspiciousBanner');
+        if (!dateInput || !summary || !list || !banner) return;
+
+        dateInput.value = this.reviewDate;
+        const entries = this.getDayEntries(this.reviewDate);
+        const total = this.calculateDayTotal(this.reviewDate);
+        const syncedCount = entries.filter(entry => entry.syncStatus === SYNC_STATUS.SYNCED).length;
+        const unsyncedCount = entries.length - syncedCount;
+        summary.innerHTML = `<div class="review-summary-card highlight"><div class="review-summary-label">${this.t('totalTrackedTime')}</div><div class="review-summary-value">${this.formatDuration(total)}</div></div><div class="review-summary-card"><div class="review-summary-label">${this.t('entriesCount', { count: entries.length })}</div></div><div class="review-summary-card"><div class="review-summary-label">${this.t('syncedCount', { count: syncedCount })}</div></div><div class="review-summary-card"><div class="review-summary-label">${this.t('unsyncedCount', { count: unsyncedCount })}</div></div>`;
+        const latestBatch = this.syncBatches.filter(batch => batch.date === this.reviewDate).sort((a, b) => b.version - a.version)[0];
+        if (latestBatch) {
+            const done = latestBatch.entries.filter(entry => [SYNC_STATUS.SYNCED, SYNC_STATUS.FAILED, SYNC_STATUS.UNKNOWN].includes(entry.syncStatus)).length;
+            const batchStatusKey = { partial: 'statusPartial', unknown: 'statusUnknown', confirmed: 'statusPending', syncing: 'statusSyncing', failed: 'statusFailed', synced: 'statusSynced' }[latestBatch.state] || 'statusPending';
+            summary.innerHTML += `<div class="review-summary-card"><div class="review-summary-label">${this.t('syncProgress', { done, total: latestBatch.entries.length })}</div><div class="review-summary-value">${this.t(batchStatusKey)}</div></div>`;
+        }
+
+        const suspicious = this.getSuspiciousEntries(this.reviewDate);
+        if (suspicious.length) {
+            banner.style.display = '';
+            banner.textContent = this.t('suspiciousNotice', { count: suspicious.length });
+        } else {
+            banner.style.display = 'none';
+            banner.textContent = '';
+        }
+
+        if (!entries.length) {
+            list.innerHTML = `<div class="review-empty">${this.t('noEntriesForDay')}</div>`;
+            return;
+        }
+
+        const issueKeys = { running: this.t('issueRunning'), zeroDuration: this.t('issueZeroDuration'), overlapping: this.t('issueOverlapping'), unusuallyLong: this.t('issueUnusuallyLong') };
+        const statusKeys = {
+            unsynced: this.t('statusUnsynced'), pending: this.t('statusPending'), confirmed: this.t('statusPending'),
+            syncing: this.t('statusSyncing'), synced: this.t('statusSynced'), failed: this.t('statusFailed'),
+            unknown: this.t('statusUnknown'), partial: this.t('statusPartial')
+        };
+        list.innerHTML = entries.map((entry, index) => {
+            const activity = this.activities.find(item => item.id === entry.activityId);
+            const issues = suspicious.find(item => item.entry.id === entry.id)?.issues || [];
+            const start = this.formatTime(entry.startTimestamp);
+            const end = entry.endTimestamp === null ? '—' : this.formatTime(entry.endTimestamp);
+            const duration = this.formatDuration(this.getEntryDuration(entry));
+            const status = statusKeys[entry.syncStatus] || this.t('statusUnsynced');
+            const previous = entries[index - 1];
+            const gap = previous?.endTimestamp !== null && previous?.endTimestamp !== undefined && previous.endTimestamp < entry.startTimestamp
+                ? `<div class="review-gap" aria-label="${this.t('gap')}"><span>${this.t('gap')}</span><time>${this.escapeHtml(this.formatTime(previous.endTimestamp))}–${this.escapeHtml(start)}</time><strong>${this.formatDuration(entry.startTimestamp - previous.endTimestamp)}</strong></div>`
+                : '';
+            const meta = [entry.project, entry.service].filter(Boolean).map(value => this.escapeHtml(value)).join(' · ');
+            const notes = entry.notes ? `<div class="review-entry-notes">${this.escapeHtml(entry.notes)}</div>` : '';
+            const issueText = issues.map(issue => issueKeys[issue]).filter(Boolean).join(' · ');
+            const batch = entry.syncBatchId ? this.syncBatches.find(item => item.id === entry.syncBatchId) : null;
+            const activityLabel = activity?.name || entry.activityNameSnapshot || this.t('activity');
+            const retryButton = entry.syncStatus === SYNC_STATUS.FAILED && batch
+                ? `<button class="review-action-btn review-retry-entry" type="button" data-batch-id="${this.escapeHtml(batch.id)}" aria-label="${this.escapeHtml(`${this.t('retry')}: ${activityLabel}`)}">${this.t('retry')}</button>`
+                : '';
+            const unknownNotice = entry.syncStatus === SYNC_STATUS.UNKNOWN ? `<small>${this.t('syncOutcomeUnknown')}</small>` : '';
+            const errorNotice = entry.clockodoError && entry.syncStatus === SYNC_STATUS.FAILED
+                ? `<small>${this.escapeHtml(this.clockodoErrorMessage({ code: entry.clockodoError }))}</small>`
+                : '';
+            return `${gap}<article class="review-entry-card${issues.length ? ' suspicious-entry' : ''}" data-entry-id="${this.escapeHtml(entry.id)}">
+                <div class="review-entry-header">
+                <div class="review-entry-times"><strong>${this.escapeHtml(start)}</strong><span>–</span><strong>${this.escapeHtml(end)}</strong></div>
+                <span class="review-entry-duration">${this.escapeHtml(duration)}</span></div>
+                <div class="review-entry-title"><span class="review-activity-dot" style="background-color:${this.escapeHtml(activity?.color || '#27AE60')}"></span>${this.escapeHtml(activityLabel)}</div>
+                ${meta ? `<div class="review-entry-tags">${entry.project ? `<span class="review-tag">${this.escapeHtml(entry.project)}</span>` : ''}${entry.service ? `<span class="review-tag">${this.escapeHtml(entry.service)}</span>` : ''}</div>` : ''}${notes}${issueText ? `<small>${this.escapeHtml(issueText)}</small>` : ''}${errorNotice}${unknownNotice}
+                <div class="review-entry-footer"><span class="sync-badge ${this.escapeHtml(entry.syncStatus)}">${this.escapeHtml(status)}</span><div class="review-entry-actions"><button class="review-action-btn review-edit-entry" type="button" data-entry-id="${this.escapeHtml(entry.id)}" aria-label="${this.escapeHtml(`${this.t('edit')}: ${activityLabel}`)}" ${entry.syncStatus === SYNC_STATUS.CONFIRMED || entry.syncStatus === SYNC_STATUS.SYNCING ? `disabled title="${this.escapeHtml(this.t('confirmedEntryLocked'))}"` : ''}>${this.t('edit')}</button>${retryButton}</div></div>
+            </article>`;
+        }).join('');
+        list.querySelectorAll('.review-edit-entry').forEach(button => button.addEventListener('click', () => this.showEntryEditModal(button.dataset.entryId)));
+        list.querySelectorAll('.review-retry-entry').forEach(button => button.addEventListener('click', () => this.retrySyncBatch(button.dataset.batchId)));
+    }
+
+    showSyncConfirmationModal() {
+        const entries = this.getDayEntries(this.reviewDate);
+        const latestBatch = this.syncBatches.filter(batch => batch.date === this.reviewDate).sort((a, b) => b.version - a.version)[0];
+        const pendingBatch = latestBatch && [SYNC_STATUS.CONFIRMED, SYNC_STATUS.SYNCING, SYNC_STATUS.FAILED, 'partial']
+            .includes(latestBatch.state) && latestBatch.entries.some(entry => [SYNC_STATUS.CONFIRMED, SYNC_STATUS.SYNCING, SYNC_STATUS.FAILED].includes(entry.syncStatus))
+            ? latestBatch
+            : null;
+        const eligible = pendingBatch
+            ? pendingBatch.entries.filter(entry => [SYNC_STATUS.CONFIRMED, SYNC_STATUS.SYNCING, SYNC_STATUS.FAILED].includes(entry.syncStatus))
+            : entries.filter(entry => [SYNC_STATUS.UNSYNCED, SYNC_STATUS.FAILED].includes(entry.syncStatus));
+        const alreadySynced = entries.filter(entry => entry.syncStatus === SYNC_STATUS.SYNCED).length;
+        const invalid = eligible.some(entry => entry.endTimestamp === null || this.getEntryDuration(entry) <= 0 || this.getEntryDuration(entry) > 24 * 60 * 60 * 1000);
+        const list = document.getElementById('syncConfirmEntriesList');
+        const desc = document.getElementById('syncConfirmDesc');
+        const summary = document.getElementById('syncConfirmSummary');
+        const notice = document.getElementById('syncConfirmAlreadySyncedNotice');
+        const submit = document.getElementById('syncConfirmSubmitBtn');
+        this.syncConfirmationOpen = true;
+
+        this.confirmedSyncEntries = eligible.map(entry => ({ ...entry }));
+        desc.textContent = this.clockodoConfigured
+            ? this.t('confirmSyncDesc', { count: eligible.length })
+            : this.t('confirmSyncDescLocal', { count: eligible.length });
+        list.innerHTML = eligible.map(entry => {
+            const activity = this.activities.find(item => item.id === entry.activityId);
+            const title = activity?.name || entry.activityNameSnapshot || this.t('activity');
+            return `<div class="sync-confirm-item"><span>${this.escapeHtml(title)} · ${this.escapeHtml(this.formatTime(entry.startTimestamp))}–${this.escapeHtml(this.formatTime(entry.endTimestamp))}</span><strong>${this.formatDuration(this.getEntryDuration(entry))}</strong></div>`;
+        }).join('') || `<div class="review-empty">${this.t('noEntriesToSync')}</div>`;
+        const total = eligible.reduce((sum, entry) => sum + this.getEntryDuration(entry), 0);
+        summary.innerHTML = `<span>${this.t('syncSummaryTotal')}</span><strong>${this.formatDuration(total)}</strong>`;
+        notice.textContent = this.t('alreadySyncedNotice', { count: alreadySynced });
+        notice.style.display = alreadySynced ? '' : 'none';
+        submit.disabled = invalid || eligible.length === 0;
+        submit.textContent = this.clockodoConfigured ? this.t('confirmSyncBtn') : this.t('confirmDayBtn');
+        if (invalid) {
+            notice.textContent = this.t('dayReviewInvalid');
+            notice.style.display = '';
+        }
+        document.getElementById('syncConfirmModal').classList.add('active');
+    }
+
+    closeSyncConfirmationModal() {
+        document.getElementById('syncConfirmModal')?.classList.remove('active');
+        this.confirmedSyncEntries = [];
+        this.syncConfirmationOpen = false;
+    }
+
+    async confirmDayReview() {
+        const entries = this.getDayEntries(this.reviewDate)
+            .filter(entry => [SYNC_STATUS.UNSYNCED, SYNC_STATUS.FAILED].includes(entry.syncStatus));
+        if (!entries.length) return false;
+        if (entries.some(entry => entry.endTimestamp === null || entry.endTimestamp <= entry.startTimestamp || entry.endTimestamp - entry.startTimestamp > 24 * 60 * 60 * 1000)) {
+            this.showToast(this.t('dayReviewInvalid'));
+            return false;
+        }
+
+        const dateBatches = this.syncBatches.filter(batch => batch.date === this.reviewDate);
+        const version = dateBatches.reduce((latest, batch) => Math.max(latest, Number(batch.version) || 0), 0) + 1;
+        const batchId = this.generateId();
+        const confirmedAt = Date.now();
+        const frozenEntries = entries.map(entry => ({
+            ...entry,
+            syncStatus: SYNC_STATUS.CONFIRMED,
+            syncBatchId: batchId
+        }));
+        const batch = {
+            id: batchId,
+            date: this.reviewDate,
+            version,
+            state: SYNC_STATUS.CONFIRMED,
+            confirmedAt,
+            entries: frozenEntries.map(entry => ({ ...entry, durationMs: entry.endTimestamp - entry.startTimestamp }))
+        };
+
+        await this.storage.saveConfirmedBatch(batch, frozenEntries);
+        const frozenById = new Map(frozenEntries.map(entry => [entry.id, entry]));
+        this.timeEntries = this.timeEntries.map(entry => frozenById.get(entry.id) || entry);
+        this.syncBatches.push(batch);
+        this.closeSyncConfirmationModal();
+        this.renderReview();
+        this.showToast(this.t('dayReviewConfirmed'));
+        return batch;
+    }
+
+    async confirmAndSyncClockodo() {
+        if (!this.syncConfirmationOpen) return false;
+        let batch = this.syncBatches.filter(item => item.date === this.reviewDate)
+            .sort((a, b) => b.version - a.version)
+            .find(item => [SYNC_STATUS.CONFIRMED, SYNC_STATUS.FAILED, SYNC_STATUS.SYNCING, 'partial'].includes(item.state) &&
+                item.entries.some(entry => [SYNC_STATUS.CONFIRMED, SYNC_STATUS.FAILED, SYNC_STATUS.SYNCING].includes(entry.syncStatus)));
+        if (!batch) batch = await this.confirmDayReview();
+        else this.closeSyncConfirmationModal();
+        if (!batch) return false;
+        if (!this.clockodoConfigured) {
+            this.showToast(this.t('dayReviewConfirmed'));
+            return batch;
+        }
+        return this.syncConfirmedBatch(batch.id);
+    }
+
+    async persistSyncProgress(batch) {
+        const currentById = new Map(this.timeEntries.map(entry => [entry.id, entry]));
+        const updatedEntries = batch.entries.map(snapshot => {
+            const local = currentById.get(snapshot.id);
+            const updated = { ...snapshot };
+            if (local) Object.assign(local, updated);
+            else this.timeEntries.push(updated);
+            return updated;
+        });
+        await this.storage.saveSyncProgress(batch, updatedEntries);
+        const index = this.syncBatches.findIndex(item => item.id === batch.id);
+        if (index < 0) this.syncBatches.push(batch);
+        else this.syncBatches[index] = batch;
+        this.renderReview();
+    }
+
+    syncConfirmedBatch(batchId) {
+        if (this.syncOperations.has(batchId)) return this.syncOperations.get(batchId);
+        const operation = this.performConfirmedBatchSync(batchId);
+        this.syncOperations.set(batchId, operation);
+        return operation.finally(() => {
+            if (this.syncOperations.get(batchId) === operation) this.syncOperations.delete(batchId);
+        });
+    }
+
+    async performConfirmedBatchSync(batchId) {
+        const batch = this.syncBatches.find(item => item.id === batchId);
+        if (!batch || ![SYNC_STATUS.CONFIRMED, SYNC_STATUS.FAILED, SYNC_STATUS.SYNCING, 'partial'].includes(batch.state)) return false;
+        if (!this.clockodoConfigured || !this.clockodoClient) {
+            this.showToast(this.t('clockodoConfigMissing'));
+            return false;
+        }
+        const pending = batch.entries.filter(entry => [SYNC_STATUS.CONFIRMED, SYNC_STATUS.FAILED, SYNC_STATUS.SYNCING].includes(entry.syncStatus));
+        if (!pending.length) return false;
+        const accessToken = this.getClockodoAccessToken();
+        const clientId = this.getPushClientId();
+        batch.state = SYNC_STATUS.SYNCING;
+        batch.startedAt = Date.now();
+        await this.persistSyncProgress(batch);
+
+        for (const snapshot of pending) {
+            const entry = batch.entries.find(item => item.id === snapshot.id);
+            entry.syncStatus = SYNC_STATUS.SYNCING;
+            entry.clockodoError = null;
+            if (!entry.clockodoPayload) {
+                try {
+                    entry.clockodoPayload = this.clockodoClient.buildEntryPayload(entry, {
+                        customerId: this.clockodoCustomerId,
+                        projectId: this.clockodoProjectId,
+                        serviceId: this.clockodoServiceId,
+                        billable: this.clockodoBillable
+                    });
+                } catch (error) {
+                    entry.syncStatus = SYNC_STATUS.FAILED;
+                    entry.clockodoError = error?.code || 'invalid_assignment';
+                    await this.persistSyncProgress(batch);
+                    continue;
+                }
+            }
+            await this.persistSyncProgress(batch);
+            try {
+                const idempotencyKey = `${batch.id}:${entry.id}`;
+                const result = entry.clockodoEntryId
+                    ? await this.clockodoClient.updateEntry(clientId, accessToken, entry.clockodoEntryId, entry.clockodoPayload, idempotencyKey)
+                    : await this.clockodoClient.createEntry(clientId, accessToken, entry.clockodoPayload, idempotencyKey);
+                if (!(result.created === true || result.updated === true) || !Number.isSafeInteger(Number(result.entryId)) || Number(result.entryId) <= 0) {
+                    entry.syncStatus = SYNC_STATUS.UNKNOWN;
+                    entry.clockodoError = 'malformed_response';
+                } else {
+                    entry.syncStatus = SYNC_STATUS.SYNCED;
+                    entry.clockodoEntryId = Number(result.entryId);
+                    entry.clockodoSyncedAt = Date.now();
+                    entry.clockodoError = null;
+                }
+            } catch (error) {
+                const uncertain = ['network_error', 'timeout', 'malformed_response', 'network_outcome_unknown', 'timeout_outcome_unknown', 'operation_outcome_unknown', 'clockodo_outcome_unknown'].includes(error?.code);
+                entry.syncStatus = uncertain ? SYNC_STATUS.UNKNOWN : SYNC_STATUS.FAILED;
+                entry.clockodoError = error?.code || 'request_rejected';
+            }
+            await this.persistSyncProgress(batch);
+        }
+
+        const states = batch.entries.map(entry => entry.syncStatus);
+        const succeeded = states.filter(state => state === SYNC_STATUS.SYNCED).length;
+        const failed = states.filter(state => state === SYNC_STATUS.FAILED).length;
+        const unknown = states.filter(state => state === SYNC_STATUS.UNKNOWN).length;
+        if (states.every(state => state === SYNC_STATUS.SYNCED)) batch.state = SYNC_STATUS.SYNCED;
+        else if (succeeded > 0) batch.state = 'partial';
+        else if (unknown > 0) batch.state = SYNC_STATUS.UNKNOWN;
+        else batch.state = SYNC_STATUS.FAILED;
+        batch.finishedAt = Date.now();
+        await this.persistSyncProgress(batch);
+
+        if (batch.state === SYNC_STATUS.SYNCED) this.showToast(this.t('syncSuccessToast', { count: succeeded }));
+        else if (batch.state === SYNC_STATUS.UNKNOWN) this.showToast(this.t('syncOutcomeUnknown'));
+        else if (batch.state === SYNC_STATUS.FAILED) {
+            const firstFailure = batch.entries.find(entry => entry.syncStatus === SYNC_STATUS.FAILED)?.clockodoError;
+            this.showToast(this.t('syncFailedToast', { error: this.clockodoErrorMessage({ code: firstFailure }) }));
+        } else this.showToast(this.t('syncPartialFailureToast', { success: succeeded, failed: failed + unknown }));
+        return batch;
+    }
+
+    retrySyncBatch(batchId) {
+        return this.syncConfirmedBatch(batchId);
     }
 
     renderAll() {
         this.applyTranslations();
         this.renderMain();
+        this.renderReview();
         this.renderLog();
         this.renderSettings();
         this.refreshTranslatedDynamicText();
@@ -1133,6 +1957,17 @@ class TimerHubApp {
             const activity = this.activities.find(item => item.id === this.editingActivityId);
             const title = document.getElementById('activityMenuTitle');
             if (title) title.textContent = activity?.name || this.t('activity');
+        }
+
+        const keyInput = document.getElementById('clockodoApiKeyInput');
+        const keyToggle = document.getElementById('clockodoToggleKeyBtn');
+        if (keyInput && keyToggle) {
+            keyToggle.textContent = keyInput.type === 'password' ? this.t('showSecret') : this.t('hideSecret');
+        }
+
+        const syncModal = document.getElementById('syncConfirmModal');
+        if (this.syncConfirmationOpen && syncModal?.classList.contains('active')) {
+            this.showSyncConfirmationModal();
         }
     }
 
@@ -1659,15 +2494,20 @@ class TimerHubApp {
             const activity = this.activities.find(a => a.id === activityId);
 
             if (activity) {
-                const entry = {
+                const entry = this.createTimeEntry({
                     id: this.generateId(),
                     activityId: activityId,
                     activityNameSnapshot: activity.name,
                     startTimestamp: now,
                     endTimestamp: null,
                     createdAt: now,
-                    updatedAt: now
-                };
+                    updatedAt: now,
+                    source: 'timer',
+                    notes: '',
+                    project: activity.project || '',
+                    service: activity.service || '',
+                    syncStatus: SYNC_STATUS.UNSYNCED
+                });
 
                 this.timeEntries.push(entry);
                 await this.storage.saveTimeEntry(entry);
@@ -1938,29 +2778,134 @@ class TimerHubApp {
         const entry = this.timeEntries.find(e => e.id === entryId);
         if (!entry) return;
 
-        // Populate activity selector
-        const activitySelect = document.getElementById('entryEditActivity');
-        activitySelect.innerHTML = '';
-        this.activities.forEach(a => {
-            const opt = document.createElement('option');
-            opt.value = a.id;
-            opt.textContent = a.name;
-            if (a.id === entry.activityId) opt.selected = true;
-            activitySelect.appendChild(opt);
-        });
-
+        this.populateEntryActivitySelect(entry.activityId);
         const startDate = new Date(entry.startTimestamp);
-        const endDate = new Date(entry.endTimestamp);
-
         document.getElementById('entryEditDate').value = this.toDateString(startDate);
         document.getElementById('entryEditStart').value = this.toTimeString(startDate);
-        document.getElementById('entryEditEnd').value = this.toTimeString(endDate);
-
-        document.getElementById('entryEditActivity').value = entry.activityId;
-
+        document.getElementById('entryEditEndDate').value = entry.endTimestamp === null
+            ? this.toDateString(startDate)
+            : this.toDateString(new Date(entry.endTimestamp));
+        document.getElementById('entryEditEnd').value = entry.endTimestamp === null
+            ? ''
+            : this.toTimeString(new Date(entry.endTimestamp));
+        document.getElementById('entryEditProject').value = entry.project || '';
+        document.getElementById('entryEditService').value = entry.service || '';
+        document.getElementById('entryEditNotes').value = entry.notes || '';
+        document.getElementById('entryEditModalTitle').textContent = this.t('editEntry');
+        const confirmed = [SYNC_STATUS.CONFIRMED, SYNC_STATUS.SYNCING].includes(entry.syncStatus);
+        this.setEntryEditorLocked(confirmed);
+        document.getElementById('entryEditDeleteBtn').style.display = confirmed ? 'none' : '';
         document.getElementById('entryConflictWarning').style.display = 'none';
-
         document.getElementById('entryEditModal').classList.add('active');
+    }
+
+    populateEntryActivitySelect(selectedId = '') {
+        const activitySelect = document.getElementById('entryEditActivity');
+        activitySelect.innerHTML = '';
+        this.activities.forEach(activity => {
+            const option = document.createElement('option');
+            option.value = activity.id;
+            option.textContent = activity.name;
+            activitySelect.appendChild(option);
+        });
+        activitySelect.value = selectedId || this.activities[0]?.id || '';
+    }
+
+    showAddEntryModal() {
+        this.editingEntryId = null;
+        this.populateEntryActivitySelect(this.activities[0]?.id || '');
+        document.getElementById('entryEditDate').value = this.reviewDate;
+        document.getElementById('entryEditEndDate').value = this.reviewDate;
+        document.getElementById('entryEditStart').value = '';
+        document.getElementById('entryEditEnd').value = '';
+        document.getElementById('entryEditProject').value = '';
+        document.getElementById('entryEditService').value = '';
+        document.getElementById('entryEditNotes').value = '';
+        document.getElementById('entryEditModalTitle').textContent = this.t('addEntry');
+        this.setEntryEditorLocked(false);
+        document.getElementById('entryEditDeleteBtn').style.display = 'none';
+        document.getElementById('entryConflictWarning').style.display = 'none';
+        document.getElementById('entryEditModal').classList.add('active');
+    }
+
+    setEntryEditorLocked(locked) {
+        ['entryEditActivity', 'entryEditDate', 'entryEditEndDate', 'entryEditStart', 'entryEditEnd', 'entryEditProject', 'entryEditService', 'entryEditNotes']
+            .forEach(id => { document.getElementById(id).disabled = locked; });
+        document.getElementById('entryEditSaveBtn').disabled = locked;
+        document.getElementById('entryEditLockedNotice').style.display = locked ? '' : 'none';
+    }
+
+    parseEntryDateTime(dateValue, timeValue) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(dateValue || '') || !/^\d{2}:\d{2}$/.test(timeValue || '')) return null;
+        const [year, month, day] = dateValue.split('-').map(Number);
+        const [hour, minute] = timeValue.split(':').map(Number);
+        if (hour > 23 || minute > 59) return null;
+        const date = new Date(year, month - 1, day, hour, minute, 0, 0);
+        if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day ||
+            date.getHours() !== hour || date.getMinutes() !== minute) return null;
+        return date.getTime();
+    }
+
+    async saveTimeEntry() {
+        const start = this.parseEntryDateTime(
+            document.getElementById('entryEditDate').value,
+            document.getElementById('entryEditStart').value
+        );
+        const end = this.parseEntryDateTime(
+            document.getElementById('entryEditEndDate').value,
+            document.getElementById('entryEditEnd').value
+        );
+        const activityId = document.getElementById('entryEditActivity').value;
+        const warning = document.getElementById('entryConflictWarning');
+        warning.style.display = 'none';
+
+        if (start === null || end === null || !activityId) {
+            this.showToast(this.t('pleaseFillAllFields'));
+            return;
+        }
+        if (end <= start) {
+            this.showToast(this.t('startBeforeEnd'));
+            return;
+        }
+        if (end - start > 24 * 60 * 60 * 1000) {
+            this.showToast(this.t('entryTooLong'));
+            return;
+        }
+
+        const editing = this.timeEntries.find(entry => entry.id === this.editingEntryId);
+        if ([SYNC_STATUS.CONFIRMED, SYNC_STATUS.SYNCING].includes(editing?.syncStatus)) {
+            this.showToast(this.t('confirmedEntryLocked'));
+            return;
+        }
+        const hasConflict = this.timeEntries.some(entry => {
+            if (entry.id === editing?.id) return false;
+            const otherEnd = entry.endTimestamp === null ? Infinity : entry.endTimestamp;
+            return start < otherEnd && end > entry.startTimestamp;
+        });
+        if (hasConflict) {
+            warning.style.display = 'block';
+            return;
+        }
+
+        const activity = this.activities.find(item => item.id === activityId);
+        const updates = {
+            activityId,
+            activityNameSnapshot: activity?.name || editing?.activityNameSnapshot || '',
+            startTimestamp: start,
+            endTimestamp: end,
+            project: document.getElementById('entryEditProject').value.trim(),
+            service: document.getElementById('entryEditService').value.trim(),
+            notes: document.getElementById('entryEditNotes').value.trim()
+        };
+
+        if (editing) {
+            await this.updateEntry(editing.id, updates);
+        } else {
+            await this.addEntry({ ...updates, source: 'manual' });
+        }
+        this.closeEntryEditModal();
+        this.renderLog();
+        this.renderReview();
     }
 
     closeEntryEditModal() {
@@ -1968,53 +2913,6 @@ class TimerHubApp {
         this.editingEntryId = null;
     }
 
-    async saveTimeEntry() {
-        const entry = this.timeEntries.find(e => e.id === this.editingEntryId);
-        if (!entry) return;
-
-        const date = document.getElementById('entryEditDate').value;
-        const startTime = document.getElementById('entryEditStart').value;
-        const endTime = document.getElementById('entryEditEnd').value;
-        const activityId = document.getElementById('entryEditActivity').value;
-
-        if (!date || !startTime || !endTime) {
-            this.showToast(this.t('pleaseFillAllFields'));
-            return;
-        }
-
-        const start = new Date(`${date}T${startTime}`).getTime();
-        const end = new Date(`${date}T${endTime}`).getTime();
-
-        if (start >= end) {
-            this.showToast(this.t('startBeforeEnd'));
-            return;
-        }
-
-        // Check for conflicts
-        const hasConflict = this.timeEntries.some(e => {
-            if (e.id === entry.id || e.endTimestamp === null) return false;
-            return !(end <= e.startTimestamp || start >= e.endTimestamp);
-        });
-
-        if (hasConflict) {
-            document.getElementById('entryConflictWarning').style.display = 'block';
-            return;
-        }
-
-        entry.startTimestamp = start;
-        entry.endTimestamp = end;
-        entry.activityId = activityId;
-        entry.updatedAt = Date.now();
-
-        const activity = this.activities.find(a => a.id === activityId);
-        if (activity) {
-            entry.activityNameSnapshot = activity.name;
-        }
-
-        await this.storage.saveTimeEntry(entry);
-        this.closeEntryEditModal();
-        this.renderLog();
-    }
 
     async deleteTimeEntry() {
         if (this.confirmDelete && !confirm(this.t('deleteConfirm'))) {
@@ -2023,11 +2921,16 @@ class TimerHubApp {
 
         const entry = this.timeEntries.find(e => e.id === this.editingEntryId);
         if (entry) {
+            if ([SYNC_STATUS.CONFIRMED, SYNC_STATUS.SYNCING].includes(entry.syncStatus)) {
+                this.showToast(this.t('confirmedEntryLocked'));
+                return;
+            }
             this.deletedEntry = entry;
             this.timeEntries = this.timeEntries.filter(e => e.id !== entry.id);
             await this.storage.deleteTimeEntry(entry.id);
             this.closeEntryEditModal();
             this.renderLog();
+            this.renderReview();
 
             // Show undo option
             this.showToast(`${this.t('deleted')} - ${this.t('undo')}`, 5000, () => this.undoDeleteEntry());
@@ -2040,7 +2943,165 @@ class TimerHubApp {
             await this.storage.saveTimeEntry(this.deletedEntry);
             this.deletedEntry = null;
             this.renderLog();
+            this.renderReview();
         }
+    }
+
+    getClockodoAccessToken() {
+        const storageKey = 'timerhubClockodoAccessToken';
+        let token = localStorage.getItem(storageKey) || '';
+        if (/^[A-Za-z0-9_-]{32,128}$/.test(token)) return token;
+        if (!crypto?.getRandomValues) throw new Error('secure_random_unavailable');
+        const bytes = crypto.getRandomValues(new Uint8Array(32));
+        token = btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+        localStorage.setItem(storageKey, token);
+        return token;
+    }
+
+    clockodoErrorMessage(error) {
+        const messagesByCode = {
+            network_error: this.t('clockodoNetworkError'), timeout: this.t('clockodoTimeout'),
+            timeout_outcome_unknown: this.t('clockodoTimeout'), invalid_credentials: this.t('clockodoInvalidCredentials'),
+            unauthorized: this.t('clockodoInvalidCredentials'), rate_limited: this.t('clockodoRateLimited'),
+            service_error: this.t('clockodoServiceError'), clockodo_rejected: this.t('clockodoRequestRejected'),
+            request_rejected: this.t('clockodoRequestRejected'), configuration_missing: this.t('clockodoConfigMissing'),
+            clockodo_outcome_unknown: this.t('syncOutcomeUnknown'), operation_outcome_unknown: this.t('syncOutcomeUnknown'),
+            network_outcome_unknown: this.t('syncOutcomeUnknown')
+        };
+        return messagesByCode[error?.code] || this.t('clockodoRequestRejected');
+    }
+
+    setClockodoStatus(message) {
+        const status = document.getElementById('clockodoStatusValue');
+        if (status) status.textContent = message;
+    }
+
+    async refreshClockodoConfigurationStatus() {
+        if (!this.clockodoClient) return;
+        try {
+            const config = await this.clockodoClient.getConfig(this.getPushClientId(), this.getClockodoAccessToken());
+            this.clockodoConfigured = config.configured === true;
+            if (this.clockodoConfigured && config.apiUser) {
+                this.clockodoEmail = config.apiUser;
+                await this.storage.setSetting('clockodoEmail', this.clockodoEmail);
+                document.getElementById('clockodoEmailInput').value = this.clockodoEmail;
+            }
+            this.setClockodoStatus(this.clockodoConfigured ? this.t('clockodoConfigSaved') : this.t('clockodoConfigMissing'));
+        } catch (error) {
+            this.clockodoConfigured = false;
+            this.setClockodoStatus(this.clockodoErrorMessage(error));
+        }
+    }
+
+    async saveClockodoSettings() {
+        const email = document.getElementById('clockodoEmailInput').value.trim();
+        const apiKeyInput = document.getElementById('clockodoApiKeyInput');
+        const apiKey = apiKeyInput.value.trim();
+        const customerId = document.getElementById('clockodoCustomerIdInput').value.trim();
+        const projectId = document.getElementById('clockodoProjectIdInput').value.trim();
+        const serviceId = document.getElementById('clockodoServiceIdInput').value.trim();
+        const validId = value => value === '' || /^\d+$/.test(value);
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !apiKey || !customerId || !serviceId) {
+            this.setClockodoStatus(this.t('clockodoRequiredFields'));
+            apiKeyInput.value = '';
+            return false;
+        }
+        if (![customerId, projectId, serviceId].every(validId)) {
+            this.setClockodoStatus(this.t('clockodoInvalidIds'));
+            apiKeyInput.value = '';
+            return false;
+        }
+        if (!this.clockodoClient) {
+            this.setClockodoStatus(this.t('clockodoNetworkError'));
+            apiKeyInput.value = '';
+            return false;
+        }
+        const button = document.getElementById('clockodoSaveBtn');
+        button.disabled = true;
+        try {
+            await this.clockodoClient.saveConfig(this.getPushClientId(), this.getClockodoAccessToken(), { apiUser: email, apiKey });
+            this.clockodoEmail = email;
+            this.clockodoCustomerId = customerId;
+            this.clockodoProjectId = projectId;
+            this.clockodoServiceId = serviceId;
+            this.clockodoBillable = document.getElementById('clockodoBillableSelect').value === 'true';
+            await Promise.all([
+                this.storage.setSetting('clockodoEmail', email),
+                this.storage.setSetting('clockodoCustomerId', customerId),
+                this.storage.setSetting('clockodoProjectId', projectId),
+                this.storage.setSetting('clockodoServiceId', serviceId),
+                this.storage.setSetting('clockodoBillable', this.clockodoBillable)
+            ]);
+            this.clockodoConfigured = true;
+            this.setClockodoStatus(this.t('clockodoConfigSaved'));
+            this.showToast(this.t('clockodoConfigSaved'));
+            return true;
+        } catch (error) {
+            this.setClockodoStatus(this.clockodoErrorMessage(error));
+            return false;
+        } finally {
+            apiKeyInput.value = '';
+            button.disabled = false;
+        }
+    }
+
+    async testClockodoConnection() {
+        if (!this.clockodoConfigured || !this.clockodoClient) {
+            this.setClockodoStatus(this.t('clockodoConfigMissing'));
+            return false;
+        }
+        const button = document.getElementById('clockodoTestBtn');
+        button.disabled = true;
+        try {
+            await this.clockodoClient.testConnection(this.getPushClientId(), this.getClockodoAccessToken());
+            this.setClockodoStatus(this.t('clockodoTestSuccess'));
+            this.showToast(this.t('clockodoTestSuccess'));
+            return true;
+        } catch (error) {
+            this.setClockodoStatus(this.clockodoErrorMessage(error));
+            return false;
+        } finally {
+            button.disabled = false;
+        }
+    }
+
+    async removeClockodoSettings() {
+        if (this.clockodoConfigured && this.clockodoClient) {
+            try {
+                await this.clockodoClient.removeConfig(this.getPushClientId(), this.getClockodoAccessToken());
+            } catch (error) {
+                this.setClockodoStatus(this.clockodoErrorMessage(error));
+                return false;
+            }
+        }
+        for (const key of ['clockodoEmail', 'clockodoCustomerId', 'clockodoProjectId', 'clockodoServiceId']) {
+            await this.storage.setSetting(key, '');
+        }
+        await this.storage.setSetting('clockodoBillable', true);
+        localStorage.removeItem('timerhubClockodoAccessToken');
+        this.clockodoEmail = '';
+        this.clockodoCustomerId = '';
+        this.clockodoProjectId = '';
+        this.clockodoServiceId = '';
+        this.clockodoBillable = true;
+        this.clockodoConfigured = false;
+        document.getElementById('clockodoEmailInput').value = '';
+        document.getElementById('clockodoApiKeyInput').value = '';
+        document.getElementById('clockodoCustomerIdInput').value = '';
+        document.getElementById('clockodoProjectIdInput').value = '';
+        document.getElementById('clockodoServiceIdInput').value = '';
+        document.getElementById('clockodoBillableSelect').value = 'true';
+        this.setClockodoStatus(this.t('clockodoConfigRemoved'));
+        this.showToast(this.t('clockodoConfigRemoved'));
+        return true;
+    }
+
+    toggleClockodoKeyVisibility() {
+        const input = document.getElementById('clockodoApiKeyInput');
+        const button = document.getElementById('clockodoToggleKeyBtn');
+        input.type = input.type === 'password' ? 'text' : 'password';
+        button.textContent = input.type === 'password' ? this.t('showSecret') : this.t('hideSecret');
+        button.setAttribute('aria-pressed', String(input.type === 'text'));
     }
 
     renderSettings() {
@@ -2049,6 +3110,13 @@ class TimerHubApp {
         document.getElementById('timeFormatSelect').value = this.timeFormat;
         document.getElementById('firstDaySelect').value = this.firstDayOfWeek;
         document.getElementById('confirmDeleteCheckbox').checked = this.confirmDelete;
+        document.getElementById('clockodoEmailInput').value = this.clockodoEmail;
+        document.getElementById('clockodoApiKeyInput').value = '';
+        document.getElementById('clockodoCustomerIdInput').value = this.clockodoCustomerId;
+        document.getElementById('clockodoProjectIdInput').value = this.clockodoProjectId;
+        document.getElementById('clockodoServiceIdInput').value = this.clockodoServiceId;
+        document.getElementById('clockodoBillableSelect').value = String(this.clockodoBillable);
+        this.refreshClockodoConfigurationStatus();
         const notificationSelect =
             document.getElementById('notificationIntervalSelect');
 
@@ -2298,15 +3366,18 @@ class TimerHubApp {
         const durations = [77, 80, 65, 45, 90, 30]; // minutes
 
         for (let i = 0; i < 6; i++) {
-            const entry = {
+            const entry = this.createTimeEntry({
                 id: this.generateId(),
                 activityId: this.activities[i % this.activities.length].id,
                 activityNameSnapshot: this.activities[i % this.activities.length].name,
                 startTimestamp: time,
                 endTimestamp: time + (durations[i] * 60 * 1000),
                 createdAt: now,
-                updatedAt: now
-            };
+                updatedAt: now,
+                source: 'manual',
+                notes: '',
+                syncStatus: SYNC_STATUS.UNSYNCED
+            });
             this.timeEntries.push(entry);
             await this.storage.saveTimeEntry(entry);
             time = entry.endTimestamp;

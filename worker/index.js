@@ -17,6 +17,20 @@ function validText(value, fallback, maxLength) {
         : fallback;
 }
 
+function bytesToBase64(bytes) {
+    let binary = "";
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    return btoa(binary);
+}
+
+function base64ToBytes(value) {
+    return Uint8Array.from(atob(value), character => character.charCodeAt(0));
+}
+
+function jsonError(error, status) {
+    return Response.json({ error }, { status });
+}
+
 export class TimerHubDurableObject {
     constructor(state, env) {
         this.state = state;
@@ -25,6 +39,10 @@ export class TimerHubDurableObject {
 
     async fetch(request) {
         const url = new URL(request.url);
+
+        if (url.pathname.startsWith("/clockodo/")) {
+            return this.handleClockodo(request, url);
+        }
 
         if (request.method === "POST" && url.pathname === "/subscribe") {
             const subscription = await request.json();
@@ -144,6 +162,168 @@ export class TimerHubDurableObject {
         return new Response("Not found", { status: 404 });
         }
 
+    async clockodoTokenDigest(token) {
+        const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+        return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, "0")).join("");
+    }
+
+    async authorizeClockodo(request, allowBootstrap = false) {
+        const token = request.headers.get("Authorization")?.replace(/^Bearer\s+/i, "") || "";
+        if (!/^[A-Za-z0-9_-]{32,128}$/.test(token)) return null;
+        const storedDigest = await this.state.storage.get("clockodoTokenDigest");
+        if (!storedDigest && allowBootstrap) {
+            await this.state.storage.put("clockodoTokenDigest", await this.clockodoTokenDigest(token));
+            return token;
+        }
+        if (!storedDigest || storedDigest !== await this.clockodoTokenDigest(token)) return null;
+        return token;
+    }
+
+    async encryptClockodoKey(token, apiKey) {
+        const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+        const key = await crypto.subtle.importKey("raw", digest, "AES-GCM", false, ["encrypt"]);
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, new TextEncoder().encode(apiKey));
+        return { keyCipher: bytesToBase64(new Uint8Array(ciphertext)), keyIv: bytesToBase64(iv) };
+    }
+
+    async decryptClockodoKey(token, credentials) {
+        const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+        const key = await crypto.subtle.importKey("raw", digest, "AES-GCM", false, ["decrypt"]);
+        const plaintext = await crypto.subtle.decrypt(
+            { name: "AES-GCM", iv: base64ToBytes(credentials.keyIv) },
+            key,
+            base64ToBytes(credentials.keyCipher)
+        );
+        return new TextDecoder().decode(plaintext);
+    }
+
+    async clockodoFetch(request, token, credentials, path, body, method = body === undefined ? "GET" : "POST") {
+        const apiKey = await this.decryptClockodoKey(token, credentials);
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 12000);
+        try {
+            return await fetch(`https://my.clockodo.com/api/${path}`, {
+                method,
+                headers: {
+                    "X-ClockodoApiUser": credentials.apiUser,
+                    "X-ClockodoApiKey": apiKey,
+                    "X-Clockodo-External-Application": `TimerHub;${credentials.apiUser}`,
+                    "Accept": "application/json",
+                    ...(body === undefined ? {} : { "Content-Type": "application/json" })
+                },
+                body: body === undefined ? undefined : JSON.stringify(body),
+                signal: controller.signal
+            });
+        } finally {
+            clearTimeout(timeout);
+        }
+    }
+
+    async handleClockodo(request, url) {
+        const path = url.pathname;
+        if (path === "/clockodo/config" && request.method === "GET" &&
+            !await this.state.storage.get("clockodoTokenDigest")) {
+            return Response.json({ configured: false, apiUser: "" });
+        }
+        if (path === "/clockodo/config" && request.method === "PUT") {
+            const credentials = await request.json().catch(() => null);
+            if (!credentials || typeof credentials.apiUser !== "string" ||
+                !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(credentials.apiUser) ||
+                typeof credentials.apiKey !== "string" || !credentials.apiKey.trim() || credentials.apiKey.length > 512) {
+                return jsonError("invalid_configuration", 400);
+            }
+            const token = await this.authorizeClockodo(request, true);
+            if (!token) return jsonError("unauthorized", 401);
+            const encrypted = await this.encryptClockodoKey(token, credentials.apiKey.trim());
+            await this.state.storage.put("clockodoCredentials", {
+                apiUser: credentials.apiUser.trim(),
+                ...encrypted
+            });
+            return Response.json({ configured: true });
+        }
+
+        const token = await this.authorizeClockodo(request);
+        if (!token) return jsonError("unauthorized", 401);
+        const credentials = await this.state.storage.get("clockodoCredentials");
+
+        if (path === "/clockodo/config" && request.method === "GET") {
+            return Response.json({ configured: Boolean(credentials), apiUser: credentials?.apiUser || "" });
+        }
+        if (path === "/clockodo/config" && request.method === "DELETE") {
+            await this.state.storage.delete("clockodoCredentials");
+            await this.state.storage.delete("clockodoTokenDigest");
+            for (const item of await this.state.storage.list({ prefix: "clockodo-operation:" })) {
+                await this.state.storage.delete(item[0]);
+            }
+            return Response.json({ configured: false });
+        }
+        if (!credentials) return jsonError("configuration_missing", 409);
+
+        if (path === "/clockodo/test" && request.method === "POST") {
+            try {
+                const response = await this.clockodoFetch(request, token, credentials, "v2/aggregates/users/me");
+                if (!response.ok) return jsonError(response.status === 401 ? "invalid_credentials" : response.status === 429 ? "rate_limited" : "clockodo_rejected", response.status);
+                const data = await response.json().catch(() => null);
+                if (!data || typeof data !== "object") return jsonError("malformed_response", 502);
+                return Response.json({ connected: true });
+            } catch (error) {
+                return jsonError(error?.name === "AbortError" ? "timeout" : "network_error", 502);
+            }
+        }
+
+        const updateMatch = path.match(/^\/clockodo\/entries\/(\d+)$/);
+        const isUpdate = Boolean(updateMatch && request.method === "PUT");
+        if ((path === "/clockodo/entries" && request.method === "POST") || isUpdate) {
+            const body = await request.json().catch(() => null);
+            const operationId = request.headers.get("Idempotency-Key") || "";
+            if (!body || typeof body !== "object" || Array.isArray(body) ||
+                !/^\d{4}-\d\d-\d\dT/.test(body.time_since || "") ||
+                !/^\d{4}-\d\d-\d\dT/.test(body.time_until || "") ||
+                !Number.isInteger(body.customers_id) || body.customers_id < 0 ||
+                !Number.isInteger(body.services_id) || body.services_id < 0 ||
+                ![0, 1].includes(body.billable) ||
+                (body.projects_id !== undefined && body.projects_id !== null && (!Number.isInteger(body.projects_id) || body.projects_id < 0)) ||
+                (body.text !== undefined && body.text !== null && (typeof body.text !== "string" || body.text.length > 1000))) {
+                return jsonError("invalid_entry", 400);
+            }
+            if (!/^[A-Za-z0-9:_-]{8,200}$/.test(operationId)) return jsonError("missing_idempotency_key", 400);
+            const storageKey = `clockodo-operation:${operationId}`;
+            const previous = await this.state.storage.get(storageKey);
+            if (previous?.state === "succeeded") return Response.json({ ...previous.result, duplicate: true });
+            if (previous?.state === "unknown" || previous?.state === "sending") return jsonError("operation_outcome_unknown", 409);
+            await this.state.storage.put(storageKey, { state: "sending", at: Date.now() });
+            try {
+                const endpoint = isUpdate ? `v2/entries/${Number(updateMatch[1])}` : "v2/entries";
+                const response = await this.clockodoFetch(request, token, credentials, endpoint, body, isUpdate ? "PUT" : "POST");
+                const data = await response.json().catch(() => null);
+                if (!response.ok) {
+                    const uncertain = response.status >= 500;
+                    await this.state.storage.put(storageKey, { state: uncertain ? "unknown" : "failed", status: response.status, at: Date.now() });
+                    const error = response.status === 401 ? "invalid_credentials"
+                        : response.status === 429 ? "rate_limited"
+                        : uncertain ? "clockodo_outcome_unknown"
+                        : "clockodo_rejected";
+                    return jsonError(error, response.status);
+                }
+                if (!data?.entry || !Number.isInteger(Number(data.entry.id)) || Number(data.entry.id) <= 0) {
+                    await this.state.storage.put(storageKey, { state: "unknown", at: Date.now() });
+                    return jsonError("malformed_response", 502);
+                }
+                const result = isUpdate
+                    ? { updated: true, entryId: Number(data.entry.id) }
+                    : { created: true, entryId: Number(data.entry.id) };
+                await this.state.storage.put(storageKey, { state: "succeeded", result, at: Date.now() });
+                return Response.json(result);
+            } catch (error) {
+                await this.state.storage.put(storageKey, { state: "unknown", at: Date.now() });
+                return jsonError(error?.name === "AbortError" ? "timeout_outcome_unknown" : "network_outcome_unknown", 502);
+            }
+        }
+
+        return jsonError("not_found", 404);
+    }
+
     async alarm() {
         const alarm = await this.state.storage.get("alarm");
         if (!alarm) return;
@@ -239,6 +419,27 @@ export default {
                 publicKey: env.VAPID_PUBLIC_KEY,
                 subject: env.VAPID_SUBJECT
             });
+        }
+
+        const clockodoRoutes = new Map([
+            ["/api/clockodo/config", "/clockodo/config"],
+            ["/api/clockodo/test", "/clockodo/test"],
+            ["/api/clockodo/entries", "/clockodo/entries"]
+        ]);
+        const clockodoEntryUpdate = /^\/api\/clockodo\/entries\/(\d+)$/.test(url.pathname);
+        if (clockodoRoutes.has(url.pathname) || clockodoEntryUpdate) {
+            if (!["GET", "PUT", "POST", "DELETE"].includes(request.method)) {
+                return jsonError("method_not_allowed", 405);
+            }
+            const clientId = url.searchParams.get("clientId");
+            if (!clientId || !/^[a-zA-Z0-9_-]{16,128}$/.test(clientId)) {
+                return jsonError("invalid_client_id", 400);
+            }
+            const id = env.TIMER_HUB.idFromName(clientId);
+            const stub = env.TIMER_HUB.get(id);
+            const targetUrl = new URL(request.url);
+            targetUrl.pathname = clockodoRoutes.get(url.pathname) || url.pathname.replace("/api/clockodo/", "/clockodo/");
+            return stub.fetch(new Request(targetUrl, request));
         }
 
         if (

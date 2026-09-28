@@ -22,6 +22,7 @@
             <div class="navbar-content">
                 <h1 class="navbar-title" id="navHome" role="button" tabindex="0" aria-label="Go to home screen" data-i18n="appName" data-i18n-aria-label="homeScreen">TimerHub</h1>
                 <div class="navbar-actions">
+                    <button id="navReview" class="nav-btn" aria-label="Day Review" data-i18n-aria-label="dayReview">📅</button>
                     <button id="navLog" class="nav-btn" aria-label="View log" data-i18n-aria-label="viewLog">📋</button>
                     <button id="navSettings" class="nav-btn" aria-label="Settings" data-i18n-aria-label="settings">⚙️</button>
                 </div>
@@ -38,6 +39,35 @@
             
             <button id="addActivityBtn" class="add-button" aria-label="Add new activity" data-i18n-aria-label="addActivity">+</button>
             
+            <div class="safe-area-bottom"></div>
+        </div>
+
+        <!-- Day Review screen -->
+        <div id="reviewScreen" class="screen">
+            <div class="screen-header">
+                <h2 data-i18n="endOfDayReview">End-of-Day Review</h2>
+            </div>
+
+            <div class="review-date-bar">
+                <button id="reviewPrevDayBtn" class="date-nav-btn" aria-label="Previous day" data-i18n-aria-label="previousDay">‹</button>
+                <input type="date" id="reviewDateInput" class="review-date-input" aria-label="Review date" data-i18n-aria-label="reviewDate">
+                <button id="reviewNextDayBtn" class="date-nav-btn" aria-label="Next day" data-i18n-aria-label="nextDay">›</button>
+                <button id="reviewTodayBtn" class="action-btn small-btn" data-i18n="today">Today</button>
+            </div>
+
+            <div id="reviewSummaryBar" class="review-summary-bar"></div>
+
+            <div id="reviewSuspiciousBanner" class="review-suspicious-banner" style="display: none;"></div>
+
+            <div class="review-toolbar">
+                <button id="reviewAddEntryBtn" class="action-btn"><span aria-hidden="true">➕</span> <span data-i18n="addEntry">Add Entry</span></button>
+                <button id="reviewConfirmSyncBtn" class="action-btn btn-primary-green"><span aria-hidden="true">🚀</span> <span data-i18n="reviewAndSync">Review &amp; Sync</span></button>
+            </div>
+
+            <div id="reviewEntriesList" class="review-entries-list">
+                <!-- Time entries rendered here -->
+            </div>
+
             <div class="safe-area-bottom"></div>
         </div>
 
@@ -171,6 +201,57 @@
                 </div>
                 
                 <div class="settings-divider"></div>
+                <h3 class="settings-subtitle" data-i18n="clockodoSettings">Clockodo Integration</h3>
+
+                <div class="settings-group">
+                    <label for="clockodoEmailInput" data-i18n="clockodoApiUser">Clockodo Email</label>
+                    <input type="email" id="clockodoEmailInput" class="form-input" placeholder="user@example.com" autocomplete="email">
+                </div>
+
+                <div class="settings-group">
+                    <label for="clockodoApiKeyInput" data-i18n="clockodoApiKey">Clockodo API Key</label>
+                    <div class="input-with-action">
+                        <input type="password" id="clockodoApiKeyInput" class="form-input" placeholder="Enter key to set or replace" data-i18n-placeholder="clockodoApiKeyPlaceholder" autocomplete="new-password">
+                        <button type="button" id="clockodoToggleKeyBtn" class="action-btn small-btn" data-i18n="showSecret">Show</button>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="clockodoCustomerIdInput" data-i18n="clockodoCustomerId">Default Customer ID</label>
+                    <input type="text" id="clockodoCustomerIdInput" class="form-input" placeholder="Clockodo customer ID" data-i18n-placeholder="customerIdPlaceholder" inputmode="numeric">
+                    </div>
+                    <div class="form-group">
+                        <label for="clockodoProjectIdInput" data-i18n="clockodoProjectId">Default Project ID</label>
+                        <input type="text" id="clockodoProjectIdInput" class="form-input" placeholder="Clockodo project ID" data-i18n-placeholder="projectIdPlaceholder" inputmode="numeric">
+                    </div>
+                </div>
+
+                <div class="settings-group">
+                    <label for="clockodoServiceIdInput" data-i18n="clockodoServiceId">Default Service ID</label>
+                    <input type="text" id="clockodoServiceIdInput" class="form-input" placeholder="Clockodo service ID" data-i18n-placeholder="serviceIdPlaceholder" inputmode="numeric">
+                </div>
+
+                <div class="settings-group">
+                    <label for="clockodoBillableSelect" data-i18n="clockodoBillable">Default billable status</label>
+                    <select id="clockodoBillableSelect" class="setting-select">
+                        <option value="true" data-i18n="clockodoBillableYes">Billable</option>
+                        <option value="false" data-i18n="clockodoBillableNo">Not billable</option>
+                    </select>
+                </div>
+
+                <small class="settings-help" data-i18n="clockodoSecurityNote">API credentials are saved locally in your browser and used only for explicit synchronization.</small>
+
+                <button id="clockodoSaveBtn" class="settings-btn btn-primary-green" type="button" style="margin-top:8px;">
+                    <span data-i18n="clockodoSaveConfig">Save Clockodo Settings</span>
+                </button>
+                <div class="clockodo-settings-actions">
+                    <button id="clockodoTestBtn" class="settings-btn" type="button" data-i18n="clockodoTestConnection">Test connection</button>
+                    <button id="clockodoRemoveBtn" class="settings-btn btn-danger" type="button" data-i18n="clockodoRemoveConfig">Remove Clockodo configuration</button>
+                </div>
+                <small id="clockodoStatus" class="settings-help" role="status" aria-live="polite"><span data-i18n="clockodoConnectionStatus">Connection status</span>: <span id="clockodoStatusValue"></span></small>
+
+                <div class="settings-divider"></div>
                 
                 <button id="backupBtn" class="settings-btn"><span aria-hidden="true">💾</span> <span data-i18n="backupData">Backup Data</span></button>
                 <button id="restoreBtn" class="settings-btn"><span aria-hidden="true">📥</span> <span data-i18n="restoreData">Restore Data</span></button>
@@ -250,11 +331,12 @@
         <div id="entryEditModal" class="modal">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h3 data-i18n="editEntry">Edit Entry</h3>
+                    <h3 id="entryEditModalTitle" data-i18n="editEntry">Edit Entry</h3>
                     <button id="entryEditCloseBtn" class="modal-close" aria-label="Close" data-i18n-aria-label="close">✕</button>
                 </div>
                 
                 <div class="modal-body">
+                    <div id="entryEditLockedNotice" class="sync-confirm-notice" data-i18n="confirmedEntryLocked" style="display: none;"></div>
                     <div class="form-group">
                             <label for="entryEditActivity" data-i18n="activity">Activity</label>
                         <select id="entryEditActivity" class="form-input"></select>
@@ -263,6 +345,11 @@
                     <div class="form-group">
                         <label for="entryEditDate" data-i18n="date">Date</label>
                         <input type="date" id="entryEditDate" class="form-input">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="entryEditEndDate" data-i18n="endDate">End Date</label>
+                        <input type="date" id="entryEditEndDate" class="form-input">
                     </div>
                     
                     <div class="form-row">
@@ -274,6 +361,22 @@
                             <label for="entryEditEnd" data-i18n="endTime">End Time</label>
                             <input type="time" id="entryEditEnd" class="form-input">
                         </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="entryEditProject" data-i18n="project">Project</label>
+                        <input type="text" id="entryEditProject" class="form-input" placeholder="Project name or ID" data-i18n-placeholder="projectPlaceholder">
+                        </div>
+                        <div class="form-group">
+                            <label for="entryEditService" data-i18n="service">Service</label>
+                        <input type="text" id="entryEditService" class="form-input" placeholder="Service name or ID" data-i18n-placeholder="servicePlaceholder">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="entryEditNotes" data-i18n="notes">Notes</label>
+                        <textarea id="entryEditNotes" class="form-input" rows="2" placeholder="Description of work done" data-i18n-placeholder="notesPlaceholder"></textarea>
                     </div>
                     
                     <div id="entryConflictWarning" class="warning" style="display: none;">
@@ -289,10 +392,33 @@
             </div>
         </div>
 
+        <!-- Modal: Final Sync Confirmation -->
+        <div id="syncConfirmModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="syncConfirmModalTitle" data-i18n="confirmSyncTitle">Confirm Clockodo Synchronization</h3>
+                    <button id="syncConfirmCloseBtn" class="modal-close" aria-label="Close" data-i18n-aria-label="close">✕</button>
+                </div>
+
+                <div class="modal-body">
+                    <p id="syncConfirmDesc" data-i18n="confirmSyncDesc">The following time entries will be sent to Clockodo:</p>
+                    <div id="syncConfirmEntriesList" class="sync-confirm-list"></div>
+                    <div id="syncConfirmSummary" class="sync-confirm-summary"></div>
+                    <div id="syncConfirmAlreadySyncedNotice" class="sync-confirm-notice" style="display: none;"></div>
+                </div>
+
+                <div class="modal-footer">
+                    <button id="syncConfirmCancelBtn" class="btn-secondary" data-i18n="cancel">Cancel</button>
+                    <button id="syncConfirmSubmitBtn" class="btn-primary-green" data-i18n="confirmDayBtn">Confirm Day for Clockodo</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Toast notifications -->
         <div id="toast" class="toast"></div>
     </div>
 
+    <script src="clockodo-client.js"></script>
     <script src="app.js"></script>
     <script>
         if ('serviceWorker' in navigator) {

@@ -7,6 +7,8 @@ A lightweight, offline-first time tracking application optimized for constructio
 - 📱 Works offline after first load
 - 🎯 One-tap activity switching
 - 📊 Detailed time logs with filtering
+- 🗓️ End-of-day review with editable time entries
+- 🔄 Explicit, retryable Clockodo synchronization
 - 📥 Export to TXT, CSV, JSON
 - 💾 Local data backup/restore
 - 🌙 Dark/Light theme support
@@ -362,17 +364,31 @@ In development (localhost), a demo button appears in settings:
 ## Privacy & Security
 
 - **No tracking:** No analytics, no user tracking
-- **No cloud sync:** Data never leaves your device
+- **Local source of truth:** Time entries stay in IndexedDB until you explicitly confirm a day for Clockodo
+- **Optional Clockodo sync:** Only the confirmed snapshot is sent through the TimerHub Worker; local entries remain available
 - **No ads:** No advertising
 - **Open source principles:** Transparent code
-- **Local storage only:** IndexedDB on your device
+- **API key handling:** The Clockodo API key is sent to the TimerHub Worker over HTTPS and stored encrypted in its Durable Object. It is not saved in browser storage, included in backups, or returned to the browser. The per-device access token is kept in browser local storage and protects that device's Worker configuration.
+
+---
+
+## End-of-Day Review and Clockodo
+
+Open **Day Review** to inspect a day's entries in time order, see gaps and the total, and add, edit, or delete entries. Entry changes are saved locally. Invalid, overlapping, and incomplete intervals are flagged; overlapping intervals are not merged automatically. Entries longer than 24 hours cannot be saved.
+
+In **Settings → Clockodo Integration**, enter the Clockodo account email, API key, and default customer and service IDs. Project ID and billable defaults are optional. Save the settings and use **Test connection** to check the credentials. The API key field is cleared after saving. Removing the configuration deletes the encrypted key from the Worker.
+
+Review the day and choose **Review & Sync**. The confirmation dialog names how many entries will be included and shows their total duration. **Confirm & Send** is the only action that transmits entries to Clockodo. If Clockodo is not configured, **Confirm Day for Clockodo** saves a local confirmed snapshot; no request is sent, and the user can configure Clockodo and send it later.
+
+Confirmation freezes an identifiable batch snapshot. The Worker records an idempotency key for each create or update, so repeating a completed operation does not create a duplicate. Per-entry results are shown. Failed entries can be retried; entries with an uncertain network outcome are marked as unknown and are not blindly resent, because Clockodo may already have accepted them. Check Clockodo before resolving an unknown result. Local entries and batch history remain in TimerHub if synchronization fails.
+
+Clockodo synchronization requires the deployed same-origin Cloudflare Worker and its Durable Object binding. A static local web server or static-only host does not provide the proxy routes, so Clockodo configuration and synchronization are unavailable there. Day review and local editing continue to work. The integration sends only entries that the user explicitly confirmed; it does not continuously sync timer activity.
 
 ---
 
 ## Future Enhancements
 
 Possible additions (not yet implemented):
-- Clockodo integration
 - Excel export with formatting
 - Photo attachments to entries
 - Voice commands
