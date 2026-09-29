@@ -656,7 +656,7 @@ test('Task 8: Interrupted syncing batches reload and recover through the Worker 
     };
     const recovered = await reloaded.syncConfirmedBatch(batch.id);
     assert.equal(recovered.state, 'synced');
-    assert.equal(sentKey, `${batch.id}:reload-sync`);
+    assert.equal(sentKey, 'timerhub-entry:reload-sync');
     assert.equal(storageData.timeEntries[0].clockodoEntryId, 700);
 });
 

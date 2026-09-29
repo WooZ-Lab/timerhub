@@ -1908,7 +1908,9 @@ class TimerHubApp {
             }
             await this.persistSyncProgress(batch);
             try {
-                const idempotencyKey = `${batch.id}:${entry.id}`;
+                // Use the local entry identity across batch versions. A restored older backup
+                // must not create a second Clockodo record for an entry already accepted.
+                const idempotencyKey = `timerhub-entry:${entry.id}`;
                 const result = await this.clockodoClient.createEntry(clientId, accessToken, entry.clockodoPayload, idempotencyKey);
                 if (result.created !== true || !Number.isSafeInteger(Number(result.entryId)) || Number(result.entryId) <= 0) {
                     entry.syncStatus = SYNC_STATUS.UNKNOWN;

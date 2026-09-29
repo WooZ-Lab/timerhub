@@ -803,7 +803,7 @@ test('Clockodo Worker stores credentials encrypted, proxies documented operation
         time_since: '2026-09-28T08:00:00.000Z', time_until: '2026-09-28T09:00:00.000Z',
         customers_id: 3, services_id: 9, projects_id: 4, billable: 1, text: 'Painting'
     };
-    const headers = { ...auth, 'Content-Type': 'application/json', 'Idempotency-Key': 'batch:entry:1' };
+    const headers = { ...auth, 'Content-Type': 'application/json', 'Idempotency-Key': 'timerhub-entry:review-entry-1' };
     const createPath = `/api/clockodo/entries?clientId=${clientId}`;
     const create = () => backend.request(createPath, { method: 'POST', headers, body: JSON.stringify(payload) });
     assert.deepEqual(await (await create()).json(), { created: true, entryId: 8765 });
