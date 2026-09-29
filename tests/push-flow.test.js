@@ -815,9 +815,14 @@ test('Clockodo Worker stores credentials encrypted, proxies documented operation
         method: 'PUT', headers: { ...auth, 'Content-Type': 'application/json', 'Idempotency-Key': 'batch:entry:update' },
         body: JSON.stringify(payload)
     });
-    assert.deepEqual(await update.json(), { updated: true, entryId: 8765 });
-    assert.equal(requests[2].url, 'https://my.clockodo.com/api/v2/entries/8765');
-    assert.equal(requests[2].init.method, 'PUT');
+    assert.equal(update.status, 405);
+    const deletion = await backend.request(`/api/clockodo/entries/8765?clientId=${clientId}`, {
+        method: 'DELETE', headers: auth
+    });
+    assert.equal(deletion.status, 405);
+    const collectionDelete = await backend.request(createPath, { method: 'DELETE', headers: auth });
+    assert.equal(collectionDelete.status, 405);
+    assert.equal(requests.length, 2, 'UPDATE and DELETE paths must not reach Clockodo');
 });
 
 test('Clockodo Worker reports authentication and uncertain malformed-create outcomes safely', async t => {

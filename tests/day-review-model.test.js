@@ -606,7 +606,7 @@ test('Task 8: Uncertain network outcomes are marked unknown and blocked from bli
     assert.equal(requests, 1);
 });
 
-test('Task 8: Material edits to an already-synced entry update its Clockodo record instead of creating a duplicate', async () => {
+test('Safety: editing an already-synced entry requires confirmation and never updates or recreates its Clockodo record', async () => {
     const { app } = createTestApp();
     const start = new Date('2026-09-28T08:00:00').getTime();
     const entry = await app.addEntry({
@@ -618,17 +618,17 @@ test('Task 8: Material edits to an already-synced entry update its Clockodo reco
     app.reviewDate = '2026-09-28'; app.clockodoConfigured = true;
     app.clockodoCustomerId = '12'; app.clockodoServiceId = '56';
     app.showToast = () => {}; app.renderReview = () => {};
-    let updatedId = null;
     let created = false;
     app.clockodoClient = {
         buildEntryPayload: value => ({ notes: value.notes }),
-        async updateEntry(clientId, token, id, payload) { updatedId = id; assert.equal(payload.notes, 'Add second coat'); return { updated: true, entryId: id }; },
+        async updateEntry() { throw new Error('UPDATE must never be reached'); },
         async createEntry() { created = true; return { created: true, entryId: 12345 }; }
     };
     app.showSyncConfirmationModal();
     const batch = await app.confirmAndSyncClockodo();
-    assert.equal(batch.state, 'synced');
-    assert.equal(updatedId, 9901);
+    assert.equal(batch.state, 'local_only');
+    assert.equal(batch.entries[0].syncStatus, 'local_only');
+    assert.equal(batch.entries[0].clockodoEntryId, 9901);
     assert.equal(created, false);
 });
 

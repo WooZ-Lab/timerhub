@@ -47,16 +47,10 @@ test('Clockodo client sends only proxy credentials and validates successful entr
     assert.equal(JSON.stringify(request.init).includes('ClockodoApiKey'), false);
 });
 
-test('Clockodo client updates an existing Clockodo entry using the documented entry resource', async () => {
-    let request;
-    const { client } = makeClient(async (url, init) => {
-        request = { url, init };
-        return Response.json({ created: true, entryId: 987 });
-    });
-    await client.updateEntry(...Object.values(clientOptions), 987, { customers_id: 1 }, 'batch:entry:update');
-    assert.match(request.url, /\/api\/clockodo\/entries\/987\?clientId=/);
-    assert.equal(request.init.method, 'PUT');
-    assert.equal(request.init.headers['Idempotency-Key'], 'batch:entry:update');
+test('Clockodo client exposes CREATE only for time entries', () => {
+    const { client } = makeClient(async () => Response.json({ created: true, entryId: 987 }));
+    assert.equal(typeof client.createEntry, 'function');
+    assert.equal(client.updateEntry, undefined);
 });
 
 test('Clockodo client classifies invalid credentials and malformed responses without exposing response bodies', async () => {

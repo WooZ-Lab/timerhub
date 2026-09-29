@@ -100,15 +100,6 @@
             });
         }
 
-        updateEntry(clientId, accessToken, entryId, entry, idempotencyKey) {
-            if (!Number.isSafeInteger(Number(entryId)) || Number(entryId) <= 0) {
-                throw new ClockodoClientError('invalid_entry_id');
-            }
-            return this.request(`/api/clockodo/entries/${Number(entryId)}`, {
-                clientId, accessToken, method: 'PUT', body: entry, idempotencyKey
-            });
-        }
-
         buildEntryPayload(entry, config) {
             return ClockodoClient.buildEntryPayload(entry, config);
         }

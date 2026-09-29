@@ -220,6 +220,9 @@ const extendedTranslations = {
         statusSynced: 'Synced', statusUnsynced: 'Unsynced',
         statusPending: 'Pending', statusSyncing: 'Syncing...', statusFailed: 'Sync failed',
         statusUnknown: 'Outcome unknown',
+        statusLocalOnly: 'Local edit; Clockodo unchanged',
+        syncLocalOnlyNotice: 'This entry already exists in Clockodo. The confirmed local edit was kept in TimerHub; Clockodo was not changed.',
+        syncLocalOnlyToast: '{count} confirmed local edit(s) were kept in TimerHub. Existing Clockodo entries were left unchanged.',
         statusPartial: 'Partially synchronized',
         syncProgress: '{done} of {total} entries processed',
         syncOutcomeUnknown: 'Clockodo may have accepted this entry. Check Clockodo before attempting a manual resend.',
@@ -334,6 +337,9 @@ const extendedTranslations = {
         statusSynced: 'Synchronisiert', statusUnsynced: 'Nicht synchronisiert',
         statusPending: 'Ausstehend', statusSyncing: 'Synchronisiere...', statusFailed: 'Fehlgeschlagen',
         statusUnknown: 'Ergebnis unklar',
+        statusLocalOnly: 'Lokal geändert; Clockodo unverändert',
+        syncLocalOnlyNotice: 'Dieser Eintrag existiert bereits in Clockodo. Die bestätigte lokale Änderung bleibt in TimerHub; Clockodo wurde nicht geändert.',
+        syncLocalOnlyToast: '{count} bestätigte lokale Änderung(en) bleiben in TimerHub. Bestehende Clockodo-Einträge wurden nicht geändert.',
         statusPartial: 'Teilweise synchronisiert',
         syncProgress: '{done} von {total} Einträgen verarbeitet',
         syncOutcomeUnknown: 'Clockodo könnte den Eintrag angenommen haben. Prüfe Clockodo vor einem erneuten manuellen Versand.',
@@ -448,6 +454,9 @@ const extendedTranslations = {
         statusSynced: 'Синхронизировано', statusUnsynced: 'Не синхронизировано',
         statusPending: 'В ожидании', statusSyncing: 'Синхронизация...', statusFailed: 'Ошибка синхронизации',
         statusUnknown: 'Результат неизвестен',
+        statusLocalOnly: 'Локальное изменение; Clockodo без изменений',
+        syncLocalOnlyNotice: 'Эта запись уже существует в Clockodo. Подтверждённое локальное изменение сохранено в TimerHub; Clockodo не изменён.',
+        syncLocalOnlyToast: 'Подтверждённые локальные изменения ({count}) сохранены в TimerHub. Существующие записи Clockodo не изменялись.',
         statusPartial: 'Синхронизировано частично',
         syncProgress: 'Обработано записей: {done} из {total}',
         syncOutcomeUnknown: 'Clockodo мог принять запись. Проверьте Clockodo перед повторной отправкой вручную.',
@@ -518,7 +527,8 @@ const SYNC_STATUS = Object.freeze({
     SYNCING: 'syncing',
     SYNCED: 'synced',
     FAILED: 'failed',
-    UNKNOWN: 'unknown'
+    UNKNOWN: 'unknown',
+    LOCAL_ONLY: 'local_only'
 });
 
 // ============================================================================
@@ -1200,7 +1210,7 @@ class TimerHubApp {
             }
             merged.isEdited = true;
             merged.editedAt = Date.now();
-            if (existing.syncStatus === SYNC_STATUS.SYNCED || existing.syncStatus === SYNC_STATUS.CONFIRMED) {
+            if (existing.syncStatus === SYNC_STATUS.SYNCED || existing.syncStatus === SYNC_STATUS.LOCAL_ONLY || existing.syncStatus === SYNC_STATUS.CONFIRMED) {
                 merged.syncStatus = SYNC_STATUS.UNSYNCED;
                 merged.clockodoError = null;
             }
@@ -1669,8 +1679,8 @@ class TimerHubApp {
         summary.innerHTML = `<div class="review-summary-card highlight"><div class="review-summary-label">${this.t('totalTrackedTime')}</div><div class="review-summary-value">${this.formatDuration(total)}</div></div><div class="review-summary-card"><div class="review-summary-label">${this.t('entriesCount', { count: entries.length })}</div></div><div class="review-summary-card"><div class="review-summary-label">${this.t('syncedCount', { count: syncedCount })}</div></div><div class="review-summary-card"><div class="review-summary-label">${this.t('unsyncedCount', { count: unsyncedCount })}</div></div>`;
         const latestBatch = this.syncBatches.filter(batch => batch.date === this.reviewDate).sort((a, b) => b.version - a.version)[0];
         if (latestBatch) {
-            const done = latestBatch.entries.filter(entry => [SYNC_STATUS.SYNCED, SYNC_STATUS.FAILED, SYNC_STATUS.UNKNOWN].includes(entry.syncStatus)).length;
-            const batchStatusKey = { partial: 'statusPartial', unknown: 'statusUnknown', confirmed: 'statusPending', syncing: 'statusSyncing', failed: 'statusFailed', synced: 'statusSynced' }[latestBatch.state] || 'statusPending';
+            const done = latestBatch.entries.filter(entry => [SYNC_STATUS.SYNCED, SYNC_STATUS.LOCAL_ONLY, SYNC_STATUS.FAILED, SYNC_STATUS.UNKNOWN].includes(entry.syncStatus)).length;
+            const batchStatusKey = { partial: 'statusPartial', unknown: 'statusUnknown', confirmed: 'statusPending', syncing: 'statusSyncing', failed: 'statusFailed', synced: 'statusSynced', local_only: 'statusLocalOnly' }[latestBatch.state] || 'statusPending';
             summary.innerHTML += `<div class="review-summary-card"><div class="review-summary-label">${this.t('syncProgress', { done, total: latestBatch.entries.length })}</div><div class="review-summary-value">${this.t(batchStatusKey)}</div></div>`;
         }
 
@@ -1692,7 +1702,7 @@ class TimerHubApp {
         const statusKeys = {
             unsynced: this.t('statusUnsynced'), pending: this.t('statusPending'), confirmed: this.t('statusPending'),
             syncing: this.t('statusSyncing'), synced: this.t('statusSynced'), failed: this.t('statusFailed'),
-            unknown: this.t('statusUnknown'), partial: this.t('statusPartial')
+            unknown: this.t('statusUnknown'), partial: this.t('statusPartial'), local_only: this.t('statusLocalOnly')
         };
         list.innerHTML = entries.map((entry, index) => {
             const activity = this.activities.find(item => item.id === entry.activityId);
@@ -1714,6 +1724,7 @@ class TimerHubApp {
                 ? `<button class="review-action-btn review-retry-entry" type="button" data-batch-id="${this.escapeHtml(batch.id)}" aria-label="${this.escapeHtml(`${this.t('retry')}: ${activityLabel}`)}">${this.t('retry')}</button>`
                 : '';
             const unknownNotice = entry.syncStatus === SYNC_STATUS.UNKNOWN ? `<small>${this.t('syncOutcomeUnknown')}</small>` : '';
+            const localOnlyNotice = entry.syncStatus === SYNC_STATUS.LOCAL_ONLY ? `<small>${this.t('syncLocalOnlyNotice')}</small>` : '';
             const errorNotice = entry.clockodoError && entry.syncStatus === SYNC_STATUS.FAILED
                 ? `<small>${this.escapeHtml(this.clockodoErrorMessage({ code: entry.clockodoError }))}</small>`
                 : '';
@@ -1722,7 +1733,7 @@ class TimerHubApp {
                 <div class="review-entry-times"><strong>${this.escapeHtml(start)}</strong><span>–</span><strong>${this.escapeHtml(end)}</strong></div>
                 <span class="review-entry-duration">${this.escapeHtml(duration)}</span></div>
                 <div class="review-entry-title"><span class="review-activity-dot" style="background-color:${this.escapeHtml(activity?.color || '#27AE60')}"></span>${this.escapeHtml(activityLabel)}</div>
-                ${meta ? `<div class="review-entry-tags">${entry.project ? `<span class="review-tag">${this.escapeHtml(entry.project)}</span>` : ''}${entry.service ? `<span class="review-tag">${this.escapeHtml(entry.service)}</span>` : ''}</div>` : ''}${notes}${issueText ? `<small>${this.escapeHtml(issueText)}</small>` : ''}${errorNotice}${unknownNotice}
+                ${meta ? `<div class="review-entry-tags">${entry.project ? `<span class="review-tag">${this.escapeHtml(entry.project)}</span>` : ''}${entry.service ? `<span class="review-tag">${this.escapeHtml(entry.service)}</span>` : ''}</div>` : ''}${notes}${issueText ? `<small>${this.escapeHtml(issueText)}</small>` : ''}${errorNotice}${unknownNotice}${localOnlyNotice}
                 <div class="review-entry-footer"><span class="sync-badge ${this.escapeHtml(entry.syncStatus)}">${this.escapeHtml(status)}</span><div class="review-entry-actions"><button class="review-action-btn review-edit-entry" type="button" data-entry-id="${this.escapeHtml(entry.id)}" aria-label="${this.escapeHtml(`${this.t('edit')}: ${activityLabel}`)}" ${entry.syncStatus === SYNC_STATUS.CONFIRMED || entry.syncStatus === SYNC_STATUS.SYNCING ? `disabled title="${this.escapeHtml(this.t('confirmedEntryLocked'))}"` : ''}>${this.t('edit')}</button>${retryButton}</div></div>
             </article>`;
         }).join('');
@@ -1872,6 +1883,12 @@ class TimerHubApp {
 
         for (const snapshot of pending) {
             const entry = batch.entries.find(item => item.id === snapshot.id);
+            if (entry.clockodoEntryId) {
+                entry.syncStatus = SYNC_STATUS.LOCAL_ONLY;
+                entry.clockodoError = null;
+                await this.persistSyncProgress(batch);
+                continue;
+            }
             entry.syncStatus = SYNC_STATUS.SYNCING;
             entry.clockodoError = null;
             if (!entry.clockodoPayload) {
@@ -1892,10 +1909,8 @@ class TimerHubApp {
             await this.persistSyncProgress(batch);
             try {
                 const idempotencyKey = `${batch.id}:${entry.id}`;
-                const result = entry.clockodoEntryId
-                    ? await this.clockodoClient.updateEntry(clientId, accessToken, entry.clockodoEntryId, entry.clockodoPayload, idempotencyKey)
-                    : await this.clockodoClient.createEntry(clientId, accessToken, entry.clockodoPayload, idempotencyKey);
-                if (!(result.created === true || result.updated === true) || !Number.isSafeInteger(Number(result.entryId)) || Number(result.entryId) <= 0) {
+                const result = await this.clockodoClient.createEntry(clientId, accessToken, entry.clockodoPayload, idempotencyKey);
+                if (result.created !== true || !Number.isSafeInteger(Number(result.entryId)) || Number(result.entryId) <= 0) {
                     entry.syncStatus = SYNC_STATUS.UNKNOWN;
                     entry.clockodoError = 'malformed_response';
                 } else {
@@ -1916,14 +1931,18 @@ class TimerHubApp {
         const succeeded = states.filter(state => state === SYNC_STATUS.SYNCED).length;
         const failed = states.filter(state => state === SYNC_STATUS.FAILED).length;
         const unknown = states.filter(state => state === SYNC_STATUS.UNKNOWN).length;
+        const localOnly = states.filter(state => state === SYNC_STATUS.LOCAL_ONLY).length;
         if (states.every(state => state === SYNC_STATUS.SYNCED)) batch.state = SYNC_STATUS.SYNCED;
         else if (succeeded > 0) batch.state = 'partial';
         else if (unknown > 0) batch.state = SYNC_STATUS.UNKNOWN;
+        else if (localOnly > 0 && failed === 0) batch.state = SYNC_STATUS.LOCAL_ONLY;
         else batch.state = SYNC_STATUS.FAILED;
         batch.finishedAt = Date.now();
         await this.persistSyncProgress(batch);
 
         if (batch.state === SYNC_STATUS.SYNCED) this.showToast(this.t('syncSuccessToast', { count: succeeded }));
+        else if (batch.state === SYNC_STATUS.LOCAL_ONLY) this.showToast(this.t('syncLocalOnlyToast', { count: localOnly }));
+        else if (localOnly > 0 && failed === 0 && unknown === 0) this.showToast(this.t('syncLocalOnlyToast', { count: localOnly }));
         else if (batch.state === SYNC_STATUS.UNKNOWN) this.showToast(this.t('syncOutcomeUnknown'));
         else if (batch.state === SYNC_STATUS.FAILED) {
             const firstFailure = batch.entries.find(entry => entry.syncStatus === SYNC_STATUS.FAILED)?.clockodoError;

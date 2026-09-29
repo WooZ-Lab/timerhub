@@ -272,9 +272,7 @@ export class TimerHubDurableObject {
             }
         }
 
-        const updateMatch = path.match(/^\/clockodo\/entries\/(\d+)$/);
-        const isUpdate = Boolean(updateMatch && request.method === "PUT");
-        if ((path === "/clockodo/entries" && request.method === "POST") || isUpdate) {
+        if (path === "/clockodo/entries" && request.method === "POST") {
             const body = await request.json().catch(() => null);
             const operationId = request.headers.get("Idempotency-Key") || "";
             if (!body || typeof body !== "object" || Array.isArray(body) ||
@@ -294,8 +292,7 @@ export class TimerHubDurableObject {
             if (previous?.state === "unknown" || previous?.state === "sending") return jsonError("operation_outcome_unknown", 409);
             await this.state.storage.put(storageKey, { state: "sending", at: Date.now() });
             try {
-                const endpoint = isUpdate ? `v2/entries/${Number(updateMatch[1])}` : "v2/entries";
-                const response = await this.clockodoFetch(request, token, credentials, endpoint, body, isUpdate ? "PUT" : "POST");
+                const response = await this.clockodoFetch(request, token, credentials, "v2/entries", body, "POST");
                 const data = await response.json().catch(() => null);
                 if (!response.ok) {
                     const uncertain = response.status >= 500;
@@ -310,9 +307,7 @@ export class TimerHubDurableObject {
                     await this.state.storage.put(storageKey, { state: "unknown", at: Date.now() });
                     return jsonError("malformed_response", 502);
                 }
-                const result = isUpdate
-                    ? { updated: true, entryId: Number(data.entry.id) }
-                    : { created: true, entryId: Number(data.entry.id) };
+                const result = { created: true, entryId: Number(data.entry.id) };
                 await this.state.storage.put(storageKey, { state: "succeeded", result, at: Date.now() });
                 return Response.json(result);
             } catch (error) {
@@ -426,9 +421,13 @@ export default {
             ["/api/clockodo/test", "/clockodo/test"],
             ["/api/clockodo/entries", "/clockodo/entries"]
         ]);
-        const clockodoEntryUpdate = /^\/api\/clockodo\/entries\/(\d+)$/.test(url.pathname);
-        if (clockodoRoutes.has(url.pathname) || clockodoEntryUpdate) {
-            if (!["GET", "PUT", "POST", "DELETE"].includes(request.method)) {
+        const clockodoEntryMutation = /^\/api\/clockodo\/entries\/\d+$/.test(url.pathname);
+        if (clockodoEntryMutation) return jsonError("method_not_allowed", 405);
+        if (clockodoRoutes.has(url.pathname)) {
+            const allowedMethods = url.pathname === "/api/clockodo/config"
+                ? ["GET", "PUT", "DELETE"]
+                : url.pathname === "/api/clockodo/test" ? ["POST"] : ["POST"];
+            if (!allowedMethods.includes(request.method)) {
                 return jsonError("method_not_allowed", 405);
             }
             const clientId = url.searchParams.get("clientId");
@@ -438,7 +437,7 @@ export default {
             const id = env.TIMER_HUB.idFromName(clientId);
             const stub = env.TIMER_HUB.get(id);
             const targetUrl = new URL(request.url);
-            targetUrl.pathname = clockodoRoutes.get(url.pathname) || url.pathname.replace("/api/clockodo/", "/clockodo/");
+            targetUrl.pathname = clockodoRoutes.get(url.pathname);
             return stub.fetch(new Request(targetUrl, request));
         }
 
