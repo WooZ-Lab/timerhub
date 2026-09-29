@@ -69,7 +69,10 @@ function createTestApp(initialData = {}) {
                 activities: storageData.activities,
                 timeEntries: storageData.timeEntries,
                 syncBatches: storageData.syncBatches,
-                settings: Object.fromEntries(Object.entries(storageData.settings).filter(([key]) => key !== 'clockodoApiKey')),
+                settings: Object.fromEntries(Object.entries(storageData.settings)
+                    .filter(([key]) => !/(clockodo|api.?key|token|secret|password|credential|auth)/i.test(key))),
+                format: 'timerhub-backup',
+                version: 1,
                 exportedAt: Date.now()
             });
         },
@@ -83,7 +86,8 @@ function createTestApp(initialData = {}) {
             if (data.timeEntries) storageData.timeEntries.push(...structuredClone(data.timeEntries));
             if (data.syncBatches) storageData.syncBatches.push(...structuredClone(data.syncBatches));
             if (data.settings) {
-                const safeSettings = Object.fromEntries(Object.entries(data.settings).filter(([key]) => key !== 'clockodoApiKey'));
+                const safeSettings = Object.fromEntries(Object.entries(data.settings)
+                    .filter(([key]) => !/(clockodo|api.?key|token|secret|password|credential|auth)/i.test(key)));
                 Object.assign(storageData.settings, structuredClone(safeSettings));
             }
         }
@@ -98,7 +102,9 @@ function createTestApp(initialData = {}) {
         'syncConfirmEntriesList', 'syncConfirmDesc', 'syncConfirmSummary',
         'syncConfirmAlreadySyncedNotice', 'syncConfirmSubmitBtn', 'syncConfirmModal',
         'clockodoEmailInput', 'clockodoApiKeyInput', 'clockodoCustomerIdInput', 'clockodoProjectIdInput', 'clockodoServiceIdInput', 'clockodoSaveBtn',
-        'clockodoBillableSelect', 'clockodoTestBtn', 'clockodoRemoveBtn', 'clockodoStatusValue', 'clockodoToggleKeyBtn'
+        'clockodoBillableSelect', 'clockodoTestBtn', 'clockodoRemoveBtn', 'clockodoStatusValue', 'clockodoToggleKeyBtn',
+        'automaticBackupStatus', 'automaticSnapshotSelect', 'restoreSnapshotBtn', 'backupRestoreModal',
+        'backupRestoreMergeBtn', 'backupRestoreReplaceBtn', 'backupRestoreCancelBtn', 'backupRestoreCloseBtn'
     ]) {
         elements.set(id, {
             id,
@@ -109,19 +115,24 @@ function createTestApp(initialData = {}) {
             textContent: '',
             dataset: {},
             style: {},
-            classList: { add() {}, remove() {} },
+            classList: { add() {}, remove() {}, contains() { return false; } },
             setAttribute() {},
             appendChild() {},
             querySelectorAll: () => [],
             addEventListener() {}
         });
     }
+    const backupCapture = { clicks: 0, blob: null, filename: '', revoked: [] };
     const testDocument = {
         title: '',
         documentElement: { lang: '' },
+        body: { appendChild(element) { backupCapture.element = element; }, removeChild() {} },
         getElementById: id => elements.get(id) || null,
         querySelectorAll: () => [],
-        createElement: () => ({ value: '', textContent: '', appendChild() {} })
+        createElement: () => ({
+            value: '', textContent: '', style: {}, appendChild() {},
+            click() { backupCapture.clicks += 1; backupCapture.filename = this.download; }
+        })
     };
 
     const context = vm.createContext({
@@ -130,6 +141,11 @@ function createTestApp(initialData = {}) {
             addEventListener() {}
         },
         document: testDocument,
+        Blob,
+        URL: {
+            createObjectURL(blob) { backupCapture.blob = blob; return 'blob:timerhub-test'; },
+            revokeObjectURL(url) { backupCapture.revoked.push(url); }
+        },
         navigator: {},
         localStorage: {
             getItem: key => localStorageData.get(key) || null,
@@ -143,7 +159,7 @@ function createTestApp(initialData = {}) {
         Date,
         Number,
         Math,
-        setTimeout,
+        setTimeout: () => 1,
         clearTimeout,
         console,
         Intl
@@ -155,7 +171,65 @@ function createTestApp(initialData = {}) {
     app.clockodoClient = initialData.clockodoClient || null;
     const toasts = [];
     app.showToast = message => toasts.push(message);
-    return { app, storageData, document: testDocument, localStorageData, toasts };
+    return { app, storageData, document: testDocument, localStorageData, toasts, backupCapture, context };
+}
+
+function createIndexedDbHarness() {
+    const keyPaths = { activities: 'id', timeEntries: 'id', settings: 'key', syncBatches: 'id', layout: 'activityId', snapshots: 'id' };
+    const data = Object.fromEntries(Object.keys(keyPaths).map(name => [name, new Map()]));
+    const stats = { snapshotTransactions: 0, failMutation: false, failSnapshot: false };
+    const db = {
+        objectStoreNames: { contains: name => Object.hasOwn(data, name) },
+        transaction(storeNames, mode) {
+            if (mode === 'readwrite' && storeNames.includes('snapshots')) stats.snapshotTransactions += 1;
+            const fail = mode === 'readwrite' && (storeNames.includes('snapshots') ? stats.failSnapshot : stats.failMutation);
+            const tx = { error: null, oncomplete: null, onerror: null, onabort: null, pending: 0, failed: false, completionQueued: false };
+            const finishIfReady = () => {
+                if (tx.pending || tx.failed || tx.completionQueued) return;
+                tx.completionQueued = true;
+                queueMicrotask(() => {
+                    tx.completionQueued = false;
+                    if (!tx.pending && !tx.failed) tx.oncomplete?.();
+                });
+            };
+            const makeRequest = operation => {
+                const request = {};
+                tx.pending += 1;
+                queueMicrotask(() => {
+                    try {
+                        if (fail) throw new Error('indexeddb_write_failed');
+                        request.result = operation();
+                        request.onsuccess?.();
+                    } catch (error) {
+                        request.error = error;
+                        tx.error = error;
+                        tx.failed = true;
+                        request.onerror?.();
+                        tx.onerror?.();
+                        tx.onabort?.();
+                    } finally {
+                        tx.pending -= 1;
+                        finishIfReady();
+                    }
+                });
+                return request;
+            };
+            tx.objectStore = name => {
+                const records = data[name];
+                const keyPath = keyPaths[name];
+                return {
+                    getAll: () => makeRequest(() => [...records.values()].map(value => structuredClone(value))),
+                    get: key => makeRequest(() => structuredClone(records.get(key))),
+                    put: value => makeRequest(() => { records.set(value[keyPath], structuredClone(value)); return value[keyPath]; }),
+                    add: value => makeRequest(() => { records.set(value[keyPath], structuredClone(value)); return value[keyPath]; }),
+                    delete: key => makeRequest(() => records.delete(key)),
+                    clear: () => makeRequest(() => records.clear())
+                };
+            };
+            return tx;
+        }
+    };
+    return { db, data, stats };
 }
 
 function makeClockodoSettingsService() {
@@ -981,6 +1055,176 @@ test('Task 2: Full export/import preserves all extended review fields without da
     assert.equal(restored.syncStatus, 'synced');
     assert.equal(restored.clockodoSyncedAt, 1770004000000);
     assert.equal(restored.isEdited, false);
+});
+
+test('manual backup downloads a valid, restorable file without credentials', async () => {
+    const activity = { id: 'backup-activity', name: 'Planning', color: '#245A45', position: 0 };
+    const { app, storageData, toasts, backupCapture, context } = createTestApp({
+        activities: [activity],
+        settings: {
+            theme: 'dark', clockodoEmail: 'person@example.test', clockodoApiKey: 'must-not-export',
+            timerhubClockodoAccessToken: 'private-token-value', customPassword: 'never-export-this'
+        }
+    });
+    const entry = await app.addEntry({
+        id: 'backup-entry', activityId: activity.id, activityNameSnapshot: activity.name,
+        startTimestamp: 1770000000000, endTimestamp: 1770003600000, notes: 'Planning session'
+    });
+    storageData.timeEntries = [entry];
+
+    const repository = vm.runInContext('new StorageRepository()', context);
+    const rows = {
+        activities: [activity], timeEntries: [entry], syncBatches: [], layout: [],
+        settings: Object.entries(storageData.settings).map(([key, value]) => ({ key, value }))
+    };
+    repository.db = {
+        transaction(storeNames) {
+            const storeName = storeNames[0];
+            return {
+                objectStore() {
+                    return {
+                        getAll() {
+                            const request = {};
+                            queueMicrotask(() => {
+                                request.result = structuredClone(rows[storeName]);
+                                request.onsuccess?.();
+                            });
+                            return request;
+                        }
+                    };
+                }
+            };
+        }
+    };
+    app.storage = repository;
+
+    await app.backupData();
+
+    assert.equal(backupCapture.clicks, 1, 'the backup button must trigger an actual download');
+    assert.match(backupCapture.filename, /^timerhub_backup_\d{8}_\d{6}\.json$/);
+    assert.deepEqual(toasts, [app.t('backupSuccess')]);
+    const content = await backupCapture.blob.text();
+    const generated = JSON.parse(content);
+    assert.equal(generated.format, 'timerhub-backup');
+    assert.equal(generated.version, 1);
+    assert.equal(generated.activities[0].id, activity.id);
+    assert.equal(generated.timeEntries[0].id, entry.id);
+    assert.equal(content.includes('must-not-export'), false);
+    assert.equal(content.includes('person@example.test'), false);
+    assert.equal(content.includes('private-token-value'), false);
+    assert.equal(content.includes('never-export-this'), false);
+
+    const { context: restoreContext } = createTestApp();
+    const restored = vm.runInContext('new StorageRepository()', restoreContext);
+    const restoreHarness = createIndexedDbHarness();
+    restored.db = restoreHarness.db;
+    await restored.importAll(generated);
+    assert.equal((await restored.getActivities())[0].id, activity.id);
+    assert.equal((await restored.getTimeEntries())[0].id, entry.id);
+    assert.equal(await restored.getSetting('theme', ''), 'dark');
+    assert.equal(restoreHarness.data.settings.has('clockodoEmail'), false);
+    assert.equal(restoreHarness.data.settings.has('clockodoApiKey'), false);
+});
+
+test('successful repository mutations snapshot locally, safely, and without recursion', async () => {
+    const { context } = createTestApp();
+    const repository = vm.runInContext('new StorageRepository()', context);
+    const harness = createIndexedDbHarness();
+    repository.db = harness.db;
+    harness.data.settings.set('clockodoApiKey', 'must-not-be-snapshotted');
+    harness.data.settings.set('theme', 'dark');
+
+    await repository.saveActivity({ id: 'first', name: 'Work' });
+    await repository.saveActivity({ id: 'second', name: 'Break' });
+
+    const snapshots = await repository.getAutomaticSnapshots();
+    assert.equal(snapshots.length, 2);
+    assert.equal(snapshots[0].format, 'timerhub-snapshot');
+    assert.equal(snapshots[0].version, 1);
+    assert.equal(snapshots[0].data.activities.length, 2);
+    assert.equal(JSON.stringify(snapshots).includes('must-not-be-snapshotted'), false);
+    assert.equal(harness.stats.snapshotTransactions, 2, 'snapshot writes must not recursively snapshot themselves');
+});
+
+test('failed writes do not snapshot; reads and unsaved form typing do not snapshot', async () => {
+    const { app, context, document } = createTestApp();
+    const repository = vm.runInContext('new StorageRepository()', context);
+    const harness = createIndexedDbHarness();
+    repository.db = harness.db;
+    app.storage = repository;
+
+    document.getElementById('clockodoApiKeyInput').value = 'typing only';
+    await repository.getActivities();
+    assert.equal(harness.stats.snapshotTransactions, 0);
+    assert.equal(harness.data.snapshots.size, 0);
+
+    harness.stats.failMutation = true;
+    await assert.rejects(() => repository.saveActivity({ id: 'failed', name: 'Not saved' }));
+    assert.equal(harness.stats.snapshotTransactions, 0);
+    assert.equal(harness.data.snapshots.size, 0);
+});
+
+test('automatic snapshots retain only the latest 20 and restore through the normal import path', async () => {
+    const { context } = createTestApp();
+    const repository = vm.runInContext('new StorageRepository()', context);
+    const harness = createIndexedDbHarness();
+    repository.db = harness.db;
+
+    for (let i = 0; i < 22; i += 1) {
+        await repository.saveActivity({ id: `activity-${i}`, name: `Activity ${i}` });
+    }
+    const snapshots = await repository.getAutomaticSnapshots();
+    assert.equal(snapshots.length, 20);
+    assert.equal(snapshots.at(-1).data.activities.length, 3, 'the two oldest snapshots should be rotated out');
+    assert.equal(snapshots[0].data.activities.length, 22);
+
+    const latestData = snapshots[0].data;
+    const freshHarness = createIndexedDbHarness();
+    const restored = vm.runInContext('new StorageRepository()', context);
+    restored.db = freshHarness.db;
+    await restored.importAll(latestData, false);
+    assert.equal((await restored.getActivities()).length, 22);
+    assert.equal((await restored.getAutomaticSnapshots()).length, 1);
+});
+
+test('automatic snapshot failures are observable but do not fail saved user data', async () => {
+    const { context } = createTestApp();
+    const repository = vm.runInContext('new StorageRepository()', context);
+    const harness = createIndexedDbHarness();
+    repository.db = harness.db;
+    harness.stats.failSnapshot = true;
+    context.console.warn = () => {};
+
+    const activity = { id: 'kept', name: 'Saved despite snapshot failure' };
+    await repository.saveActivity(activity);
+
+    assert.equal((await repository.getActivities())[0].id, activity.id);
+    assert.equal(repository.snapshotStatus, 'failed');
+    assert.equal(harness.data.snapshots.size, 0);
+});
+
+test('restore requires a clear merge or replace choice; cancelling performs no mutation', async () => {
+    const { app, toasts } = createTestApp();
+    const choices = [];
+    app.storage.validateBackupData = data => data;
+    app.storage.importAll = async (_data, merge) => choices.push(merge);
+    app.loadActivities = async () => {};
+    app.loadTimeEntries = async () => {};
+    app.renderAll = () => {};
+    app.refreshAutomaticBackupStatus = async () => {};
+    const payload = { format: 'timerhub-backup', version: 1, activities: [], timeEntries: [], settings: {} };
+
+    app.openRestoreConfirmation(payload);
+    app.cancelPendingRestore();
+    assert.deepEqual(choices, []);
+    assert.equal(app.pendingRestoreData, null);
+
+    app.openRestoreConfirmation(payload);
+    assert.equal(await app.restorePendingData(true), true);
+    app.openRestoreConfirmation(payload);
+    assert.equal(await app.restorePendingData(false), true);
+    assert.deepEqual(choices, [true, false]);
+    assert.deepEqual(toasts, [app.t('restoreSuccess'), app.t('restoreSuccess')]);
 });
 
 test('Task 9: Clockodo secret visibility label follows the selected locale dynamically', () => {

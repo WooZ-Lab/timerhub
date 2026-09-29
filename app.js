@@ -9,7 +9,14 @@
 
 const translations = {
     en: {
+        timerIdle: 'Choose an activity to start tracking', timerRunning: 'Timer running',
+        timerStatusRunning: 'Timer running: {activity} · {duration}',
+        timerSaving: 'Saving timer…', timerSaveFailed: 'Could not save the timer. Check device storage and try again.',
+        activityStartHint: 'Tap to start or switch', activityStopHint: 'Tap to stop',
+        activityStartAria: 'Start or switch to {activity}', activityStopAria: 'Stop timing {activity}',
+        noActivitiesTitle: 'No activities yet', noActivitiesMessage: 'Add an activity to start tracking your work.',
         appName: 'TimerHub',
+        loadingApp: 'Loading TimerHub…', reloadApp: 'Reload TimerHub',
         createActivity: 'Create Activity',
         editActivity: 'Edit Activity',
         name: 'Name',
@@ -37,8 +44,7 @@ const translations = {
         timeFormat: 'Time Format',
         firstDayOfWeek: 'First Day of Week',
         confirmDelete: 'Confirm before delete',
-        backupData: 'Backup Data',
-        restoreData: 'Restore Data',
+        backupData: 'Create backup',
         noEntries: 'No entries found',
         since: 'since',
         deleteEntry: 'Delete Entry',
@@ -52,13 +58,20 @@ const translations = {
         undo: 'Undo',
         deleted: 'Deleted',
         restoreSuccess: 'Data restored successfully',
-        backupSuccess: 'Backup created',
+        backupSuccess: 'Backup file created successfully',
         small: 'Small',
         medium: 'Medium',
         large: 'Large',
     },
     de: {
+        timerIdle: 'Aktivität auswählen, um die Zeit zu erfassen', timerRunning: 'Timer läuft',
+        timerStatusRunning: 'Timer läuft: {activity} · {duration}',
+        timerSaving: 'Timer wird gespeichert…', timerSaveFailed: 'Timer konnte nicht gespeichert werden. Prüfe den Gerätespeicher und versuche es erneut.',
+        activityStartHint: 'Tippen zum Starten oder Wechseln', activityStopHint: 'Tippen zum Stoppen',
+        activityStartAria: '{activity} starten oder dorthin wechseln', activityStopAria: 'Zeit für {activity} stoppen',
+        noActivitiesTitle: 'Noch keine Aktivitäten', noActivitiesMessage: 'Füge eine Aktivität hinzu, um deine Arbeit zu erfassen.',
         appName: 'TimerHub',
+        loadingApp: 'TimerHub wird geladen…', reloadApp: 'TimerHub neu laden',
         createActivity: 'Aktivität erstellen',
         editActivity: 'Aktivität bearbeiten',
         name: 'Name',
@@ -86,8 +99,7 @@ const translations = {
         timeFormat: 'Zeitformat',
         firstDayOfWeek: 'Erster Wochentag',
         confirmDelete: 'Vor dem Löschen bestätigen',
-        backupData: 'Daten sichern',
-        restoreData: 'Daten wiederherstellen',
+        backupData: 'Sicherung erstellen',
         noEntries: 'Keine Einträge gefunden',
         since: 'seit',
         deleteEntry: 'Eintrag löschen',
@@ -101,13 +113,20 @@ const translations = {
         undo: 'Rückgängig',
         deleted: 'Gelöscht',
         restoreSuccess: 'Daten erfolgreich wiederhergestellt',
-        backupSuccess: 'Sicherung erstellt',
+        backupSuccess: 'Sicherungsdatei wurde erstellt',
         small: 'Klein',
         medium: 'Mittel',
         large: 'Groß',
     },
     ru: {
+        timerIdle: 'Выберите занятие, чтобы начать отсчёт', timerRunning: 'Таймер запущен',
+        timerStatusRunning: 'Таймер работает: {activity} · {duration}',
+        timerSaving: 'Сохранение таймера…', timerSaveFailed: 'Не удалось сохранить таймер. Проверьте память устройства и попробуйте снова.',
+        activityStartHint: 'Нажмите, чтобы начать или переключить', activityStopHint: 'Нажмите, чтобы остановить',
+        activityStartAria: 'Начать или переключиться на «{activity}»', activityStopAria: 'Остановить отсчёт для «{activity}»',
+        noActivitiesTitle: 'Занятий пока нет', noActivitiesMessage: 'Добавьте занятие, чтобы начать учёт времени.',
         appName: 'TimerHub',
+        loadingApp: 'Загрузка TimerHub…', reloadApp: 'Перезагрузить TimerHub',
         createActivity: 'Создать занятие',
         editActivity: 'Изменить занятие',
         name: 'Название',
@@ -135,8 +154,7 @@ const translations = {
         timeFormat: 'Формат времени',
         firstDayOfWeek: 'Первый день недели',
         confirmDelete: 'Подтверждать удаление',
-        backupData: 'Резервная копия',
-        restoreData: 'Восстановить данные',
+        backupData: 'Создать резервную копию',
         noEntries: 'Записи не найдены',
         since: 'с',
         deleteEntry: 'Удалить запись',
@@ -150,7 +168,7 @@ const translations = {
         undo: 'Отменить',
         deleted: 'Удалено',
         restoreSuccess: 'Данные успешно восстановлены',
-        backupSuccess: 'Резервная копия создана',
+        backupSuccess: 'Файл резервной копии создан',
         small: 'Маленький',
         medium: 'Средний',
         large: 'Большой',
@@ -162,6 +180,7 @@ const translations = {
 const extendedTranslations = {
     en: {
         activityFilter: 'Activity filter',
+        timerScreen: 'Timer',
         documentTitle: 'TimerHub - Time Tracker', homeScreen: 'Go to home screen',
         viewLog: 'View log', addActivity: 'Add new activity', copy: 'Copy', share: 'Share',
         exportTxt: 'Export TXT', exportCsv: 'Export CSV', exportJson: 'Export JSON',
@@ -179,8 +198,26 @@ const extendedTranslations = {
         shapeHeart: 'Heart', shapeOval: 'Oval', colorSample: 'Color {color}',
         pleaseEnterName: 'Please enter a name', pleaseFillAllFields: 'Please fill all fields',
         startBeforeEnd: 'Start time must be before end time', failedToCopy: 'Failed to copy',
-        exportedAs: 'Exported as {format}', backupFailed: 'Backup failed', restoreFailed: 'Restore failed',
-        mergeExistingData: 'Merge with existing data? (Cancel to replace)', demoDataLoaded: 'Demo data loaded',
+        exportedAs: 'Exported as {format}', backupFailed: 'Could not create the backup file. Try again.', restoreFailed: 'Could not restore this backup. Your current data was kept.',
+        demoDataLoaded: 'Demo data loaded',
+        backupSectionTitle: 'Backups and restore', manualBackupTitle: 'Manual backup file',
+        appearanceSettings: 'Appearance and regional settings', timerAndNotifications: 'Timer and notifications',
+        confirmationsSettings: 'Confirmations', connectionSection: 'Connection',
+        entryDefaultsSection: 'Entry defaults', dangerousActions: 'Dangerous actions',
+        clockodoDefaultsHelp: 'Customer, project, and service values are used when creating entries. They are not needed to check the connection.',
+        manualBackupDescription: 'Create a file you can save or move to another device.',
+        backupCredentialNote: 'Clockodo credentials, including the API key, are never included.',
+        automaticSnapshotsTitle: 'Automatic local snapshots',
+        automaticSnapshotsDescription: 'TimerHub keeps the 20 most recent safety snapshots on this device after saved changes.',
+        automaticSnapshotsNone: 'No automatic snapshots yet.',
+        automaticSnapshotsLatest: 'Latest local snapshot: {date}',
+        automaticSnapshotsFailed: 'A local snapshot could not be saved. Your change was still saved.',
+        selectSnapshot: 'Choose a local snapshot', restoreFromFile: 'Restore from backup file',
+        restoreSnapshot: 'Restore selected snapshot', invalidBackup: 'This file is not a valid TimerHub backup.',
+        restoreConfirmTitle: 'Restore TimerHub data?',
+        restoreConfirmDesc: 'Choose whether to merge this backup with current data or replace current data. Clockodo credentials are not included.',
+        restoreMergeAction: 'Merge data', restoreReplaceAction: 'Replace current data',
+        snapshotDateFormat: '{date}',
         initFailed: 'TimerHub could not start. Reload the page or restore a backup.',
         notificationOffStatus: 'Notifications are off.', notificationUnsupported: 'Notifications are not supported by this browser.',
         notificationsEnabled: 'Notifications enabled', notificationsBlocked: 'Notifications blocked',
@@ -217,7 +254,7 @@ const extendedTranslations = {
         noEntriesForDay: 'No time entries recorded for this day.',
         totalTrackedTime: 'Total Tracked Time', entriesCount: '{count} entries', gap: 'Gap',
         syncedCount: '{count} synced', unsyncedCount: '{count} unsynced',
-        statusSynced: 'Synced', statusUnsynced: 'Unsynced',
+        statusSynced: 'Synced', statusLocal: 'Local only', statusConfirmed: 'Confirmed',
         statusPending: 'Pending', statusSyncing: 'Syncing...', statusFailed: 'Sync failed',
         statusUnknown: 'Outcome unknown',
         statusLocalOnly: 'Local edit; Clockodo unchanged',
@@ -256,6 +293,7 @@ const extendedTranslations = {
         clockodoConfigMissing: 'Please configure Clockodo API key and email in Settings.',
         clockodoSecurityNote: 'The API key is encrypted in TimerHub Cloudflare storage and is never saved in this browser. A local access token protects this device connection.',
         clockodoApiKeyPlaceholder: 'Enter key to set or replace',
+        clockodoEmailPlaceholder: 'name@example.com',
         clockodoTestConnection: 'Check connection',
         clockodoRemoveConfig: 'Remove Clockodo configuration',
         clockodoConnectionStatus: 'Connection status',
@@ -285,6 +323,7 @@ const extendedTranslations = {
     },
     de: {
         activityFilter: 'Aktivitätsfilter',
+        timerScreen: 'Timer',
         documentTitle: 'TimerHub - Zeiterfassung', homeScreen: 'Zum Startbildschirm',
         viewLog: 'Zeitprotokoll anzeigen', addActivity: 'Aktivität hinzufügen', copy: 'Kopieren', share: 'Teilen',
         exportTxt: 'TXT exportieren', exportCsv: 'CSV exportieren', exportJson: 'JSON exportieren',
@@ -302,8 +341,26 @@ const extendedTranslations = {
         shapeHeart: 'Herz', shapeOval: 'Oval', colorSample: 'Farbe {color}',
         pleaseEnterName: 'Bitte einen Namen eingeben', pleaseFillAllFields: 'Bitte alle Felder ausfüllen',
         startBeforeEnd: 'Die Startzeit muss vor der Endzeit liegen', failedToCopy: 'Kopieren fehlgeschlagen',
-        exportedAs: 'Als {format} exportiert', backupFailed: 'Sicherung fehlgeschlagen', restoreFailed: 'Wiederherstellung fehlgeschlagen',
-        mergeExistingData: 'Mit vorhandenen Daten zusammenführen? (Abbrechen, um sie zu ersetzen)', demoDataLoaded: 'Demodaten geladen',
+        exportedAs: 'Als {format} exportiert', backupFailed: 'Sicherungsdatei konnte nicht erstellt werden. Versuche es erneut.', restoreFailed: 'Sicherung konnte nicht wiederhergestellt werden. Deine aktuellen Daten blieben erhalten.',
+        demoDataLoaded: 'Demodaten geladen',
+        backupSectionTitle: 'Sicherung und Wiederherstellung', manualBackupTitle: 'Manuelle Sicherungsdatei',
+        appearanceSettings: 'Darstellung und Region', timerAndNotifications: 'Timer und Benachrichtigungen',
+        confirmationsSettings: 'Bestätigungen', connectionSection: 'Verbindung',
+        entryDefaultsSection: 'Vorgaben für Einträge', dangerousActions: 'Kritische Aktionen',
+        clockodoDefaultsHelp: 'Kunde, Projekt und Leistung werden beim Erstellen von Einträgen verwendet. Für den Verbindungstest sind sie nicht erforderlich.',
+        manualBackupDescription: 'Erstellt eine Datei, die du speichern oder auf ein anderes Gerät übertragen kannst.',
+        backupCredentialNote: 'Clockodo-Zugangsdaten einschließlich API-Schlüssel werden niemals einbezogen.',
+        automaticSnapshotsTitle: 'Automatische lokale Sicherungen',
+        automaticSnapshotsDescription: 'TimerHub speichert nach Änderungen die 20 letzten Sicherungen auf diesem Gerät.',
+        automaticSnapshotsNone: 'Noch keine automatischen Sicherungen vorhanden.',
+        automaticSnapshotsLatest: 'Letzte lokale Sicherung: {date}',
+        automaticSnapshotsFailed: 'Lokale Sicherung fehlgeschlagen. Deine Änderung wurde trotzdem gespeichert.',
+        selectSnapshot: 'Lokale Sicherung auswählen', restoreFromFile: 'Aus Sicherungsdatei wiederherstellen',
+        restoreSnapshot: 'Ausgewählte Sicherung wiederherstellen', invalidBackup: 'Diese Datei ist keine gültige TimerHub-Sicherung.',
+        restoreConfirmTitle: 'TimerHub-Daten wiederherstellen?',
+        restoreConfirmDesc: 'Wähle, ob du diese Sicherung mit den aktuellen Daten zusammenführen oder sie ersetzen möchtest. Clockodo-Zugangsdaten sind nicht enthalten.',
+        restoreMergeAction: 'Daten zusammenführen', restoreReplaceAction: 'Aktuelle Daten ersetzen',
+        snapshotDateFormat: '{date}',
         initFailed: 'TimerHub konnte nicht gestartet werden. Lade die Seite neu oder stelle eine Sicherung wieder her.',
         notificationOffStatus: 'Benachrichtigungen sind ausgeschaltet.', notificationUnsupported: 'Dieser Browser unterstützt keine Benachrichtigungen.',
         notificationsEnabled: 'Benachrichtigungen aktiviert', notificationsBlocked: 'Benachrichtigungen blockiert',
@@ -340,7 +397,7 @@ const extendedTranslations = {
         noEntriesForDay: 'Keine Zeiteinträge für diesen Tag aufgezeichnet.',
         totalTrackedTime: 'Gesamte erfasste Zeit', entriesCount: '{count} Einträge', gap: 'Lücke',
         syncedCount: '{count} synchronisiert', unsyncedCount: '{count} nicht synchronisiert',
-        statusSynced: 'Synchronisiert', statusUnsynced: 'Nicht synchronisiert',
+        statusSynced: 'Synchronisiert', statusLocal: 'Nur lokal', statusConfirmed: 'Bestätigt',
         statusPending: 'Ausstehend', statusSyncing: 'Synchronisiere...', statusFailed: 'Fehlgeschlagen',
         statusUnknown: 'Ergebnis unklar',
         statusLocalOnly: 'Lokal geändert; Clockodo unverändert',
@@ -379,6 +436,7 @@ const extendedTranslations = {
         clockodoConfigMissing: 'Bitte Clockodo-API-Schlüssel und E-Mail in den Einstellungen konfigurieren.',
         clockodoSecurityNote: 'Der API-Schlüssel wird verschlüsselt in TimerHubs Cloudflare-Speicher abgelegt und nie in diesem Browser gespeichert. Ein lokales Zugriffstoken schützt die Geräteverbindung.',
         clockodoApiKeyPlaceholder: 'Schlüssel eingeben zum Speichern oder Ersetzen',
+        clockodoEmailPlaceholder: 'name@beispiel.de',
         clockodoTestConnection: 'Verbindung prüfen',
         clockodoRemoveConfig: 'Clockodo-Konfiguration entfernen',
         clockodoConnectionStatus: 'Verbindungsstatus',
@@ -408,6 +466,7 @@ const extendedTranslations = {
     },
     ru: {
         activityFilter: 'Фильтр занятий',
+        timerScreen: 'Таймер',
         documentTitle: 'TimerHub — учёт времени', homeScreen: 'На главный экран',
         viewLog: 'Открыть журнал времени', addActivity: 'Добавить занятие', copy: 'Копировать', share: 'Поделиться',
         exportTxt: 'Экспорт TXT', exportCsv: 'Экспорт CSV', exportJson: 'Экспорт JSON',
@@ -425,8 +484,26 @@ const extendedTranslations = {
         shapeHeart: 'Сердце', shapeOval: 'Овал', colorSample: 'Цвет {color}',
         pleaseEnterName: 'Введите название', pleaseFillAllFields: 'Заполните все поля',
         startBeforeEnd: 'Время начала должно быть раньше времени окончания', failedToCopy: 'Не удалось скопировать',
-        exportedAs: 'Экспортировано в формате {format}', backupFailed: 'Не удалось создать резервную копию', restoreFailed: 'Не удалось восстановить данные',
-        mergeExistingData: 'Объединить с существующими данными? (Отмена — заменить данные)', demoDataLoaded: 'Демонстрационные данные загружены',
+        exportedAs: 'Экспортировано в формате {format}', backupFailed: 'Не удалось создать файл копии. Попробуйте ещё раз.', restoreFailed: 'Не удалось восстановить данные. Текущие данные сохранены.',
+        demoDataLoaded: 'Демонстрационные данные загружены',
+        backupSectionTitle: 'Резервное копирование и восстановление', manualBackupTitle: 'Файл резервной копии',
+        appearanceSettings: 'Внешний вид и региональные настройки', timerAndNotifications: 'Таймер и уведомления',
+        confirmationsSettings: 'Подтверждения', connectionSection: 'Подключение',
+        entryDefaultsSection: 'Параметры записей', dangerousActions: 'Опасные действия',
+        clockodoDefaultsHelp: 'Клиент, проект и услуга используются при создании записей. Для проверки подключения они не нужны.',
+        manualBackupDescription: 'Создаёт файл, который можно сохранить или перенести на другое устройство.',
+        backupCredentialNote: 'Данные Clockodo, включая API-ключ, никогда не добавляются в копию.',
+        automaticSnapshotsTitle: 'Автоматические локальные копии',
+        automaticSnapshotsDescription: 'После сохранения изменений TimerHub хранит на устройстве 20 последних копий.',
+        automaticSnapshotsNone: 'Автоматических копий пока нет.',
+        automaticSnapshotsLatest: 'Последняя локальная копия: {date}',
+        automaticSnapshotsFailed: 'Не удалось сохранить локальную копию. Изменение всё равно сохранено.',
+        selectSnapshot: 'Выберите локальную копию', restoreFromFile: 'Восстановить из файла',
+        restoreSnapshot: 'Восстановить выбранную копию', invalidBackup: 'Этот файл не является резервной копией TimerHub.',
+        restoreConfirmTitle: 'Восстановить данные TimerHub?',
+        restoreConfirmDesc: 'Выберите, объединить эту копию с текущими данными или заменить их. Данные Clockodo не включены.',
+        restoreMergeAction: 'Объединить данные', restoreReplaceAction: 'Заменить текущие данные',
+        snapshotDateFormat: '{date}',
         initFailed: 'Не удалось запустить TimerHub. Перезагрузите страницу или восстановите резервную копию.',
         notificationOffStatus: 'Уведомления выключены.', notificationUnsupported: 'Этот браузер не поддерживает уведомления.',
         notificationsEnabled: 'Уведомления включены', notificationsBlocked: 'Уведомления заблокированы',
@@ -463,7 +540,7 @@ const extendedTranslations = {
         noEntriesForDay: 'Нет записей времени за этот день.',
         totalTrackedTime: 'Всего учтено времени', entriesCount: '{count} записей', gap: 'Перерыв',
         syncedCount: '{count} синхронизировано', unsyncedCount: '{count} не синхронизировано',
-        statusSynced: 'Синхронизировано', statusUnsynced: 'Не синхронизировано',
+        statusSynced: 'Синхронизировано', statusLocal: 'Только локально', statusConfirmed: 'Подтверждено',
         statusPending: 'В ожидании', statusSyncing: 'Синхронизация...', statusFailed: 'Ошибка синхронизации',
         statusUnknown: 'Результат неизвестен',
         statusLocalOnly: 'Локальное изменение; Clockodo без изменений',
@@ -502,6 +579,7 @@ const extendedTranslations = {
         clockodoConfigMissing: 'Пожалуйста, укажите API-ключ и email Clockodo в Настройках.',
         clockodoSecurityNote: 'API-ключ хранится в зашифрованном виде в Cloudflare-хранилище TimerHub и не сохраняется в браузере. Локальный токен защищает подключение устройства.',
         clockodoApiKeyPlaceholder: 'Введите ключ для сохранения или замены',
+        clockodoEmailPlaceholder: 'имя@пример.рф',
         clockodoTestConnection: 'Проверить соединение',
         clockodoRemoveConfig: 'Удалить настройки Clockodo',
         clockodoConnectionStatus: 'Состояние соединения',
@@ -556,8 +634,13 @@ const SYNC_STATUS = Object.freeze({
 class StorageRepository {
     constructor() {
         this.dbName = 'TimerHubDB';
-        this.version = 2;
+        this.version = 3;
         this.db = null;
+        this.mutationQueue = Promise.resolve();
+        this.snapshotSequence = 0;
+        this.snapshotStatus = 'idle';
+        this.lastSnapshotAt = null;
+        this.onSnapshotStatus = null;
     }
 
     async init() {
@@ -599,7 +682,90 @@ class StorageRepository {
                     const batchStore = db.createObjectStore('syncBatches', { keyPath: 'id' });
                     batchStore.createIndex('date', 'date', { unique: false });
                 }
+                if (!db.objectStoreNames.contains('snapshots')) {
+                    const snapshotStore = db.createObjectStore('snapshots', { keyPath: 'id' });
+                    snapshotStore.createIndex('createdAt', 'createdAt', { unique: false });
+                }
             };
+        });
+    }
+
+    async persistMutation(storeNames, enqueueWrites) {
+        const operation = this.mutationQueue.then(() => new Promise((resolve, reject) => {
+            let tx;
+            let result;
+            try {
+                tx = this.db.transaction(storeNames, 'readwrite');
+                result = enqueueWrites(tx);
+            } catch (error) {
+                reject(error);
+                return;
+            }
+            tx.oncomplete = async () => {
+                await this.writeAutomaticSnapshotSafely();
+                resolve(result);
+            };
+            tx.onerror = () => reject(tx.error || new Error('storage_write_failed'));
+            tx.onabort = () => reject(tx.error || new Error('storage_write_aborted'));
+        }));
+        this.mutationQueue = operation.catch(() => undefined);
+        return operation;
+    }
+
+    async writeAutomaticSnapshotSafely() {
+        try {
+            const snapshot = {
+                id: `${Date.now()}-${++this.snapshotSequence}`,
+                format: 'timerhub-snapshot',
+                version: 1,
+                createdAt: Date.now(),
+                data: await this.exportAll()
+            };
+            await new Promise((resolve, reject) => {
+                const tx = this.db.transaction(['snapshots'], 'readwrite');
+                const store = tx.objectStore('snapshots');
+                store.put(snapshot);
+                const listRequest = store.getAll();
+                listRequest.onsuccess = () => {
+                    const ordered = listRequest.result
+                        .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
+                    ordered.slice(0, Math.max(0, ordered.length - 20))
+                        .forEach(item => store.delete(item.id));
+                };
+                tx.oncomplete = resolve;
+                tx.onerror = () => reject(tx.error || new Error('snapshot_write_failed'));
+                tx.onabort = () => reject(tx.error || new Error('snapshot_write_aborted'));
+            });
+            this.snapshotStatus = 'saved';
+            this.lastSnapshotAt = snapshot.createdAt;
+            Promise.resolve().then(() => this.onSnapshotStatus?.()).catch(() => {
+                console.warn('TimerHub automatic snapshot status refresh failed');
+            });
+            return true;
+        } catch {
+            this.snapshotStatus = 'failed';
+            Promise.resolve().then(() => this.onSnapshotStatus?.()).catch(() => {});
+            console.warn('TimerHub automatic snapshot failed (snapshot_write_failed)');
+            return false;
+        }
+    }
+
+    async getAutomaticSnapshots() {
+        const tx = this.db.transaction(['snapshots'], 'readonly');
+        return new Promise((resolve, reject) => {
+            const request = tx.objectStore('snapshots').getAll();
+            request.onsuccess = () => resolve(request.result.sort((a, b) => b.createdAt - a.createdAt));
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async removeSettingWithoutSnapshot(key) {
+        const tx = this.db.transaction(['settings'], 'readwrite');
+        return new Promise((resolve, reject) => {
+            tx.objectStore('settings').delete(key);
+            tx.oncomplete = resolve;
+            tx.onerror = () => reject(tx.error || new Error('storage_write_failed'));
+            tx.onabort = () => reject(tx.error || new Error('storage_write_aborted'));
         });
     }
 
@@ -625,23 +791,11 @@ class StorageRepository {
     }
 
     async saveActivity(activity) {
-        const tx = this.db.transaction(['activities'], 'readwrite');
-        const store = tx.objectStore('activities');
-        return new Promise((resolve, reject) => {
-            const request = store.put(activity);
-            request.onsuccess = () => resolve(activity);
-            request.onerror = () => reject(request.error);
-        });
+        return this.persistMutation(['activities'], tx => tx.objectStore('activities').put(activity) && activity);
     }
 
     async deleteActivity(id) {
-        const tx = this.db.transaction(['activities'], 'readwrite');
-        const store = tx.objectStore('activities');
-        return new Promise((resolve, reject) => {
-            const request = store.delete(id);
-            request.onsuccess = () => resolve();
-            request.onerror = () => reject(request.error);
-        });
+        return this.persistMutation(['activities'], tx => { tx.objectStore('activities').delete(id); });
     }
 
     // TimeEntries
@@ -666,23 +820,11 @@ class StorageRepository {
     }
 
     async saveTimeEntry(entry) {
-        const tx = this.db.transaction(['timeEntries'], 'readwrite');
-        const store = tx.objectStore('timeEntries');
-        return new Promise((resolve, reject) => {
-            const request = store.put(entry);
-            request.onsuccess = () => resolve(entry);
-            request.onerror = () => reject(request.error);
-        });
+        return this.persistMutation(['timeEntries'], tx => tx.objectStore('timeEntries').put(entry) && entry);
     }
 
     async deleteTimeEntry(id) {
-        const tx = this.db.transaction(['timeEntries'], 'readwrite');
-        const store = tx.objectStore('timeEntries');
-        return new Promise((resolve, reject) => {
-            const request = store.delete(id);
-            request.onsuccess = () => resolve();
-            request.onerror = () => reject(request.error);
-        });
+        return this.persistMutation(['timeEntries'], tx => { tx.objectStore('timeEntries').delete(id); });
     }
 
     async getSyncBatches() {
@@ -695,14 +837,11 @@ class StorageRepository {
     }
 
     async saveConfirmedBatch(batch, entries) {
-        const tx = this.db.transaction(['syncBatches', 'timeEntries'], 'readwrite');
-        tx.objectStore('syncBatches').put(batch);
-        const entryStore = tx.objectStore('timeEntries');
-        entries.forEach(entry => entryStore.put(entry));
-        return new Promise((resolve, reject) => {
-            tx.oncomplete = () => resolve(batch);
-            tx.onerror = () => reject(tx.error);
-            tx.onabort = () => reject(tx.error || new Error('Unable to save confirmed day batch'));
+        return this.persistMutation(['syncBatches', 'timeEntries'], tx => {
+            tx.objectStore('syncBatches').put(batch);
+            const entryStore = tx.objectStore('timeEntries');
+            entries.forEach(entry => entryStore.put(entry));
+            return batch;
         });
     }
 
@@ -725,13 +864,7 @@ class StorageRepository {
     }
 
     async setSetting(key, value) {
-        const tx = this.db.transaction(['settings'], 'readwrite');
-        const store = tx.objectStore('settings');
-        return new Promise((resolve, reject) => {
-            const request = store.put({ key, value });
-            request.onsuccess = () => resolve();
-            request.onerror = () => reject(request.error);
-        });
+        return this.persistMutation(['settings'], tx => { tx.objectStore('settings').put({ key, value }); });
     }
 
     // Layout
@@ -746,105 +879,100 @@ class StorageRepository {
     }
 
     async saveLayout(layout) {
-        const tx = this.db.transaction(['layout'], 'readwrite');
-        const store = tx.objectStore('layout');
-        return new Promise((resolve, reject) => {
-            const request = store.put(layout);
-            request.onsuccess = () => resolve();
-            request.onerror = () => reject(request.error);
+        return this.persistMutation(['layout'], tx => { tx.objectStore('layout').put(layout); });
+    }
+
+    async replaceWorkData(activities, timeEntries) {
+        return this.persistMutation(['activities', 'timeEntries'], tx => {
+            const activityStore = tx.objectStore('activities');
+            const entryStore = tx.objectStore('timeEntries');
+            activityStore.clear();
+            entryStore.clear();
+            activities.forEach(activity => activityStore.put(activity));
+            timeEntries.forEach(entry => entryStore.put(entry));
         });
     }
 
     // Bulk export/import
+    isSensitiveBackupKey(key) {
+        return /api.?key|(?:access|refresh|id)?.?token|secret|password|credential|authorization|^auth(?:entication|orization)?$/i.test(key) ||
+            /^(clockodoEmail|clockodoApiUser)$/i.test(key);
+    }
+
+    stripSensitiveBackupFields(value) {
+        if (Array.isArray(value)) return value.map(item => this.stripSensitiveBackupFields(item));
+        if (value && typeof value === 'object') {
+            return Object.fromEntries(Object.entries(value)
+                .filter(([key]) => !this.isSensitiveBackupKey(key))
+                .map(([key, nested]) => [key, this.stripSensitiveBackupFields(nested)]));
+        }
+        return value;
+    }
+
     async exportAll() {
-        const [activities, timeEntries, settings, syncBatches] = await Promise.all([
+        const [activities, timeEntries, settings, syncBatches, layout] = await Promise.all([
             this.getActivities(),
             this.getTimeEntries(),
-            this.db.transaction(['settings'], 'readonly').objectStore('settings').getAll(),
-            this.getSyncBatches()
+            new Promise((resolve, reject) => {
+                const request = this.db.transaction(['settings'], 'readonly')
+                    .objectStore('settings').getAll();
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            }),
+            this.getSyncBatches(),
+            this.getLayout()
         ]);
 
         return {
-            activities,
-            timeEntries,
-            syncBatches,
-            settings: Object.fromEntries(settings.filter(s => s.key !== 'clockodoApiKey').map(s => [s.key, s.value])),
+            format: 'timerhub-backup',
+            version: 1,
+            activities: this.stripSensitiveBackupFields(activities),
+            timeEntries: this.stripSensitiveBackupFields(timeEntries),
+            syncBatches: this.stripSensitiveBackupFields(syncBatches),
+            layout: this.stripSensitiveBackupFields(layout),
+            settings: Object.fromEntries(settings
+                .filter(s => !/(clockodo|api.?key|token|secret|password|credential|auth)/i.test(s.key))
+                .map(s => [s.key, this.stripSensitiveBackupFields(s.value)])),
             exportedAt: Date.now()
         };
     }
 
+    validateBackupData(data) {
+        const isRecord = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+        if (!isRecord(data) || (data.format !== undefined && (data.format !== 'timerhub-backup' || data.version !== 1)) ||
+            !Array.isArray(data.activities) || !Array.isArray(data.timeEntries) ||
+            (data.syncBatches !== undefined && !Array.isArray(data.syncBatches)) ||
+            (data.layout !== undefined && !Array.isArray(data.layout)) ||
+            (data.settings !== undefined && !isRecord(data.settings))) {
+            throw new Error('invalid_backup');
+        }
+        return data;
+    }
+
     async importAll(data, merge = false) {
-        // Activities
-        const txAct = this.db.transaction(['activities'], 'readwrite');
-        const storeAct = txAct.objectStore('activities');
-        
-        if (!merge) {
-            await new Promise((resolve, reject) => {
-                const request = storeAct.clear();
-                request.onsuccess = () => resolve();
-                request.onerror = () => reject(request.error);
-            });
-        }
-
-        for (const act of data.activities) {
-            await new Promise((resolve, reject) => {
-                const request = storeAct.put(act);
-                request.onsuccess = () => resolve();
-                request.onerror = () => reject(request.error);
-            });
-        }
-
-        // TimeEntries
-        const txEntry = this.db.transaction(['timeEntries'], 'readwrite');
-        const storeEntry = txEntry.objectStore('timeEntries');
-        
-        if (!merge) {
-            await new Promise((resolve, reject) => {
-                const request = storeEntry.clear();
-                request.onsuccess = () => resolve();
-                request.onerror = () => reject(request.error);
-            });
-        }
-
-        for (const entry of data.timeEntries) {
-            await new Promise((resolve, reject) => {
-                const request = storeEntry.put(entry);
-                request.onsuccess = () => resolve();
-                request.onerror = () => reject(request.error);
-            });
-        }
-
-        if (this.db.objectStoreNames.contains('syncBatches')) {
-            const txBatches = this.db.transaction(['syncBatches'], 'readwrite');
-            const storeBatches = txBatches.objectStore('syncBatches');
+        this.validateBackupData(data);
+        const stores = ['activities', 'timeEntries', 'settings', 'syncBatches', 'layout'];
+        return this.persistMutation(stores, tx => {
+            const activities = tx.objectStore('activities');
+            const timeEntries = tx.objectStore('timeEntries');
+            const syncBatches = tx.objectStore('syncBatches');
+            const layout = tx.objectStore('layout');
+            const settings = tx.objectStore('settings');
             if (!merge) {
-                await new Promise((resolve, reject) => {
-                    const request = storeBatches.clear();
-                    request.onsuccess = () => resolve();
-                    request.onerror = () => reject(request.error);
-                });
+                activities.clear();
+                timeEntries.clear();
+                syncBatches.clear();
+                layout.clear();
             }
-            for (const batch of data.syncBatches || []) {
-                await new Promise((resolve, reject) => {
-                    const request = storeBatches.put(batch);
-                    request.onsuccess = () => resolve();
-                    request.onerror = () => reject(request.error);
-                });
+            data.activities.forEach(item => activities.put(this.stripSensitiveBackupFields(item)));
+            data.timeEntries.forEach(item => timeEntries.put(this.stripSensitiveBackupFields(item)));
+            (data.syncBatches || []).forEach(item => syncBatches.put(this.stripSensitiveBackupFields(item)));
+            (data.layout || []).forEach(item => layout.put(this.stripSensitiveBackupFields(item)));
+            for (const [key, value] of Object.entries(data.settings || {})) {
+                if (/(clockodo|api.?key|token|secret|password|credential|auth)/i.test(key)) continue;
+                settings.put({ key, value: this.stripSensitiveBackupFields(value) });
             }
-        }
-
-        // Settings
-        const txSettings = this.db.transaction(['settings'], 'readwrite');
-        const storeSettings = txSettings.objectStore('settings');
-        
-        for (const [key, value] of Object.entries(data.settings || {})) {
-            if (key === 'clockodoApiKey') continue;
-            await new Promise((resolve, reject) => {
-                const request = storeSettings.put({ key, value });
-                request.onsuccess = () => resolve();
-                request.onerror = () => reject(request.error);
-            });
-        }
+        });
     }
 }
 
@@ -859,6 +987,8 @@ class TimerHubApp {
 
     constructor() {
         this.storage = new StorageRepository();
+        this.pendingRestoreData = null;
+        this.backupSnapshots = [];
         this.activities = [];
         this.timeEntries = [];
         this.activeActivityId = null;
@@ -874,6 +1004,8 @@ class TimerHubApp {
         this.deletedEntry = null;
         this.uiUpdateInterval = null;
         this.notificationTimeout = null;
+        this.timerActionInProgress = false;
+        this.timerActionState = 'idle';
         this.toastTimeout = null;
         this.notificationTestMode = false;
         this.isDemoMode = this.isDevMode();
@@ -901,16 +1033,16 @@ class TimerHubApp {
         ];
 
         this.SHAPES = [
-            { id: 'circle', key: 'shapeCircle', label: '●', svg: 'M 50 50 C 50 77.6 27.6 100 0 100 C -27.6 100 -50 77.6 -50 50 C -50 22.4 -27.6 0 0 0 C 27.6 0 50 22.4 50 50' },
-            { id: 'square', key: 'shapeSquare', label: '■', svg: 'M -50 -50 L 50 -50 L 50 50 L -50 50 Z' },
-            { id: 'rounded', key: 'shapeRounded', label: '▬', svg: 'M -50 -30 L 50 -30 Q 50 -50 30 -50 L -30 -50 Q -50 -50 -50 -30 L -50 30 Q -50 50 -30 50 L 30 50 Q 50 50 50 30 L 50 -30 Z' },
-            { id: 'diamond', key: 'shapeDiamond', label: '◆', svg: 'M 0 -50 L 50 0 L 0 50 L -50 0 Z' },
-            { id: 'triangle', key: 'shapeTriangle', label: '▲', svg: 'M 0 -50 L 50 50 L -50 50 Z' },
-            { id: 'hexagon', key: 'shapeHexagon', label: '⬡', svg: 'M 0 -50 L 43.3 -25 L 43.3 25 L 0 50 L -43.3 25 L -43.3 -25 Z' },
-            { id: 'octagon', key: 'shapeOctagon', label: '⬢', svg: 'M -29.29 -50 L 29.29 -50 L 50 -29.29 L 50 29.29 L 29.29 50 L -29.29 50 L -50 29.29 L -50 -29.29 Z' },
-            { id: 'star', key: 'shapeStar', label: '★', svg: 'M 0 -50 L 15 -20 L 50 -20 L 25 5 L 40 40 L 0 15 L -40 40 L -25 5 L -50 -20 L -15 -20 Z' },
-            { id: 'heart', key: 'shapeHeart', label: '♥', svg: 'M 0 10 C -30 -20 -50 -10 -50 -20 C -50 -40 -30 -50 -15 -50 C 0 -60 15 -50 15 -50 C 30 -50 50 -40 50 -20 C 50 -10 30 -20 0 10' },
-            { id: 'oval', key: 'shapeOval', label: '⬭', svg: 'M -50 0 A 50 30 0 0 1 50 0 A 50 30 0 0 1 -50 0' }
+            { id: 'circle', key: 'shapeCircle', svg: 'M 0 -50 A 50 50 0 1 0 0 50 A 50 50 0 1 0 0 -50 Z' },
+            { id: 'square', key: 'shapeSquare', svg: 'M -50 -50 L 50 -50 L 50 50 L -50 50 Z' },
+            { id: 'rounded', key: 'shapeRounded', svg: 'M -50 -30 L 50 -30 Q 50 -50 30 -50 L -30 -50 Q -50 -50 -50 -30 L -50 30 Q -50 50 -30 50 L 30 50 Q 50 50 50 30 L 50 -30 Z' },
+            { id: 'diamond', key: 'shapeDiamond', svg: 'M 0 -50 L 50 0 L 0 50 L -50 0 Z' },
+            { id: 'triangle', key: 'shapeTriangle', svg: 'M 0 -50 L 50 50 L -50 50 Z' },
+            { id: 'hexagon', key: 'shapeHexagon', svg: 'M 0 -50 L 43.3 -25 L 43.3 25 L 0 50 L -43.3 25 L -43.3 -25 Z' },
+            { id: 'octagon', key: 'shapeOctagon', svg: 'M -29.29 -50 L 29.29 -50 L 50 -29.29 L 50 29.29 L 29.29 50 L -29.29 50 L -50 29.29 L -50 -29.29 Z' },
+            { id: 'star', key: 'shapeStar', svg: 'M 0 -50 L 15 -20 L 50 -20 L 25 5 L 40 40 L 0 15 L -40 40 L -25 5 L -50 -20 L -15 -20 Z' },
+            { id: 'heart', key: 'shapeHeart', svg: 'M 0 10 C -30 -20 -50 -10 -50 -20 C -50 -40 -30 -50 -15 -50 C 0 -60 15 -50 15 -50 C 30 -50 50 -40 50 -20 C 50 -10 30 -20 0 10' },
+            { id: 'oval', key: 'shapeOval', svg: 'M -50 0 A 50 30 0 0 1 50 0 A 50 30 0 0 1 -50 0' }
         ];
     }
 
@@ -975,6 +1107,7 @@ class TimerHubApp {
     async init() {
         try {
             await this.storage.init();
+            this.storage.onSnapshotStatus = () => this.refreshAutomaticBackupStatus();
             await this.loadSettings();
             await this.refreshClockodoConfigurationStatus();
             await this.loadActivities();
@@ -985,6 +1118,8 @@ class TimerHubApp {
             this.syncServiceWorkerLocale();
             this.startUIUpdateLoop();
             this.renderMain();
+            const loading = document.getElementById('appLoading');
+            if (loading) loading.hidden = true;
 
             // Reconcile a timer restored from IndexedDB with its persisted
             // server alarm so browser restarts do not silently lose reminders.
@@ -999,9 +1134,14 @@ class TimerHubApp {
             if (this.activities.length === 0) {
                 this.showOnboarding();
             }
-        } catch (error) {
-            console.error('Init error:', error);
-            alert(this.t('initFailed'));
+        } catch {
+            console.error('TimerHub initialization failed');
+            const loading = document.getElementById('appLoading');
+            if (loading) loading.hidden = true;
+            const panel = document.getElementById('initErrorPanel');
+            if (panel) panel.hidden = false;
+            this.applyTranslations();
+            document.getElementById('initReloadBtn')?.addEventListener('click', () => window.location.reload());
         }
     }
 
@@ -1019,7 +1159,7 @@ class TimerHubApp {
             await this.storage.getSetting('notificationInterval', 20);
         this.notificationCustomMinutes =
             await this.storage.getSetting('notificationCustomMinutes', 20);
-        await this.storage.setSetting('clockodoApiKey', '');
+        await this.storage.removeSettingWithoutSnapshot('clockodoApiKey');
         this.clockodoEmail = await this.storage.getSetting('clockodoEmail', '');
         this.clockodoCustomerId = await this.storage.getSetting('clockodoCustomerId', '');
         this.clockodoProjectId = await this.storage.getSetting('clockodoProjectId', '');
@@ -1278,8 +1418,10 @@ class TimerHubApp {
             if (!el) console.warn(`Element not found: ${id}`);
             return el;
         };
+        this.setupDialogAccessibility();
 
         // Navigation
+        sel('navTimer')?.addEventListener('click', () => this.switchScreen('main'));
         sel('navReview')?.addEventListener('click', () => this.switchScreen('review'));
         sel('navLog')?.addEventListener('click', () => this.switchScreen('log'));
         sel('navSettings')?.addEventListener('click', () => this.switchScreen('settings'));
@@ -1486,6 +1628,17 @@ class TimerHubApp {
 
         sel('backupBtn')?.addEventListener('click', () => this.backupData());
         sel('restoreBtn')?.addEventListener('click', () => this.restoreData());
+        sel('automaticSnapshotSelect')?.addEventListener('change', e => {
+            const restoreButton = document.getElementById('restoreSnapshotBtn');
+            if (restoreButton) restoreButton.disabled = !e.target.value;
+        });
+        sel('restoreSnapshotBtn')?.addEventListener('click', () => this.restoreSelectedSnapshot());
+        sel('backupRestoreCloseBtn')?.addEventListener('click', () => this.cancelPendingRestore());
+        sel('backupRestoreCancelBtn')?.addEventListener('click', () => this.cancelPendingRestore());
+        sel('backupRestoreMergeBtn')?.addEventListener('click', () => this.restorePendingData(true));
+        sel('backupRestoreReplaceBtn')?.addEventListener('click', () => this.restorePendingData(false));
+        this.storage.onSnapshotStatus = () => this.refreshAutomaticBackupStatus();
+        this.refreshAutomaticBackupStatus();
 
         if (this.isDemoMode) {
             const demoBtn = sel('demoDataBtn');
@@ -1513,6 +1666,48 @@ class TimerHubApp {
         sel('activityName')?.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 this.saveActivity();
+            }
+        });
+    }
+
+    setupDialogAccessibility() {
+        if (this.dialogAccessibilityReady) return;
+        this.dialogAccessibilityReady = true;
+        let opener = null;
+        let activeModal = null;
+        const focusable = modal => [...modal.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])')]
+            .filter(element => element.getClientRects().length > 0);
+        const observer = new MutationObserver(() => {
+            const modal = [...document.querySelectorAll('.modal.active')].at(-1) || null;
+            if (modal && modal !== activeModal) {
+                if (!activeModal) opener = document.activeElement;
+                activeModal = modal;
+                const first = focusable(modal)[0];
+                if (first) requestAnimationFrame(() => first.focus());
+            } else if (!modal && activeModal) {
+                activeModal = null;
+                const restore = opener;
+                opener = null;
+                if (restore?.isConnected) requestAnimationFrame(() => restore.focus());
+            }
+        });
+        document.querySelectorAll('.modal').forEach(modal => observer.observe(modal, { attributes: true, attributeFilter: ['class'] }));
+        document.addEventListener('keydown', event => {
+            if (!activeModal) return;
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                activeModal.querySelector('.modal-close')?.click();
+                return;
+            }
+            if (event.key !== 'Tab') return;
+            const items = focusable(activeModal);
+            if (!items.length) return;
+            const first = items[0];
+            const last = items[items.length - 1];
+            if (event.shiftKey && (document.activeElement === first || !activeModal.contains(document.activeElement))) {
+                event.preventDefault(); last.focus();
+            } else if (!event.shiftKey && (document.activeElement === last || !activeModal.contains(document.activeElement))) {
+                event.preventDefault(); first.focus();
             }
         });
     }
@@ -1600,7 +1795,13 @@ class TimerHubApp {
         this.SHAPES.forEach(shape => {
             const btn = document.createElement('button');
             btn.className = 'shape-option';
-            btn.textContent = shape.label;
+            const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            icon.setAttribute('viewBox', '-60 -60 120 120');
+            icon.setAttribute('aria-hidden', 'true');
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', shape.svg);
+            icon.appendChild(path);
+            btn.appendChild(icon);
             btn.dataset.shape = shape.id;
             btn.dataset.i18nTitle = shape.key;
             btn.dataset.i18nAriaLabel = shape.key;
@@ -1628,10 +1829,29 @@ class TimerHubApp {
         }
     }
 
+    updateTimerStatus() {
+        const status = document.getElementById('timerRunningStatus');
+        if (!status) return;
+        const activeActivity = this.activities.find(activity => activity.id === this.activeActivityId);
+        const actionState = this.timerActionState || 'idle';
+        status.textContent = actionState === 'saving'
+            ? this.t('timerSaving')
+            : actionState === 'error'
+                ? this.t('timerSaveFailed')
+                : activeActivity
+                    ? this.t('timerStatusRunning', { activity: activeActivity.name, duration: this.formatDuration(this.getActiveDuration()) })
+                    : this.t('timerIdle');
+        status.dataset.state = actionState === 'error' ? 'error' : actionState === 'saving' ? 'saving' : activeActivity ? 'running' : 'idle';
+        status.classList.toggle('is-running', Boolean(activeActivity) && actionState === 'idle');
+        status.classList.toggle('is-saving', actionState === 'saving');
+        status.classList.toggle('is-error', actionState === 'error');
+    }
+
     startUIUpdateLoop() {
         if (this.uiUpdateInterval) clearInterval(this.uiUpdateInterval);
         
         this.uiUpdateInterval = setInterval(() => {
+            this.updateTimerStatus();
             // Update active button duration every second
             if (this.activeActivityId) {
                 const btn = document.querySelector(`[data-activity-id="${this.activeActivityId}"]`);
@@ -1668,6 +1888,15 @@ class TimerHubApp {
                 document.getElementById('mainScreen')?.classList.add('active');
                 this.renderMain();
         }
+        document.querySelectorAll('.nav-btn').forEach(button => {
+            const selected = ((screen === 'main' || !['review', 'log', 'settings'].includes(screen)) && button.id === 'navTimer') ||
+                (screen === 'review' && button.id === 'navReview') ||
+                (screen === 'log' && button.id === 'navLog') ||
+                (screen === 'settings' && button.id === 'navSettings');
+            button.classList.toggle('selected', selected);
+            if (selected) button.setAttribute('aria-current', 'page');
+            else button.removeAttribute('aria-current');
+        });
     }
 
     changeReviewDay(offset) {
@@ -1700,7 +1929,7 @@ class TimerHubApp {
         const latestBatch = this.syncBatches.filter(batch => batch.date === this.reviewDate).sort((a, b) => b.version - a.version)[0];
         if (latestBatch) {
             const done = latestBatch.entries.filter(entry => [SYNC_STATUS.SYNCED, SYNC_STATUS.LOCAL_ONLY, SYNC_STATUS.FAILED, SYNC_STATUS.UNKNOWN].includes(entry.syncStatus)).length;
-            const batchStatusKey = { partial: 'statusPartial', unknown: 'statusUnknown', confirmed: 'statusPending', syncing: 'statusSyncing', failed: 'statusFailed', synced: 'statusSynced', local_only: 'statusLocalOnly' }[latestBatch.state] || 'statusPending';
+            const batchStatusKey = { partial: 'statusPartial', unknown: 'statusUnknown', confirmed: 'statusConfirmed', syncing: 'statusSyncing', failed: 'statusFailed', synced: 'statusSynced', local_only: 'statusLocalOnly' }[latestBatch.state] || 'statusPending';
             summary.innerHTML += `<div class="review-summary-card"><div class="review-summary-label">${this.t('syncProgress', { done, total: latestBatch.entries.length })}</div><div class="review-summary-value">${this.t(batchStatusKey)}</div></div>`;
         }
 
@@ -1720,7 +1949,7 @@ class TimerHubApp {
 
         const issueKeys = { running: this.t('issueRunning'), zeroDuration: this.t('issueZeroDuration'), overlapping: this.t('issueOverlapping'), unusuallyLong: this.t('issueUnusuallyLong') };
         const statusKeys = {
-            unsynced: this.t('statusUnsynced'), pending: this.t('statusPending'), confirmed: this.t('statusPending'),
+            unsynced: this.t('statusLocal'), pending: this.t('statusPending'), confirmed: this.t('statusConfirmed'),
             syncing: this.t('statusSyncing'), synced: this.t('statusSynced'), failed: this.t('statusFailed'),
             unknown: this.t('statusUnknown'), partial: this.t('statusPartial'), local_only: this.t('statusLocalOnly')
         };
@@ -1730,7 +1959,7 @@ class TimerHubApp {
             const start = this.formatTime(entry.startTimestamp);
             const end = entry.endTimestamp === null ? '—' : this.formatTime(entry.endTimestamp);
             const duration = this.formatDuration(this.getEntryDuration(entry));
-            const status = statusKeys[entry.syncStatus] || this.t('statusUnsynced');
+            const status = statusKeys[entry.syncStatus] || this.t('statusLocal');
             const previous = entries[index - 1];
             const gap = previous?.endTimestamp !== null && previous?.endTimestamp !== undefined && previous.endTimestamp < entry.startTimestamp
                 ? `<div class="review-gap" aria-label="${this.t('gap')}"><span>${this.t('gap')}</span><time>${this.escapeHtml(this.formatTime(previous.endTimestamp))}–${this.escapeHtml(start)}</time><strong>${this.formatDuration(entry.startTimestamp - previous.endTimestamp)}</strong></div>`
@@ -1741,7 +1970,7 @@ class TimerHubApp {
             const batch = entry.syncBatchId ? this.syncBatches.find(item => item.id === entry.syncBatchId) : null;
             const activityLabel = activity?.name || entry.activityNameSnapshot || this.t('activity');
             const retryButton = entry.syncStatus === SYNC_STATUS.FAILED && batch
-                ? `<button class="review-action-btn review-retry-entry" type="button" data-batch-id="${this.escapeHtml(batch.id)}" aria-label="${this.escapeHtml(`${this.t('retry')}: ${activityLabel}`)}">${this.t('retry')}</button>`
+                ? `<button class="review-action-btn review-retry-entry" type="button" data-batch-id="${this.escapeHtml(batch.id)}" aria-label="${this.escapeHtml(`${this.t('retry')}: ${activityLabel}`)}"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 7v5h-5M4.8 9a7.5 7.5 0 0 1 12.7-2L20 12M4 17v-5h5m10.2 3a7.5 7.5 0 0 1-12.7 2L4 12"/></svg>${this.t('retry')}</button>`
                 : '';
             const unknownNotice = entry.syncStatus === SYNC_STATUS.UNKNOWN ? `<small>${this.t('syncOutcomeUnknown')}</small>` : '';
             const localOnlyNotice = entry.syncStatus === SYNC_STATUS.LOCAL_ONLY ? `<small>${this.t('syncLocalOnlyNotice')}</small>` : '';
@@ -1754,7 +1983,7 @@ class TimerHubApp {
                 <span class="review-entry-duration">${this.escapeHtml(duration)}</span></div>
                 <div class="review-entry-title"><span class="review-activity-dot" style="background-color:${this.escapeHtml(activity?.color || '#27AE60')}"></span>${this.escapeHtml(activityLabel)}</div>
                 ${meta ? `<div class="review-entry-tags">${entry.project ? `<span class="review-tag">${this.escapeHtml(entry.project)}</span>` : ''}${entry.service ? `<span class="review-tag">${this.escapeHtml(entry.service)}</span>` : ''}</div>` : ''}${notes}${issueText ? `<small>${this.escapeHtml(issueText)}</small>` : ''}${errorNotice}${unknownNotice}${localOnlyNotice}
-                <div class="review-entry-footer"><span class="sync-badge ${this.escapeHtml(entry.syncStatus)}">${this.escapeHtml(status)}</span><div class="review-entry-actions"><button class="review-action-btn review-edit-entry" type="button" data-entry-id="${this.escapeHtml(entry.id)}" aria-label="${this.escapeHtml(`${this.t('edit')}: ${activityLabel}`)}" ${entry.syncStatus === SYNC_STATUS.CONFIRMED || entry.syncStatus === SYNC_STATUS.SYNCING ? `disabled title="${this.escapeHtml(this.t('confirmedEntryLocked'))}"` : ''}>${this.t('edit')}</button>${retryButton}</div></div>
+                <div class="review-entry-footer"><span class="sync-badge ${this.escapeHtml(entry.syncStatus)}">${this.escapeHtml(status)}</span><div class="review-entry-actions"><button class="review-action-btn review-edit-entry" type="button" data-entry-id="${this.escapeHtml(entry.id)}" aria-label="${this.escapeHtml(`${this.t('edit')}: ${activityLabel}`)}" ${entry.syncStatus === SYNC_STATUS.CONFIRMED || entry.syncStatus === SYNC_STATUS.SYNCING ? `disabled title="${this.escapeHtml(this.t('confirmedEntryLocked'))}"` : ''}><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m4 16.5-.8 4.3 4.3-.8L19 8.5 15.5 5 4 16.5Z"/><path d="m13.5 7 3.5 3.5"/></svg>${this.t('edit')}</button>${retryButton}</div></div>
             </article>`;
         }).join('');
         list.querySelectorAll('.review-edit-entry').forEach(button => button.addEventListener('click', () => this.showEntryEditModal(button.dataset.entryId)));
@@ -2014,7 +2243,23 @@ class TimerHubApp {
 
     renderMain() {
         const grid = document.getElementById('activitiesGrid');
+        this.updateTimerStatus();
+        if (!grid) return;
+        grid.setAttribute('aria-busy', String(Boolean(this.timerActionInProgress)));
         grid.innerHTML = '';
+
+        if (!this.activities.length) {
+            const empty = document.createElement('div');
+            empty.className = 'activity-empty';
+            const title = document.createElement('h3');
+            title.textContent = this.t('noActivitiesTitle');
+            const message = document.createElement('p');
+            message.textContent = this.t('noActivitiesMessage');
+            empty.append(title, message);
+            grid.appendChild(empty);
+            this.populateActivityFilter();
+            return;
+        }
 
         this.activities.forEach((activity, index) => {
             const btn = document.createElement('button');
@@ -2023,22 +2268,37 @@ class TimerHubApp {
                 btn.classList.add('active');
             }
             btn.dataset.activityId = activity.id;
-            btn.setAttribute('aria-label', activity.name);
-            btn.style.backgroundColor = activity.color;
-            btn.style.setProperty('--activity-text-color', this.contrastingTextColor(activity.color));
-
-            // Apply shape if needed (for now using border-radius)
-            if (activity.shape === 'circle') {
-                btn.style.borderRadius = '50%';
-            } else if (activity.shape === 'diamond') {
-                btn.style.borderRadius = '0';
-            }
+            btn.disabled = Boolean(this.timerActionInProgress);
+            const activityShape = ['circle', 'square', 'rounded', 'diamond', 'triangle', 'hexagon', 'octagon', 'star', 'heart', 'oval'].includes(activity.shape)
+                ? activity.shape : 'rounded';
+            btn.dataset.shape = activityShape;
+            btn.classList.add(`activity-shape-${activityShape}`);
+            btn.setAttribute('aria-pressed', String(this.activeActivityId === activity.id));
+            btn.setAttribute('aria-label', this.activeActivityId === activity.id
+                ? this.t('activityStopAria', { activity: activity.name })
+                : this.t('activityStartAria', { activity: activity.name }));
+            btn.style.setProperty('--activity-accent', activity.color || '#18794e');
 
             const name = document.createElement('div');
             name.className = 'btn-name';
             name.textContent = activity.name;
 
+            const colorMark = document.createElement('span');
+            colorMark.className = 'activity-color-mark';
+            colorMark.style.backgroundColor = activity.color || '#18794e';
+            colorMark.setAttribute('aria-hidden', 'true');
+            btn.appendChild(colorMark);
+            const shapeMark = document.createElement('span');
+            shapeMark.className = 'activity-shape-mark';
+            shapeMark.setAttribute('aria-hidden', 'true');
+            btn.appendChild(shapeMark);
+            btn.appendChild(name);
+
             if (this.activeActivityId === activity.id) {
+                const state = document.createElement('span');
+                state.className = 'btn-state';
+                state.textContent = this.t('timerRunning');
+                btn.appendChild(state);
                 const entry = this.timeEntries.find(e => e.activityId === activity.id && e.endTimestamp === null);
                 if (entry) {
                     const timeEl = document.createElement('div');
@@ -2053,14 +2313,32 @@ class TimerHubApp {
                     btn.appendChild(timeEl);
                     btn.appendChild(durationEl);
                 }
+                const hint = document.createElement('span');
+                hint.className = 'btn-hint';
+                hint.textContent = this.t('activityStopHint');
+                btn.appendChild(hint);
             } else {
-                btn.appendChild(name);
+                const hint = document.createElement('span');
+                hint.className = 'btn-hint';
+                hint.textContent = this.t('activityStartHint');
+                btn.appendChild(hint);
             }
 
             // Click events
-            btn.addEventListener('click', (e) => {
-                if (!this.draggedActivityId) {
-                    this.toggleActivity(activity.id);
+            btn.addEventListener('click', async () => {
+                if (this.draggedActivityId || this.timerActionInProgress) return;
+                this.timerActionInProgress = true;
+                this.timerActionState = 'saving';
+                this.renderMain();
+                try {
+                    await this.toggleActivity(activity.id);
+                    this.timerActionState = 'idle';
+                } catch {
+                    this.timerActionState = 'error';
+                    this.showToast(this.t('timerSaveFailed'));
+                } finally {
+                    this.timerActionInProgress = false;
+                    this.renderMain();
                 }
             });
 
@@ -2499,9 +2777,17 @@ class TimerHubApp {
             );
 
             if (entry) {
+                const previousEnd = entry.endTimestamp;
+                const previousUpdatedAt = entry.updatedAt;
                 entry.endTimestamp = now;
                 entry.updatedAt = now;
-                await this.storage.saveTimeEntry(entry);
+                try {
+                    await this.storage.saveTimeEntry(entry);
+                } catch (error) {
+                    entry.endTimestamp = previousEnd;
+                    entry.updatedAt = previousUpdatedAt;
+                    throw error;
+                }
                 try {
                     await this.cancelBackgroundAlarm();
                 } catch (error) {
@@ -2519,9 +2805,18 @@ class TimerHubApp {
                              e.endTimestamp === null
                     );
                     if (prevEntry) {
+                        const previousEnd = prevEntry.endTimestamp;
+                        const previousUpdatedAt = prevEntry.updatedAt;
                         prevEntry.endTimestamp = now;
                         prevEntry.updatedAt = now;
-                        await this.storage.saveTimeEntry(prevEntry);
+                        try {
+                            await this.storage.saveTimeEntry(prevEntry);
+                        } catch (error) {
+                            prevEntry.endTimestamp = previousEnd;
+                            prevEntry.updatedAt = previousUpdatedAt;
+                            throw error;
+                        }
+                        this.activeActivityId = null;
                     }
                     try {
                         await this.cancelBackgroundAlarm();
@@ -2551,7 +2846,13 @@ class TimerHubApp {
                 });
 
                 this.timeEntries.push(entry);
-                await this.storage.saveTimeEntry(entry);
+                try {
+                    await this.storage.saveTimeEntry(entry);
+                } catch (error) {
+                    this.timeEntries = this.timeEntries.filter(item => item.id !== entry.id);
+                    this.activeActivityId = null;
+                    throw error;
+                }
                 this.activeActivityId = activityId;
                 this.renderMain();
 
@@ -3324,16 +3625,62 @@ class TimerHubApp {
             const blob = new Blob([json], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
+            const now = new Date();
+            const parts = new Intl.DateTimeFormat('en-CA', {
+                timeZone: 'UTC', year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
+            }).formatToParts(now).reduce((values, part) => ({ ...values, [part.type]: part.value }), {});
+            const filename = `${this.t('backupFilename')}_${parts.year}${parts.month}${parts.day}_${parts.hour}${parts.minute}${parts.second}.json`;
             a.href = url;
-            a.download = `${this.t('backupFilename')}_${Date.now()}.json`;
+            a.download = filename;
+            a.rel = 'noopener';
+            a.style.display = 'none';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            // Mobile browsers may consume the Blob URL asynchronously after click.
+            setTimeout(() => URL.revokeObjectURL(url), 60_000);
             this.showToast(this.t('backupSuccess'));
         } catch (error) {
             this.showToast(this.t('backupFailed'));
-            console.error(error);
+        }
+    }
+
+    formatSnapshotDate(timestamp) {
+        return new Intl.DateTimeFormat(this.currentLanguage, {
+            dateStyle: 'medium', timeStyle: 'short'
+        }).format(new Date(timestamp));
+    }
+
+    async refreshAutomaticBackupStatus() {
+        const status = document.getElementById('automaticBackupStatus');
+        const select = document.getElementById('automaticSnapshotSelect');
+        if (!status || !select) return;
+        try {
+            this.backupSnapshots = await this.storage.getAutomaticSnapshots();
+            const selectedId = select.value;
+            select.replaceChildren();
+            const placeholder = document.createElement('option');
+            placeholder.value = '';
+            placeholder.textContent = this.t('selectSnapshot');
+            select.appendChild(placeholder);
+            for (const snapshot of this.backupSnapshots) {
+                const option = document.createElement('option');
+                option.value = snapshot.id;
+                option.textContent = this.t('snapshotDateFormat', { date: this.formatSnapshotDate(snapshot.createdAt) });
+                select.appendChild(option);
+            }
+            if (this.backupSnapshots.some(snapshot => snapshot.id === selectedId)) select.value = selectedId;
+            const latest = this.backupSnapshots[0];
+            status.textContent = this.storage.snapshotStatus === 'failed'
+                ? this.t('automaticSnapshotsFailed')
+                : latest
+                    ? this.t('automaticSnapshotsLatest', { date: this.formatSnapshotDate(latest.createdAt) })
+                    : this.t('automaticSnapshotsNone');
+            const restoreButton = document.getElementById('restoreSnapshotBtn');
+            if (restoreButton) restoreButton.disabled = !select.value;
+        } catch {
+            status.textContent = this.t('automaticSnapshotsFailed');
         }
     }
 
@@ -3349,24 +3696,64 @@ class TimerHubApp {
             reader.onload = async (event) => {
                 try {
                     const data = JSON.parse(event.target.result);
-                    
-                    const merge = confirm(this.t('mergeExistingData'));
-                    
-                    await this.storage.importAll(data, merge);
-                    
-                    await this.loadActivities();
-                    await this.loadTimeEntries();
-                    this.renderAll();
-                    
-                    this.showToast(this.t('restoreSuccess'));
+                    this.storage.validateBackupData(data);
+                    this.openRestoreConfirmation(data);
                 } catch (error) {
-                    this.showToast(this.t('restoreFailed'));
-                    console.error(error);
+                    this.showToast(error?.message === 'invalid_backup' ? this.t('invalidBackup') : this.t('restoreFailed'));
                 }
             };
+            reader.onerror = () => this.showToast(this.t('restoreFailed'));
             reader.readAsText(file);
         });
         input.click();
+    }
+
+    restoreSelectedSnapshot() {
+        const snapshotId = document.getElementById('automaticSnapshotSelect')?.value;
+        const snapshot = this.backupSnapshots.find(item => item.id === snapshotId);
+        if (!snapshot || snapshot.format !== 'timerhub-snapshot' || snapshot.version !== 1) {
+            this.showToast(this.t('restoreFailed'));
+            return false;
+        }
+        try {
+            this.storage.validateBackupData(snapshot.data);
+            this.openRestoreConfirmation(snapshot.data);
+            return true;
+        } catch {
+            this.showToast(this.t('invalidBackup'));
+            return false;
+        }
+    }
+
+    openRestoreConfirmation(data) {
+        this.pendingRestoreData = data;
+        document.getElementById('backupRestoreModal')?.classList.add('active');
+    }
+
+    cancelPendingRestore() {
+        this.pendingRestoreData = null;
+        document.getElementById('backupRestoreModal')?.classList.remove('active');
+    }
+
+    async restorePendingData(merge) {
+        if (!this.pendingRestoreData) return false;
+        const buttons = ['backupRestoreMergeBtn', 'backupRestoreReplaceBtn'];
+        buttons.forEach(id => { const button = document.getElementById(id); if (button) button.disabled = true; });
+        try {
+            await this.storage.importAll(this.pendingRestoreData, merge);
+            this.cancelPendingRestore();
+            await this.loadActivities();
+            await this.loadTimeEntries();
+            this.renderAll();
+            await this.refreshAutomaticBackupStatus();
+            this.showToast(this.t('restoreSuccess'));
+            return true;
+        } catch {
+            this.showToast(this.t('restoreFailed'));
+            return false;
+        } finally {
+            buttons.forEach(id => { const button = document.getElementById(id); if (button) button.disabled = false; });
+        }
     }
 
     async loadDemoData() {
@@ -3383,53 +3770,27 @@ class TimerHubApp {
             { name: this.t('demoBreak'), color: '#95A5A6', shape: 'oval' }
         ];
 
-        // Clear existing
-        this.activities = [];
-        this.timeEntries = [];
-        
-        const txAct = this.storage.db.transaction(['activities'], 'readwrite');
-        const storeAct = txAct.objectStore('activities');
-        await new Promise((resolve, reject) => {
-            const request = storeAct.clear();
-            request.onsuccess = () => resolve();
-            request.onerror = () => reject(request.error);
-        });
-
-        const txEntry = this.storage.db.transaction(['timeEntries'], 'readwrite');
-        const storeEntry = txEntry.objectStore('timeEntries');
-        await new Promise((resolve, reject) => {
-            const request = storeEntry.clear();
-            request.onsuccess = () => resolve();
-            request.onerror = () => reject(request.error);
-        });
-
-        // Create demo activities
-        for (let i = 0; i < demoActivities.length; i++) {
-            const act = demoActivities[i];
-            const activity = {
+        const activities = demoActivities.map((act, index) => ({
                 id: this.generateId(),
                 name: act.name,
                 color: act.color,
                 shape: act.shape || 'circle',
                 size: 'medium',
-                position: i,
+                position: index,
                 archived: false,
                 createdAt: now,
                 updatedAt: now
-            };
-            this.activities.push(activity);
-            await this.storage.saveActivity(activity);
-        }
+        }));
 
-        // Create demo entries
+        const timeEntries = [];
         let time = today.getTime() + (8 * 60 * 60 * 1000); // 08:00
         const durations = [77, 80, 65, 45, 90, 30]; // minutes
 
         for (let i = 0; i < 6; i++) {
             const entry = this.createTimeEntry({
                 id: this.generateId(),
-                activityId: this.activities[i % this.activities.length].id,
-                activityNameSnapshot: this.activities[i % this.activities.length].name,
+                activityId: activities[i % activities.length].id,
+                activityNameSnapshot: activities[i % activities.length].name,
                 startTimestamp: time,
                 endTimestamp: time + (durations[i] * 60 * 1000),
                 createdAt: now,
@@ -3438,10 +3799,14 @@ class TimerHubApp {
                 notes: '',
                 syncStatus: SYNC_STATUS.UNSYNCED
             });
-            this.timeEntries.push(entry);
-            await this.storage.saveTimeEntry(entry);
+            timeEntries.push(entry);
             time = entry.endTimestamp;
         }
+
+        await this.storage.replaceWorkData(activities, timeEntries);
+        this.activities = activities;
+        this.timeEntries = timeEntries;
+        this.activeActivityId = null;
 
         this.renderAll();
         this.showToast(this.t('demoDataLoaded'));

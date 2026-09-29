@@ -21,17 +21,27 @@
         <nav class="navbar">
             <div class="navbar-content">
                 <h1 class="navbar-title" id="navHome" role="button" tabindex="0" aria-label="Go to home screen" data-i18n="appName" data-i18n-aria-label="homeScreen">TimerHub</h1>
-                <div class="navbar-actions">
-                    <button id="navReview" class="nav-btn" aria-label="Day Review" data-i18n-aria-label="dayReview">📅</button>
-                    <button id="navLog" class="nav-btn" aria-label="View log" data-i18n-aria-label="viewLog">📋</button>
-                    <button id="navSettings" class="nav-btn" aria-label="Settings" data-i18n-aria-label="settings">⚙️</button>
+                <div class="navbar-actions" role="group">
+                    <button id="navTimer" class="nav-btn selected" aria-label="Timer" aria-current="page" data-i18n-aria-label="timerScreen"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="13" r="8.5"/><path d="M12 8v5l3 2M9 2h6M12 2v2"/></svg><span data-i18n="timerScreen">Timer</span></button>
+                    <button id="navReview" class="nav-btn" aria-label="Day Review" data-i18n-aria-label="dayReview"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M8 3.5v3M16 3.5v3M4 9.5h16M8 13h3M8 16h6"/></svg><span data-i18n="dayReview">Day Review</span></button>
+                    <button id="navLog" class="nav-btn" aria-label="View log" data-i18n-aria-label="viewLog"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 4.5h13v16H7zM4 7.5v13h13M10 9h7M10 12.5h7M10 16h5"/></svg><span data-i18n="timeLog">Time Log</span></button>
+                    <button id="navSettings" class="nav-btn" aria-label="Settings" data-i18n-aria-label="settings"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z"/><path d="m19.4 13.5 1.1.8-1.2 2.1-1.3-.5a7.9 7.9 0 0 1-1.5.9l-.2 1.4h-2.5l-.3-1.4a7.6 7.6 0 0 1-1.6-.1l-.9 1.1-2.1-1.2.5-1.3a7 7 0 0 1-.9-1.5l-1.4-.2v-2.5l1.4-.3a7 7 0 0 1 .7-1.5l-.7-1.3 1.8-1.7 1.2.8a7 7 0 0 1 1.7-.4l.5-1.3 2.4.6.1 1.4a7 7 0 0 1 1.4 1l1.4-.4 1.1 2.2-1.1.9a7 7 0 0 1 .1 1.7Z"/></svg><span data-i18n="settings">Settings</span></button>
                 </div>
             </div>
         </nav>
 
+        <div id="appLoading" class="app-loading" role="status" aria-live="polite"><span data-i18n="loadingApp">Loading TimerHub…</span></div>
+        <div id="initErrorPanel" class="init-error" role="alert" hidden>
+            <div class="init-error-card">
+                <h2 data-i18n="initFailed">TimerHub could not start. Reload the page or restore a backup.</h2>
+                <button id="initReloadBtn" class="btn-primary-green" type="button" data-i18n="reloadApp">Reload TimerHub</button>
+            </div>
+        </div>
+
         <!-- Main screen -->
         <div id="mainScreen" class="screen active">
             <div class="safe-area-top"></div>
+            <header class="timer-heading"><div><p class="eyebrow" data-i18n="appName">TimerHub</p><h2 data-i18n="activity">Activity</h2></div><div id="timerRunningStatus" class="timer-running-status" role="status" aria-live="polite"></div></header>
             
             <div class="activities-grid" id="activitiesGrid">
                 <!-- Activity buttons will be rendered here -->
@@ -60,8 +70,8 @@
             <div id="reviewSuspiciousBanner" class="review-suspicious-banner" style="display: none;"></div>
 
             <div class="review-toolbar">
-                <button id="reviewAddEntryBtn" class="action-btn"><span aria-hidden="true">➕</span> <span data-i18n="addEntry">Add Entry</span></button>
-                <button id="reviewConfirmSyncBtn" class="action-btn btn-primary-green"><span aria-hidden="true">🚀</span> <span data-i18n="reviewAndSync">Review &amp; Sync</span></button>
+                <button id="reviewAddEntryBtn" class="action-btn"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span data-i18n="addEntry">Add Entry</span></button>
+                <button id="reviewConfirmSyncBtn" class="action-btn btn-primary-green"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 7v5h-5M4.8 9a7.5 7.5 0 0 1 12.7-2L20 12M4 17v-5h5m10.2 3a7.5 7.5 0 0 1-12.7 2L4 12"/></svg><span data-i18n="reviewAndSync">Review &amp; Sync</span></button>
             </div>
 
             <div id="reviewEntriesList" class="review-entries-list">
@@ -96,11 +106,11 @@
             </div>
             
             <div class="log-actions">
-                <button id="copyLogBtn" class="action-btn"><span aria-hidden="true">📋</span> <span data-i18n="copy">Copy</span></button>
-                <button id="shareLogBtn" class="action-btn"><span aria-hidden="true">📤</span> <span data-i18n="share">Share</span></button>
-                <button id="exportTxtBtn" class="action-btn"><span aria-hidden="true">💾</span> <span data-i18n="exportTxt">Export TXT</span></button>
-                <button id="exportCsvBtn" class="action-btn"><span aria-hidden="true">📊</span> <span data-i18n="exportCsv">Export CSV</span></button>
-                <button id="exportJsonBtn" class="action-btn"><span aria-hidden="true">🔧</span> <span data-i18n="exportJson">Export JSON</span></button>
+                <button id="copyLogBtn" class="action-btn"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h2"/></svg><span data-i18n="copy">Copy</span></button>
+                <button id="shareLogBtn" class="action-btn"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 15V3m-4 4 4-4 4 4M5 12v8h14v-8"/></svg><span data-i18n="share">Share</span></button>
+                <button id="exportTxtBtn" class="action-btn"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 3h10l4 4v14H5zM14 3v5h5M8 13h8M8 17h8"/></svg><span data-i18n="exportTxt">Export TXT</span></button>
+                <button id="exportCsvBtn" class="action-btn"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM4 10h16M10 4v16M15 10v10"/></svg><span data-i18n="exportCsv">Export CSV</span></button>
+                <button id="exportJsonBtn" class="action-btn"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M8 4H5v16h3M16 4h3v16h-3M14 8l-4 8"/></svg><span data-i18n="exportJson">Export JSON</span></button>
             </div>
 
             <div id="logContent" class="log-content">
@@ -117,6 +127,7 @@
             </div>
             
             <div class="settings-content">
+                <h3 class="settings-section-title" data-i18n="appearanceSettings">Appearance and regional settings</h3>
                 <div class="settings-group">
                     <label for="themeSelect" data-i18n="theme">Theme</label>
                     <select id="themeSelect" class="setting-select">
@@ -143,6 +154,15 @@
                     </select>
                 </div>
 
+                <div class="settings-group">
+                    <label for="firstDaySelect" data-i18n="firstDayOfWeek">First Day of Week</label>
+                    <select id="firstDaySelect" class="setting-select">
+                        <option value="0" data-i18n="firstDaySunday">Sunday</option>
+                        <option value="1" data-i18n="firstDayMonday">Monday</option>
+                    </select>
+                </div>
+
+                <h3 class="settings-section-title" data-i18n="timerAndNotifications">Timer and notifications</h3>
                 <div class="settings-group">
                     <label for="notificationIntervalSelect" data-i18n="timerNotifications">Timer Notifications</label>
                     <select id="notificationIntervalSelect" class="setting-select">
@@ -185,14 +205,7 @@
                     ></small>
                 </div>
                 
-                <div class="settings-group">
-                    <label for="firstDaySelect" data-i18n="firstDayOfWeek">First Day of Week</label>
-                    <select id="firstDaySelect" class="setting-select">
-                        <option value="0" data-i18n="firstDaySunday">Sunday</option>
-                        <option value="1" data-i18n="firstDayMonday">Monday</option>
-                    </select>
-                </div>
-                
+                <h3 class="settings-section-title" data-i18n="confirmationsSettings">Confirmations</h3>
                 <div class="settings-group">
                     <label>
                         <input type="checkbox" id="confirmDeleteCheckbox">
@@ -203,9 +216,10 @@
                 <div class="settings-divider"></div>
                 <h3 class="settings-subtitle" data-i18n="clockodoSettings">Clockodo Integration</h3>
 
+                <h4 class="settings-group-title" data-i18n="connectionSection">Connection</h4>
                 <div class="settings-group">
                     <label for="clockodoEmailInput" data-i18n="clockodoApiUser">Clockodo Email</label>
-                    <input type="email" id="clockodoEmailInput" class="form-input" placeholder="user@example.com" autocomplete="email">
+                    <input type="email" id="clockodoEmailInput" class="form-input" placeholder="name@example.com" data-i18n-placeholder="clockodoEmailPlaceholder" autocomplete="email">
                 </div>
 
                 <div class="settings-group">
@@ -216,6 +230,8 @@
                     </div>
                 </div>
 
+                <h4 class="settings-group-title" data-i18n="entryDefaultsSection">Entry defaults</h4>
+                <small class="settings-help" data-i18n="clockodoDefaultsHelp">Customer, project, and service values are used when creating entries. They are not needed to check the connection.</small>
                 <div class="form-row">
                     <div class="form-group">
                         <label for="clockodoCustomerIdInput" data-i18n="clockodoCustomerId">Default Customer ID</label>
@@ -247,15 +263,35 @@
                 </button>
                 <div class="clockodo-settings-actions">
                     <button id="clockodoTestBtn" class="settings-btn" type="button" data-i18n="clockodoTestConnection">Test connection</button>
-                    <button id="clockodoRemoveBtn" class="settings-btn btn-danger" type="button" data-i18n="clockodoRemoveConfig">Remove Clockodo configuration</button>
                 </div>
                 <small id="clockodoStatus" class="settings-help" role="status" aria-live="polite"><span data-i18n="clockodoConnectionStatus">Connection status</span>: <span id="clockodoStatusValue"></span></small>
+                <div class="settings-danger-zone">
+                    <h4 class="settings-group-title" data-i18n="dangerousActions">Dangerous actions</h4>
+                    <button id="clockodoRemoveBtn" class="settings-btn btn-danger" type="button" data-i18n="clockodoRemoveConfig">Remove Clockodo configuration</button>
+                </div>
 
                 <div class="settings-divider"></div>
-                
-                <button id="backupBtn" class="settings-btn"><span aria-hidden="true">💾</span> <span data-i18n="backupData">Backup Data</span></button>
-                <button id="restoreBtn" class="settings-btn"><span aria-hidden="true">📥</span> <span data-i18n="restoreData">Restore Data</span></button>
-                <button id="demoDataBtn" class="settings-btn demo-only"><span aria-hidden="true">🎮</span> <span data-i18n="loadDemoData">Load Demo Data</span></button>
+                <section class="backup-area" aria-labelledby="backupSectionTitle">
+                    <h3 id="backupSectionTitle" class="settings-subtitle" data-i18n="backupSectionTitle">Backups and restore</h3>
+                    <div class="backup-panel">
+                        <h4 data-i18n="manualBackupTitle">Manual backup file</h4>
+                        <p data-i18n="manualBackupDescription">Create a file you can save or move to another device.</p>
+                        <p class="settings-help" data-i18n="backupCredentialNote">Clockodo credentials, including the API key, are never included.</p>
+                        <button id="backupBtn" class="settings-btn btn-primary-green" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 16V3m-5 5 5-5 5 5M4 14v6h16v-6"/></svg><span data-i18n="backupData">Create backup</span></button>
+                        <button id="restoreBtn" class="settings-btn" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 8v13m-5-5 5 5 5-5M4 4h16v5H4z"/></svg><span data-i18n="restoreFromFile">Restore from backup file</span></button>
+                    </div>
+                    <div class="backup-panel">
+                        <h4 data-i18n="automaticSnapshotsTitle">Automatic local snapshots</h4>
+                        <p data-i18n="automaticSnapshotsDescription">TimerHub keeps the 20 most recent safety snapshots on this device after saved changes.</p>
+                        <p id="automaticBackupStatus" class="backup-status" role="status" aria-live="polite" data-i18n="automaticSnapshotsNone">No automatic snapshots yet.</p>
+                        <label for="automaticSnapshotSelect" data-i18n="selectSnapshot">Choose a local snapshot</label>
+                        <select id="automaticSnapshotSelect" class="setting-select" aria-label="Choose a local snapshot" data-i18n-aria-label="selectSnapshot">
+                            <option value="" data-i18n="automaticSnapshotsNone">No automatic snapshots yet.</option>
+                        </select>
+                        <button id="restoreSnapshotBtn" class="settings-btn" type="button" disabled><span data-i18n="restoreSnapshot">Restore selected snapshot</span></button>
+                    </div>
+                </section>
+                <button id="demoDataBtn" class="settings-btn demo-only"><span data-i18n="loadDemoData">Load Demo Data</span></button>
                 
                 <div class="settings-divider"></div>
                 <div class="settings-info">
@@ -266,12 +302,29 @@
             <div class="safe-area-bottom"></div>
         </div>
 
+<div id="backupRestoreModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="backupRestoreTitle" aria-describedby="backupRestoreDescription">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="backupRestoreTitle" data-i18n="restoreConfirmTitle">Restore TimerHub data?</h3>
+                    <button id="backupRestoreCloseBtn" class="modal-close" type="button" aria-label="Cancel" data-i18n-aria-label="cancel"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+                </div>
+                <div class="modal-body">
+                    <p id="backupRestoreDescription" data-i18n="restoreConfirmDesc">Choose whether to merge this backup with current data or replace current data. Clockodo credentials are not included.</p>
+                </div>
+                <div class="modal-footer backup-restore-actions">
+                    <button id="backupRestoreCancelBtn" class="btn-secondary" type="button" data-i18n="cancel">Cancel</button>
+                    <button id="backupRestoreMergeBtn" class="btn-secondary" type="button" data-i18n="restoreMergeAction">Merge data</button>
+                    <button id="backupRestoreReplaceBtn" class="btn-danger" type="button" data-i18n="restoreReplaceAction">Replace current data</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Modal: Create/Edit Activity -->
-        <div id="activityModal" class="modal">
+        <div id="activityModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
             <div class="modal-content">
                 <div class="modal-header">
                     <h3 id="modalTitle" data-i18n="createActivity">Create Activity</h3>
-                    <button id="modalCloseBtn" class="modal-close" aria-label="Close" data-i18n-aria-label="close">✕</button>
+                    <button id="modalCloseBtn" class="modal-close" aria-label="Close" data-i18n-aria-label="close"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
                 </div>
                 
                 <div class="modal-body">
@@ -312,27 +365,27 @@
         </div>
 
         <!-- Modal: Activity Menu (Edit/Delete/Archive) -->
-        <div id="activityMenuModal" class="modal">
+        <div id="activityMenuModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="activityMenuTitle">
             <div class="modal-content modal-small">
                 <div class="modal-header">
                     <h3 id="activityMenuTitle" data-i18n="activity">Activity</h3>
-                    <button id="menuCloseBtn" class="modal-close" aria-label="Close" data-i18n-aria-label="close">✕</button>
+                    <button id="menuCloseBtn" class="modal-close" aria-label="Close" data-i18n-aria-label="close"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
                 </div>
                 
                 <div class="modal-body">
-                    <button id="menuEditBtn" class="menu-item"><span aria-hidden="true">✏️</span> <span data-i18n="edit">Edit</span></button>
-                    <button id="menuArchiveBtn" class="menu-item"><span aria-hidden="true">📦</span> <span data-i18n="archive">Archive</span></button>
-                    <button id="menuDeleteBtn" class="menu-item menu-danger"><span aria-hidden="true">🗑️</span> <span data-i18n="delete">Delete</span></button>
+                    <button id="menuEditBtn" class="menu-item"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m4 16.5-.8 4.3 4.3-.8L19 8.5 15.5 5 4 16.5Z"/><path d="m13.5 7 3.5 3.5"/></svg><span data-i18n="edit">Edit</span></button>
+                    <button id="menuArchiveBtn" class="menu-item"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7h16v14H4zM3 3h18v4H3zM9 11h6"/></svg><span data-i18n="archive">Archive</span></button>
+                    <button id="menuDeleteBtn" class="menu-item menu-danger"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 14h10l1-14M9 7V4h6v3"/></svg><span data-i18n="delete">Delete</span></button>
                 </div>
             </div>
         </div>
 
         <!-- Modal: Edit TimeEntry -->
-        <div id="entryEditModal" class="modal">
+        <div id="entryEditModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="entryEditModalTitle">
             <div class="modal-content">
                 <div class="modal-header">
                     <h3 id="entryEditModalTitle" data-i18n="editEntry">Edit Entry</h3>
-                    <button id="entryEditCloseBtn" class="modal-close" aria-label="Close" data-i18n-aria-label="close">✕</button>
+                    <button id="entryEditCloseBtn" class="modal-close" aria-label="Close" data-i18n-aria-label="close"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
                 </div>
                 
                 <div class="modal-body">
@@ -380,7 +433,7 @@
                     </div>
                     
                     <div id="entryConflictWarning" class="warning" style="display: none;">
-                        <span aria-hidden="true">⚠️</span> <span data-i18n="overlappingEntry">This time overlaps with another entry</span>
+                        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3 2.8 20h18.4L12 3Z"/><path d="M12 9v5m0 2.5v.1"/></svg><span data-i18n="overlappingEntry">This time overlaps with another entry</span>
                     </div>
                 </div>
                 
@@ -393,11 +446,11 @@
         </div>
 
         <!-- Modal: Final Sync Confirmation -->
-        <div id="syncConfirmModal" class="modal">
+        <div id="syncConfirmModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="syncConfirmModalTitle" aria-describedby="syncConfirmDesc">
             <div class="modal-content">
                 <div class="modal-header">
                     <h3 id="syncConfirmModalTitle" data-i18n="confirmSyncTitle">Confirm Clockodo Synchronization</h3>
-                    <button id="syncConfirmCloseBtn" class="modal-close" aria-label="Close" data-i18n-aria-label="close">✕</button>
+                    <button id="syncConfirmCloseBtn" class="modal-close" aria-label="Close" data-i18n-aria-label="close"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
                 </div>
 
                 <div class="modal-body">
