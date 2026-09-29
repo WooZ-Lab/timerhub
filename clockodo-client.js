@@ -57,7 +57,7 @@
                 if (!response.ok) {
                     const status = response.status;
                     const safeErrorCodes = new Set([
-                        'invalid_credentials', 'rate_limited', 'clockodo_rejected', 'timeout', 'network_error',
+                        'invalid_credentials', 'rate_limited', 'clockodo_rejected', 'service_error', 'timeout', 'network_error',
                         'malformed_response', 'configuration_missing', 'invalid_entry', 'missing_idempotency_key',
                         'operation_outcome_unknown', 'timeout_outcome_unknown', 'network_outcome_unknown',
                         'clockodo_outcome_unknown', 'not_found', 'unauthorized', 'method_not_allowed', 'invalid_client_id'

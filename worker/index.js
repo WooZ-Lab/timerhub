@@ -262,10 +262,20 @@ export class TimerHubDurableObject {
 
         if (path === "/clockodo/test" && request.method === "POST") {
             try {
-                const response = await this.clockodoFetch(request, token, credentials, "v2/aggregates/users/me");
-                if (!response.ok) return jsonError(response.status === 401 ? "invalid_credentials" : response.status === 429 ? "rate_limited" : "clockodo_rejected", response.status);
+                const response = await this.clockodoFetch(request, token, credentials, "v4/users/me");
+                if (!response.ok) {
+                    const error = response.status === 401 ? "invalid_credentials"
+                        : response.status === 429 ? "rate_limited"
+                        : response.status >= 500 ? "service_error"
+                        : "clockodo_rejected";
+                    return jsonError(error, response.status);
+                }
                 const data = await response.json().catch(() => null);
-                if (!data || typeof data !== "object") return jsonError("malformed_response", 502);
+                if (!data || typeof data !== "object" || Array.isArray(data) ||
+                    !data.data || typeof data.data !== "object" || Array.isArray(data.data) ||
+                    !Number.isSafeInteger(data.data.id) || data.data.id < 1) {
+                    return jsonError("malformed_response", 502);
+                }
                 return Response.json({ connected: true });
             } catch (error) {
                 return jsonError(error?.name === "AbortError" ? "timeout" : "network_error", 502);

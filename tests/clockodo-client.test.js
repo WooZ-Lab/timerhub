@@ -60,6 +60,8 @@ test('Clockodo client classifies invalid credentials and malformed responses wit
     await assert.rejects(() => malformed.client.testConnection(...Object.values(clientOptions)), error => error.code === 'malformed_response');
     const limited = makeClient(async () => Response.json({ error: 'slow down' }, { status: 429 }));
     await assert.rejects(() => limited.client.testConnection(...Object.values(clientOptions)), error => error.code === 'rate_limited' && error.status === 429);
+    const service = makeClient(async () => Response.json({ error: 'service_error' }, { status: 503 }));
+    await assert.rejects(() => service.client.testConnection(...Object.values(clientOptions)), error => error.code === 'service_error' && error.status === 503);
 });
 
 test('Clockodo client reports network failures and timeouts distinctly', async () => {

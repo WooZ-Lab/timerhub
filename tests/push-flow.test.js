@@ -765,7 +765,7 @@ test('Clockodo Worker stores credentials encrypted, proxies documented operation
     const requests = [];
     globalThis.fetch = async (url, init) => {
         requests.push({ url: String(url), init });
-        if (String(url).endsWith('/v2/aggregates/users/me')) return Response.json({ user: { id: 7 } });
+        if (String(url).endsWith('/v4/users/me')) return Response.json({ data: { id: 7, name: 'Test user' } });
         return Response.json({ entry: { id: 8765 } });
     };
     t.after(() => { globalThis.fetch = originalFetch; });
@@ -799,6 +799,9 @@ test('Clockodo Worker stores credentials encrypted, proxies documented operation
         method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' }, body: '{}'
     });
     assert.deepEqual(await tested.json(), { connected: true });
+    assert.equal(requests[0].url, 'https://my.clockodo.com/api/v4/users/me');
+    assert.equal(requests[0].init.method, 'GET');
+    assert.equal(requests[0].init.body, undefined);
     assert.equal(requests[0].init.headers['X-ClockodoApiUser'], 'person@example.test');
     assert.equal(requests[0].init.headers['X-ClockodoApiKey'], apiKey);
     assert.equal(requests[0].init.headers['X-Clockodo-External-Application'], 'TimerHub;person@example.test');
@@ -832,6 +835,61 @@ test('Clockodo Worker stores credentials encrypted, proxies documented operation
     assert.deepEqual(await removed.json(), { configured: false });
     const unconfigured = await backend.request(`/api/clockodo/config?clientId=${clientId}`, { headers: auth });
     assert.deepEqual(await unconfigured.json(), { configured: false, apiUser: '' });
+});
+
+test('Clockodo connection check uses v4 user endpoint and safely classifies upstream responses', async t => {
+    const backend = makeBackend();
+    const originalFetch = globalThis.fetch;
+    const requests = [];
+    let upstreamResponse = Response.json({ data: { id: 19, name: 'Stub user' } });
+    globalThis.fetch = async (url, init) => {
+        requests.push({ url: String(url), init });
+        return upstreamResponse;
+    };
+    t.after(() => { globalThis.fetch = originalFetch; });
+
+    const clientId = 'clockodo_v4_check_client_123';
+    const token = 'clockodo-v4-check-token'.padEnd(48, 'z');
+    const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+    const save = await backend.request(`/api/clockodo/config?clientId=${clientId}`, {
+        method: 'PUT', headers: auth,
+        body: JSON.stringify({ apiUser: 'person@example.test', apiKey: 'test fixture only' })
+    });
+    assert.equal(save.status, 200);
+
+    const check = () => backend.request(`/api/clockodo/test?clientId=${clientId}`, {
+        method: 'POST', headers: auth, body: '{}'
+    });
+    const success = await check();
+    assert.equal(success.status, 200);
+    assert.deepEqual(await success.json(), { connected: true });
+    assert.equal(requests[0].url, 'https://my.clockodo.com/api/v4/users/me');
+    assert.equal(requests[0].init.method, 'GET');
+    assert.equal(requests[0].init.body, undefined);
+    assert.equal(requests[0].init.headers['X-ClockodoApiUser'], 'person@example.test');
+    assert.equal(requests[0].init.headers['X-Clockodo-External-Application'], 'TimerHub;person@example.test');
+
+    const failures = [
+        [401, 'invalid_credentials'],
+        [429, 'rate_limited'],
+        [403, 'clockodo_rejected'],
+        [503, 'service_error']
+    ];
+    for (const [status, expectedError] of failures) {
+        upstreamResponse = Response.json({ error: 'sensitive upstream detail' }, { status });
+        const response = await check();
+        assert.equal(response.status, status);
+        const responseText = await response.text();
+        assert.deepEqual(JSON.parse(responseText), { error: expectedError });
+        assert.equal(responseText.includes('sensitive upstream detail'), false);
+        assert.equal(responseText.includes('test fixture only'), false);
+    }
+
+    upstreamResponse = Response.json({ user: { id: 19 } }); // legacy shape is not the documented v4 user response
+    const malformed = await check();
+    assert.equal(malformed.status, 502);
+    assert.deepEqual(await malformed.json(), { error: 'malformed_response' });
+    assert.equal(requests.every(item => item.url === 'https://my.clockodo.com/api/v4/users/me'), true);
 });
 
 test('Clockodo Worker reports authentication and uncertain malformed-create outcomes safely', async t => {
