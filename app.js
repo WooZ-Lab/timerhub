@@ -9,11 +9,13 @@
 
 const translations = {
     en: {
-        timerIdle: 'Choose an activity to start tracking', timerRunning: 'Timer running',
+        timerRunning: 'Timer running',
         timerStatusRunning: 'Timer running: {activity} · {duration}',
         timerSaving: 'Saving timer…', timerSaveFailed: 'Could not save the timer. Check device storage and try again.',
         activityStartHint: 'Tap to start or switch', activityStopHint: 'Tap to stop',
         activityStartAria: 'Start or switch to {activity}', activityStopAria: 'Stop timing {activity}',
+        activityCanvas: 'Activity canvas', canvasHelp: 'Drag an activity to move it. Drag empty space or focus the canvas and use arrow keys to pan. Use its corner handle to resize; with the keyboard, use Shift+arrow to move and arrow keys on the resize handle to resize.',
+        activityResize: 'Resize {activity}', canvasLayoutSaveFailed: 'Could not save this activity position. Try again.',
         noActivitiesTitle: 'No activities yet', noActivitiesMessage: 'Add an activity to start tracking your work.',
         appName: 'TimerHub',
         loadingApp: 'Loading TimerHub…', reloadApp: 'Reload TimerHub',
@@ -64,11 +66,13 @@ const translations = {
         large: 'Large',
     },
     de: {
-        timerIdle: 'Aktivität auswählen, um die Zeit zu erfassen', timerRunning: 'Timer läuft',
+        timerRunning: 'Timer läuft',
         timerStatusRunning: 'Timer läuft: {activity} · {duration}',
         timerSaving: 'Timer wird gespeichert…', timerSaveFailed: 'Timer konnte nicht gespeichert werden. Prüfe den Gerätespeicher und versuche es erneut.',
         activityStartHint: 'Tippen zum Starten oder Wechseln', activityStopHint: 'Tippen zum Stoppen',
         activityStartAria: '{activity} starten oder dorthin wechseln', activityStopAria: 'Zeit für {activity} stoppen',
+        activityCanvas: 'Aktivitätsfläche', canvasHelp: 'Ziehe eine Aktivität zum Verschieben. Ziehe eine freie Fläche oder fokussiere die Fläche und nutze die Pfeiltasten zum Verschieben. Mit dem Eckgriff änderst du die Größe; mit Umschalt+Pfeiltaste verschiebst du die fokussierte Aktivität und mit Pfeiltasten am Eckgriff änderst du ihre Größe.',
+        activityResize: 'Größe von {activity} ändern', canvasLayoutSaveFailed: 'Position konnte nicht gespeichert werden. Bitte erneut versuchen.',
         noActivitiesTitle: 'Noch keine Aktivitäten', noActivitiesMessage: 'Füge eine Aktivität hinzu, um deine Arbeit zu erfassen.',
         appName: 'TimerHub',
         loadingApp: 'TimerHub wird geladen…', reloadApp: 'TimerHub neu laden',
@@ -119,11 +123,13 @@ const translations = {
         large: 'Groß',
     },
     ru: {
-        timerIdle: 'Выберите занятие, чтобы начать отсчёт', timerRunning: 'Таймер запущен',
+        timerRunning: 'Таймер запущен',
         timerStatusRunning: 'Таймер работает: {activity} · {duration}',
         timerSaving: 'Сохранение таймера…', timerSaveFailed: 'Не удалось сохранить таймер. Проверьте память устройства и попробуйте снова.',
         activityStartHint: 'Нажмите, чтобы начать или переключить', activityStopHint: 'Нажмите, чтобы остановить',
         activityStartAria: 'Начать или переключиться на «{activity}»', activityStopAria: 'Остановить отсчёт для «{activity}»',
+        activityCanvas: 'Поле занятий', canvasHelp: 'Перетаскивайте занятие, чтобы переместить его. Перетаскивайте пустое место или используйте стрелки на поле, чтобы сдвинуть его. Изменяйте размер за угловой маркер; Shift+стрелки перемещают занятие, а стрелки на маркере изменяют его размер.',
+        activityResize: 'Изменить размер: {activity}', canvasLayoutSaveFailed: 'Не удалось сохранить расположение занятия. Попробуйте ещё раз.',
         noActivitiesTitle: 'Занятий пока нет', noActivitiesMessage: 'Добавьте занятие, чтобы начать учёт времени.',
         appName: 'TimerHub',
         loadingApp: 'Загрузка TimerHub…', reloadApp: 'Перезагрузить TimerHub',
@@ -998,7 +1004,11 @@ class TimerHubApp {
         this.firstDayOfWeek = 1; // Monday
         this.confirmDelete = true;
         this.currentScreen = 'main';
-        this.draggedActivityId = null;
+        this.activityLayouts = new Map();
+        this.canvasPan = this.readCanvasPan();
+        this.canvasZIndex = 1;
+        this.canvasGesture = null;
+        this.suppressActivityClick = null;
         this.editingActivityId = null;
         this.editingEntryId = null;
         this.deletedEntry = null;
@@ -1168,7 +1178,12 @@ class TimerHubApp {
     }
 
     async loadActivities() {
-        this.activities = (await this.storage.getActivities())
+        const [activities, layouts] = await Promise.all([
+            this.storage.getActivities(),
+            typeof this.storage.getLayout === 'function' ? this.storage.getLayout() : Promise.resolve([])
+        ]);
+        this.activityLayouts = new Map(layouts.map(layout => [layout.activityId, layout]));
+        this.activities = activities
             .filter(a => !a.archived)
             .sort((a, b) => (a.position || 0) - (b.position || 0));
     }
@@ -1419,6 +1434,7 @@ class TimerHubApp {
             return el;
         };
         this.setupDialogAccessibility();
+        this.setupActivityCanvasInteractions();
 
         // Navigation
         sel('navTimer')?.addEventListener('click', () => this.switchScreen('main'));
@@ -1834,13 +1850,12 @@ class TimerHubApp {
         if (!status) return;
         const activeActivity = this.activities.find(activity => activity.id === this.activeActivityId);
         const actionState = this.timerActionState || 'idle';
-        status.textContent = actionState === 'saving'
+        status.hidden = !activeActivity && actionState === 'idle';
+        status.textContent = status.hidden ? '' : actionState === 'saving'
             ? this.t('timerSaving')
             : actionState === 'error'
                 ? this.t('timerSaveFailed')
-                : activeActivity
-                    ? this.t('timerStatusRunning', { activity: activeActivity.name, duration: this.formatDuration(this.getActiveDuration()) })
-                    : this.t('timerIdle');
+                : this.t('timerStatusRunning', { activity: activeActivity.name, duration: this.formatDuration(this.getActiveDuration()) });
         status.dataset.state = actionState === 'error' ? 'error' : actionState === 'saving' ? 'saving' : activeActivity ? 'running' : 'idle';
         status.classList.toggle('is-running', Boolean(activeActivity) && actionState === 'idle');
         status.classList.toggle('is-saving', actionState === 'saving');
@@ -2246,7 +2261,9 @@ class TimerHubApp {
         this.updateTimerStatus();
         if (!grid) return;
         grid.setAttribute('aria-busy', String(Boolean(this.timerActionInProgress)));
-        grid.innerHTML = '';
+        grid.replaceChildren();
+        this.canvasZIndex = 1;
+        grid.style.transform = `translate(${this.canvasPan.x}px, ${this.canvasPan.y}px)`;
 
         if (!this.activities.length) {
             const empty = document.createElement('div');
@@ -2263,12 +2280,22 @@ class TimerHubApp {
 
         this.activities.forEach((activity, index) => {
             const btn = document.createElement('button');
-            btn.className = `activity-btn ${activity.size}`;
+            btn.type = 'button';
+            btn.className = `activity-btn activity-node ${activity.size || 'medium'}`;
             if (this.activeActivityId === activity.id) {
                 btn.classList.add('active');
             }
             btn.dataset.activityId = activity.id;
+            btn.setAttribute('aria-describedby', 'canvasHelp');
             btn.disabled = Boolean(this.timerActionInProgress);
+            const layout = this.getActivityCanvasLayout(activity, index);
+            btn.style.left = `${layout.x}px`;
+            btn.style.top = `${layout.y}px`;
+            btn.style.width = `${layout.width}px`;
+            btn.style.height = `${layout.height}px`;
+            const nodeZIndex = this.canvasZIndex;
+            this.canvasZIndex += 2;
+            btn.style.zIndex = String(nodeZIndex);
             const activityShape = ['circle', 'square', 'rounded', 'diamond', 'triangle', 'hexagon', 'octagon', 'star', 'heart', 'oval'].includes(activity.shape)
                 ? activity.shape : 'rounded';
             btn.dataset.shape = activityShape;
@@ -2309,7 +2336,6 @@ class TimerHubApp {
                     durationEl.className = 'btn-duration';
                     durationEl.textContent = this.formatDuration(this.getActiveDuration());
                     
-                    btn.appendChild(name);
                     btn.appendChild(timeEl);
                     btn.appendChild(durationEl);
                 }
@@ -2326,7 +2352,11 @@ class TimerHubApp {
 
             // Click events
             btn.addEventListener('click', async () => {
-                if (this.draggedActivityId || this.timerActionInProgress) return;
+                if (this.suppressActivityClick?.activityId === activity.id && Date.now() < this.suppressActivityClick.until) {
+                    this.suppressActivityClick = null;
+                    return;
+                }
+                if (this.timerActionInProgress) return;
                 this.timerActionInProgress = true;
                 this.timerActionState = 'saving';
                 this.renderMain();
@@ -2342,58 +2372,242 @@ class TimerHubApp {
                 }
             });
 
-            // Long press for menu
-            let longPressTimer;
-            btn.addEventListener('touchstart', () => {
-                longPressTimer = setTimeout(() => {
-                    this.showActivityMenu(activity.id);
-                }, 500);
-            });
-            btn.addEventListener('touchend', () => clearTimeout(longPressTimer));
-
-            // Drag
-            btn.addEventListener('touchstart', (e) => {
-                if (e.touches.length === 1) {
-                    this.startDrag(activity.id, e.touches[0]);
-                }
-            });
-
             grid.appendChild(btn);
+
+            const resize = document.createElement('button');
+            resize.type = 'button';
+            resize.className = 'activity-resize-handle';
+            resize.dataset.activityId = activity.id;
+            resize.style.left = `${layout.x + layout.width}px`;
+            resize.style.top = `${layout.y + layout.height}px`;
+            resize.style.zIndex = String(nodeZIndex + 1);
+            resize.setAttribute('aria-label', this.t('activityResize', { activity: activity.name }));
+            resize.title = this.t('activityResize', { activity: activity.name });
+            resize.setAttribute('aria-describedby', 'canvasHelp');
+            resize.addEventListener('click', event => event.stopPropagation());
+            grid.appendChild(resize);
         });
 
         this.populateActivityFilter();
     }
 
-    startDrag(activityId, touch) {
-        this.draggedActivityId = activityId;
-        const btn = document.querySelector(`[data-activity-id="${activityId}"]`);
-        if (btn) {
-            btn.classList.add('dragging');
-            btn.style.position = 'fixed';
-            btn.style.zIndex = '1000';
-            
-            const moveHandler = (e) => {
-                const t = e.touches[0];
-                btn.style.left = (t.clientX - btn.offsetWidth / 2) + 'px';
-                btn.style.top = (t.clientY - btn.offsetHeight / 2) + 'px';
-            };
+    getActivityCanvasLayout(activity, index) {
+        const saved = this.activityLayouts.get(activity.id);
+        const sizeDefaults = { small: [220, 120], medium: [260, 150], large: [320, 190] };
+        const [defaultWidth, defaultHeight] = sizeDefaults[activity.size] || sizeDefaults.medium;
+        const order = Number.isFinite(Number(activity.position)) ? Number(activity.position) : index;
+        const angle = order * 2.399963229728653;
+        const radius = 82 * Math.sqrt(Math.max(0, order));
+        return {
+            x: this.clampCanvasCoordinate(saved?.x, 24 + radius * (1 + Math.cos(angle)), 0, 2800),
+            y: this.clampCanvasCoordinate(saved?.y, 24 + radius * (1 + Math.sin(angle)), 0, 1600),
+            width: this.clampCanvasCoordinate(saved?.width, defaultWidth, 160, 640),
+            height: this.clampCanvasCoordinate(saved?.height, defaultHeight, 110, 520)
+        };
+    }
 
-            const endHandler = () => {
-                btn.classList.remove('dragging');
-                btn.style.position = '';
-                btn.style.zIndex = '';
-                btn.style.left = '';
-                btn.style.top = '';
-                this.draggedActivityId = null;
-                
-                document.removeEventListener('touchmove', moveHandler);
-                document.removeEventListener('touchend', endHandler);
-                
-                this.renderMain();
-            };
+    clampCanvasCoordinate(value, fallback, min, max) {
+        const number = Number(value);
+        return Number.isFinite(number) ? Math.max(min, Math.min(max, number)) : fallback;
+    }
 
-            document.addEventListener('touchmove', moveHandler, { passive: true });
-            document.addEventListener('touchend', endHandler);
+    readCanvasPan() {
+        try {
+            const value = JSON.parse(localStorage.getItem('timerhubActivityCanvasView') || '{}');
+            return { x: this.clampCanvasCoordinate(value.x, 0, -2800, 2800), y: this.clampCanvasCoordinate(value.y, 0, -1600, 1600) };
+        } catch {
+            return { x: 0, y: 0 };
+        }
+    }
+
+    positionActivityResizeHandle(activityId, layout, zIndex) {
+        const handle = document.querySelector(`.activity-resize-handle[data-activity-id="${CSS.escape(activityId)}"]`);
+        if (!handle) return;
+        handle.style.left = `${layout.x + layout.width}px`;
+        handle.style.top = `${layout.y + layout.height}px`;
+        if (zIndex !== undefined) handle.style.zIndex = String(zIndex + 1);
+    }
+
+    setupActivityCanvasInteractions() {
+        const viewport = document.getElementById('activityCanvasViewport');
+        const stage = document.getElementById('activitiesGrid');
+        if (!viewport || !stage || viewport.dataset.canvasReady === 'true') return;
+        viewport.dataset.canvasReady = 'true';
+
+        viewport.addEventListener('pointerdown', event => {
+            if (!event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0)) return;
+            const resizeHandle = event.target.closest?.('.activity-resize-handle');
+            const activityButton = event.target.closest?.('.activity-btn') || (resizeHandle
+                ? stage.querySelector(`.activity-btn[data-activity-id="${CSS.escape(resizeHandle.dataset.activityId)}"]`)
+                : null);
+            const activityId = resizeHandle?.dataset.activityId || activityButton?.dataset.activityId || null;
+            const activity = activityId && this.activities.find(item => item.id === activityId);
+            const mode = resizeHandle ? 'resize' : activityButton ? 'move' : 'pan';
+            const layout = activity ? this.getActivityCanvasLayout(activity, this.activities.indexOf(activity)) : null;
+
+            this.canvasGesture = {
+                pointerId: event.pointerId,
+                mode,
+                activityId,
+                activityButton,
+                resizeHandle,
+                startX: event.clientX,
+                startY: event.clientY,
+                layout,
+                pan: { ...this.canvasPan },
+                started: false,
+                longPressTimer: null,
+                openedMenu: false
+            };
+            this.canvasGesture.captureTarget = resizeHandle || activityButton || viewport;
+            try { this.canvasGesture.captureTarget.setPointerCapture(event.pointerId); } catch {}
+
+            if (mode === 'move' && activity) {
+                this.canvasGesture.longPressTimer = setTimeout(() => {
+                    const gesture = this.canvasGesture;
+                    if (gesture?.pointerId !== event.pointerId || gesture.started) return;
+                    gesture.openedMenu = true;
+                    this.suppressActivityClick = { activityId, until: Date.now() + 150 };
+                    this.showActivityMenu(activityId);
+                }, 550);
+            }
+        });
+
+        viewport.addEventListener('pointermove', event => {
+            const gesture = this.canvasGesture;
+            if (!gesture || gesture.pointerId !== event.pointerId) return;
+            const dx = event.clientX - gesture.startX;
+            const dy = event.clientY - gesture.startY;
+            if (!gesture.started && Math.hypot(dx, dy) < 6) return;
+            if (!gesture.started) {
+                gesture.started = true;
+                clearTimeout(gesture.longPressTimer);
+                gesture.activityButton?.classList.add('dragging');
+                if (gesture.mode === 'move') {
+                    gesture.activityButton.style.zIndex = String(this.canvasZIndex++);
+                    this.positionActivityResizeHandle(gesture.activityId, gesture.layout, this.canvasZIndex - 1);
+                }
+            }
+            event.preventDefault();
+            if (gesture.mode === 'move') {
+                gesture.activityButton.style.left = `${this.clampCanvasCoordinate(gesture.layout.x + dx, 0, 0, 2800)}px`;
+                gesture.activityButton.style.top = `${this.clampCanvasCoordinate(gesture.layout.y + dy, 0, 0, 1600)}px`;
+                this.positionActivityResizeHandle(gesture.activityId, {
+                    ...gesture.layout,
+                    x: Number.parseFloat(gesture.activityButton.style.left),
+                    y: Number.parseFloat(gesture.activityButton.style.top)
+                });
+            } else if (gesture.mode === 'resize') {
+                gesture.resizeHandle.style.left = `${gesture.layout.x + this.clampCanvasCoordinate(gesture.layout.width + dx, 160, 160, 640)}px`;
+                gesture.resizeHandle.style.top = `${gesture.layout.y + this.clampCanvasCoordinate(gesture.layout.height + dy, 110, 110, 520)}px`;
+                gesture.activityButton = stage.querySelector(`.activity-btn[data-activity-id="${CSS.escape(gesture.activityId)}"]`);
+                if (gesture.activityButton) {
+                    gesture.activityButton.style.width = `${this.clampCanvasCoordinate(gesture.layout.width + dx, 160, 160, 640)}px`;
+                    gesture.activityButton.style.height = `${this.clampCanvasCoordinate(gesture.layout.height + dy, 110, 110, 520)}px`;
+                    this.positionActivityResizeHandle(gesture.activityId, {
+                        ...gesture.layout,
+                        width: Number.parseFloat(gesture.activityButton.style.width),
+                        height: Number.parseFloat(gesture.activityButton.style.height)
+                    });
+                }
+            } else {
+                this.canvasPan = {
+                    x: this.clampCanvasCoordinate(gesture.pan.x + dx, 0, -2800, 2800),
+                    y: this.clampCanvasCoordinate(gesture.pan.y + dy, 0, -1600, 1600)
+                };
+                stage.style.transform = `translate(${this.canvasPan.x}px, ${this.canvasPan.y}px)`;
+            }
+        });
+
+        const finishGesture = event => {
+            const gesture = this.canvasGesture;
+            if (!gesture || gesture.pointerId !== event.pointerId) return;
+            clearTimeout(gesture.longPressTimer);
+            this.canvasGesture = null;
+            gesture.activityButton?.classList.remove('dragging');
+            if (gesture.started && gesture.mode === 'pan') {
+                try { localStorage.setItem('timerhubActivityCanvasView', JSON.stringify(this.canvasPan)); } catch {}
+            }
+            if (gesture.openedMenu) {
+                this.suppressActivityClick = { activityId: gesture.activityId, until: Date.now() + 400 };
+            }
+            if (gesture.started && gesture.mode !== 'pan' && gesture.activityId) {
+                this.suppressActivityClick = { activityId: gesture.activityId, until: Date.now() + 500 };
+                const button = stage.querySelector(`.activity-btn[data-activity-id="${CSS.escape(gesture.activityId)}"]`);
+                if (button) {
+                    const finalLayout = {
+                        activityId: gesture.activityId,
+                        x: Number.parseFloat(button.style.left) || 0,
+                        y: Number.parseFloat(button.style.top) || 0,
+                        width: Number.parseFloat(button.style.width) || gesture.layout.width,
+                        height: Number.parseFloat(button.style.height) || gesture.layout.height
+                    };
+                    this.saveActivityCanvasLayout(finalLayout);
+                }
+            }
+        };
+        viewport.addEventListener('pointerup', finishGesture);
+        viewport.addEventListener('pointercancel', finishGesture);
+
+        viewport.addEventListener('click', event => {
+            if (event.target.closest?.('.activity-resize-handle')) event.stopPropagation();
+            const button = event.target.closest?.('.activity-btn');
+            if (button && this.suppressActivityClick?.activityId === button.dataset.activityId && Date.now() < this.suppressActivityClick.until) {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                this.suppressActivityClick = null;
+            }
+        }, true);
+
+        stage.addEventListener('keydown', event => {
+            const button = event.target.closest?.('.activity-btn');
+            const resizeHandle = event.target.closest?.('.activity-resize-handle');
+            const activityId = resizeHandle?.dataset.activityId || button?.dataset.activityId;
+            if (!activityId) return;
+            const delta = event.shiftKey ? 10 : 0;
+            if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key) || (!resizeHandle && !event.shiftKey)) return;
+            event.preventDefault();
+            const activity = this.activities.find(item => item.id === activityId);
+            if (!activity) return;
+            const layout = this.getActivityCanvasLayout(activity, this.activities.indexOf(activity));
+            if (resizeHandle) {
+                layout.width = this.clampCanvasCoordinate(layout.width + (event.key === 'ArrowRight' ? 10 : event.key === 'ArrowLeft' ? -10 : 0), layout.width, 160, 640);
+                layout.height = this.clampCanvasCoordinate(layout.height + (event.key === 'ArrowDown' ? 10 : event.key === 'ArrowUp' ? -10 : 0), layout.height, 110, 520);
+            } else if (event.shiftKey) {
+                layout.x = this.clampCanvasCoordinate(layout.x + (event.key === 'ArrowRight' ? delta : event.key === 'ArrowLeft' ? -delta : 0), layout.x, 0, 2800);
+                layout.y = this.clampCanvasCoordinate(layout.y + (event.key === 'ArrowDown' ? delta : event.key === 'ArrowUp' ? -delta : 0), layout.y, 0, 1600);
+            } else return;
+            const node = stage.querySelector(`.activity-btn[data-activity-id="${CSS.escape(activityId)}"]`);
+            const handle = stage.querySelector(`.activity-resize-handle[data-activity-id="${CSS.escape(activityId)}"]`);
+            if (node) {
+                node.style.left = `${layout.x}px`;
+                node.style.top = `${layout.y}px`;
+                node.style.width = `${layout.width}px`;
+                node.style.height = `${layout.height}px`;
+            }
+            if (handle) this.positionActivityResizeHandle(activityId, layout);
+            const saved = { activityId, ...layout };
+            this.saveActivityCanvasLayout(saved);
+        });
+
+        viewport.tabIndex = 0;
+        viewport.addEventListener('keydown', event => {
+            if (event.target !== viewport || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+            event.preventDefault();
+            const amount = event.shiftKey ? 120 : 48;
+            this.canvasPan.x = this.clampCanvasCoordinate(this.canvasPan.x + (event.key === 'ArrowRight' ? amount : event.key === 'ArrowLeft' ? -amount : 0), 0, -2800, 2800);
+            this.canvasPan.y = this.clampCanvasCoordinate(this.canvasPan.y + (event.key === 'ArrowDown' ? amount : event.key === 'ArrowUp' ? -amount : 0), 0, -1600, 1600);
+            stage.style.transform = `translate(${this.canvasPan.x}px, ${this.canvasPan.y}px)`;
+            try { localStorage.setItem('timerhubActivityCanvasView', JSON.stringify(this.canvasPan)); } catch {}
+        });
+    }
+
+    async saveActivityCanvasLayout(layout) {
+        this.activityLayouts.set(layout.activityId, layout);
+        try {
+            await this.storage.saveLayout(layout);
+        } catch {
+            this.showToast(this.t('canvasLayoutSaveFailed'));
         }
     }
 

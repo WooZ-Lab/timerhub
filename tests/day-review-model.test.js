@@ -1187,6 +1187,135 @@ test('automatic snapshots retain only the latest 20 and restore through the norm
     assert.equal((await restored.getAutomaticSnapshots()).length, 1);
 });
 
+test('activity canvas positions and dimensions persist independently and may overlap', async () => {
+    const { context } = createTestApp();
+    const harness = createIndexedDbHarness();
+    const repository = vm.runInContext('new StorageRepository()', context);
+    repository.db = harness.db;
+
+    const first = { activityId: 'canvas-one', x: 140, y: 90, width: 310, height: 180 };
+    const second = { activityId: 'canvas-two', x: 140, y: 90, width: 220, height: 130 };
+    await repository.saveLayout(first);
+    await repository.saveLayout(second);
+
+    const reloadedRepository = vm.runInContext('new StorageRepository()', context);
+    reloadedRepository.db = harness.db;
+    const layouts = await reloadedRepository.getLayout();
+    assert.deepEqual(layouts.find(item => item.activityId === first.activityId), first);
+    assert.deepEqual(layouts.find(item => item.activityId === second.activityId), second);
+    assert.equal(layouts[0].x, layouts[1].x);
+    assert.equal(layouts[0].y, layouts[1].y);
+});
+
+test('canvas taps start the timer; movement and resize gestures only save their final layout', async () => {
+    const { app, context, localStorageData } = createTestApp();
+    context.CSS = { escape: value => value };
+    const children = [];
+    const makeElement = (className = '') => {
+        const handlers = new Map();
+        const classes = new Set(className.split(/\s+/).filter(Boolean));
+        const element = {
+            className,
+            dataset: {},
+            style: { setProperty() {} },
+            children: [],
+            hidden: false,
+            classList: {
+                add(value) { classes.add(value); },
+                remove(value) { classes.delete(value); },
+                contains(value) { return classes.has(value) || element.className.split(/\s+/).includes(value); },
+                toggle(value, enabled) { enabled ? classes.add(value) : classes.delete(value); }
+            },
+            setAttribute() {},
+            append(...items) { this.children.push(...items); },
+            appendChild(item) { this.children.push(item); return item; },
+            replaceChildren(...items) { this.children = items; },
+            addEventListener(type, handler) { handlers.set(type, handler); },
+            setPointerCapture() {},
+            closest(selector) {
+                return (selector === '.activity-btn' && this.className.split(/\s+/).includes('activity-btn')) ||
+                    (selector === '.activity-resize-handle' && this.className.split(/\s+/).includes('activity-resize-handle')) ? this : null;
+            },
+            get handlers() { return handlers; }
+        };
+        return element;
+    };
+    const viewport = makeElement();
+    viewport.dataset = {};
+    const stage = makeElement();
+    stage.querySelector = selector => {
+        const isHandle = selector.startsWith('.activity-resize-handle');
+        return children.find(child => child.classList.contains(isHandle ? 'activity-resize-handle' : 'activity-btn')) || null;
+    };
+    stage.appendChild = item => { children.push(item); return item; };
+    stage.replaceChildren = () => { children.length = 0; };
+    const status = makeElement();
+    const filter = makeElement();
+    filter.value = '';
+    const originalGetById = context.document.getElementById;
+    context.document.getElementById = id => ({
+        activityCanvasViewport: viewport, activitiesGrid: stage, timerRunningStatus: status, logActivityFilter: filter
+    })[id] || originalGetById(id);
+    context.document.querySelector = selector => stage.querySelector(selector);
+    context.document.createElement = tag => makeElement(tag === 'button' ? '' : tag);
+
+    const activity = { id: 'canvas-tap', name: 'Focus', position: 0, size: 'medium', color: '#ffffff', shape: 'circle' };
+    app.activities = [activity];
+    app.activityLayouts = new Map([[activity.id, { activityId: activity.id, x: 140, y: 90, width: 260, height: 150 }]]);
+    const savedLayouts = [];
+    app.storage = { async saveLayout(layout) { savedLayouts.push(structuredClone(layout)); } };
+    let timerStarts = 0;
+    app.toggleActivity = async id => { timerStarts += 1; app.activeActivityId = id; };
+    app.getActiveDuration = () => 0;
+    app.formatDuration = () => '00:00';
+    app.setupActivityCanvasInteractions();
+    app.renderMain();
+    assert.equal(status.hidden, true, 'the idle prompt stays hidden when an activity exists');
+
+    const pointer = (type, target, x, y) => viewport.handlers.get(type)?.({
+        isPrimary: true, pointerType: 'mouse', button: 0, pointerId: 1, clientX: x, clientY: y, target,
+        preventDefault() {}
+    });
+
+    let button = children.find(child => child.classList.contains('activity-btn'));
+    pointer('pointerdown', button, 10, 10);
+    pointer('pointermove', button, 12, 12);
+    pointer('pointerup', button, 12, 12);
+    assert.equal(savedLayouts.length, 0, 'a tap or sub-threshold movement is not a layout edit');
+    await button.handlers.get('click')();
+    assert.equal(timerStarts, 1, 'a normal tap keeps the one-tap timer action');
+    assert.equal(status.hidden, false, 'the active timer state is visible');
+
+    app.activeActivityId = null;
+    app.renderMain();
+    button = children.find(child => child.classList.contains('activity-btn'));
+    pointer('pointerdown', button, 10, 10);
+    pointer('pointermove', button, 30, 36);
+    pointer('pointermove', button, 44, 51);
+    assert.equal(savedLayouts.length, 0, 'pointer movement does not write layout or snapshots');
+    pointer('pointerup', button, 44, 51);
+    assert.equal(savedLayouts.length, 1, 'the final node position is persisted once');
+    assert.deepEqual(savedLayouts[0], { activityId: activity.id, x: 174, y: 131, width: 260, height: 150 });
+    await button.handlers.get('click')();
+    assert.equal(timerStarts, 1, 'a drag cannot accidentally start the timer');
+
+    app.renderMain();
+    const resize = children.find(child => child.classList.contains('activity-resize-handle'));
+    pointer('pointerdown', resize, 0, 0);
+    pointer('pointermove', resize, 50, 30);
+    pointer('pointerup', resize, 50, 30);
+    assert.equal(savedLayouts.length, 2);
+    assert.deepEqual(savedLayouts[1], { activityId: activity.id, x: 174, y: 131, width: 310, height: 180 });
+    assert.equal(timerStarts, 1, 'resizing cannot start the timer');
+
+    pointer('pointerdown', viewport, 0, 0);
+    pointer('pointermove', viewport, 35, 25);
+    pointer('pointerup', viewport, 35, 25);
+    assert.equal(savedLayouts.length, 2, 'panning does not create activity layout mutations');
+    assert.ok(localStorageData.has('timerhubActivityCanvasView'), 'the viewport returns to its panned position after reload');
+    assert.deepEqual([app.readCanvasPan().x, app.readCanvasPan().y], [35, 25]);
+});
+
 test('automatic snapshot failures are observable but do not fail saved user data', async () => {
     const { context } = createTestApp();
     const repository = vm.runInContext('new StorageRepository()', context);
