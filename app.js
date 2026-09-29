@@ -256,13 +256,18 @@ const extendedTranslations = {
         clockodoConfigMissing: 'Please configure Clockodo API key and email in Settings.',
         clockodoSecurityNote: 'The API key is encrypted in TimerHub Cloudflare storage and is never saved in this browser. A local access token protects this device connection.',
         clockodoApiKeyPlaceholder: 'Enter key to set or replace',
-        clockodoTestConnection: 'Test connection',
+        clockodoTestConnection: 'Check connection',
         clockodoRemoveConfig: 'Remove Clockodo configuration',
         clockodoConnectionStatus: 'Connection status',
+        clockodoStatusNotConfigured: 'Credentials not configured',
+        clockodoStatusConfigured: 'Credentials configured · connection not checked',
+        clockodoStatusChecking: 'Checking connection…',
+        clockodoStatusConnected: 'Connection successful',
+        clockodoStatusFailed: 'Connection check failed',
         clockodoConfigRemoved: 'Clockodo configuration removed.',
         clockodoTestSuccess: 'Clockodo connection verified.',
-        clockodoRequiredFields: 'Enter a valid Clockodo email, API key, customer ID, and service ID.',
-        clockodoInvalidIds: 'Customer, project, and service IDs must be whole numbers.',
+        clockodoRequiredFields: 'Enter a valid Clockodo email and API key.',
+        clockodoAssignmentMissing: 'Add a valid customer and service ID in Clockodo settings before syncing this entry.',
         clockodoNetworkError: 'Could not reach the TimerHub service. Check your connection and retry.',
         clockodoTimeout: 'Clockodo did not respond before the request timed out.',
         clockodoInvalidCredentials: 'Clockodo rejected these credentials. Check the email and API key.',
@@ -373,13 +378,18 @@ const extendedTranslations = {
         clockodoConfigMissing: 'Bitte Clockodo-API-Schlüssel und E-Mail in den Einstellungen konfigurieren.',
         clockodoSecurityNote: 'Der API-Schlüssel wird verschlüsselt in TimerHubs Cloudflare-Speicher abgelegt und nie in diesem Browser gespeichert. Ein lokales Zugriffstoken schützt die Geräteverbindung.',
         clockodoApiKeyPlaceholder: 'Schlüssel eingeben zum Speichern oder Ersetzen',
-        clockodoTestConnection: 'Verbindung testen',
+        clockodoTestConnection: 'Verbindung prüfen',
         clockodoRemoveConfig: 'Clockodo-Konfiguration entfernen',
         clockodoConnectionStatus: 'Verbindungsstatus',
+        clockodoStatusNotConfigured: 'Zugangsdaten nicht eingerichtet',
+        clockodoStatusConfigured: 'Zugangsdaten eingerichtet · Verbindung nicht geprüft',
+        clockodoStatusChecking: 'Verbindung wird geprüft …',
+        clockodoStatusConnected: 'Verbindung erfolgreich',
+        clockodoStatusFailed: 'Verbindungsprüfung fehlgeschlagen',
         clockodoConfigRemoved: 'Clockodo-Konfiguration entfernt.',
         clockodoTestSuccess: 'Clockodo-Verbindung bestätigt.',
-        clockodoRequiredFields: 'Gib eine gültige Clockodo-E-Mail, einen API-Schlüssel sowie Kunden- und Leistungs-ID ein.',
-        clockodoInvalidIds: 'Kunden-, Projekt- und Leistungs-IDs müssen ganze Zahlen sein.',
+        clockodoRequiredFields: 'Gib eine gültige Clockodo-E-Mail und einen API-Schlüssel ein.',
+        clockodoAssignmentMissing: 'Füge vor der Synchronisierung eine gültige Kunden- und Leistungs-ID in den Clockodo-Einstellungen hinzu.',
         clockodoNetworkError: 'TimerHub ist nicht erreichbar. Prüfe die Verbindung und versuche es erneut.',
         clockodoTimeout: 'Clockodo hat vor Ablauf der Zeitüberschreitung nicht geantwortet.',
         clockodoInvalidCredentials: 'Clockodo hat die Zugangsdaten abgelehnt. Prüfe E-Mail und API-Schlüssel.',
@@ -493,10 +503,15 @@ const extendedTranslations = {
         clockodoTestConnection: 'Проверить соединение',
         clockodoRemoveConfig: 'Удалить настройки Clockodo',
         clockodoConnectionStatus: 'Состояние соединения',
+        clockodoStatusNotConfigured: 'Данные доступа не настроены',
+        clockodoStatusConfigured: 'Данные доступа настроены · соединение не проверено',
+        clockodoStatusChecking: 'Проверка соединения…',
+        clockodoStatusConnected: 'Соединение установлено',
+        clockodoStatusFailed: 'Не удалось проверить соединение',
         clockodoConfigRemoved: 'Настройки Clockodo удалены.',
         clockodoTestSuccess: 'Соединение с Clockodo подтверждено.',
-        clockodoRequiredFields: 'Укажите действующий email Clockodo, API-ключ, ID клиента и услуги.',
-        clockodoInvalidIds: 'ID клиента, проекта и услуги должны быть целыми числами.',
+        clockodoRequiredFields: 'Укажите действующий email Clockodo и API-ключ.',
+        clockodoAssignmentMissing: 'Перед синхронизацией записи укажите в настройках Clockodo действительные ID клиента и услуги.',
         clockodoNetworkError: 'Не удалось связаться с TimerHub. Проверьте подключение и повторите.',
         clockodoTimeout: 'Clockodo не ответил до истечения времени ожидания.',
         clockodoInvalidCredentials: 'Clockodo отклонил данные. Проверьте email и API-ключ.',
@@ -866,6 +881,8 @@ class TimerHubApp {
         this.clockodoServiceId = '';
         this.clockodoBillable = true;
         this.clockodoConfigured = false;
+        this.clockodoStatus = 'unconfigured';
+        this.clockodoConfigVersion = 0;
         this.confirmedSyncEntries = [];
         this.syncConfirmationOpen = false;
         this.syncBatches = [];
@@ -2985,6 +3002,7 @@ class TimerHubApp {
             timeout_outcome_unknown: this.t('clockodoTimeout'), invalid_credentials: this.t('clockodoInvalidCredentials'),
             unauthorized: this.t('clockodoInvalidCredentials'), rate_limited: this.t('clockodoRateLimited'),
             service_error: this.t('clockodoServiceError'), clockodo_rejected: this.t('clockodoRequestRejected'),
+            missing_clockodo_assignment: this.t('clockodoAssignmentMissing'),
             request_rejected: this.t('clockodoRequestRejected'), configuration_missing: this.t('clockodoConfigMissing'),
             clockodo_outcome_unknown: this.t('syncOutcomeUnknown'), operation_outcome_unknown: this.t('syncOutcomeUnknown'),
             network_outcome_unknown: this.t('syncOutcomeUnknown')
@@ -2994,23 +3012,33 @@ class TimerHubApp {
 
     setClockodoStatus(message) {
         const status = document.getElementById('clockodoStatusValue');
-        if (status) status.textContent = message;
+        if (status) {
+            status.textContent = message;
+            status.dataset.state = this.clockodoStatus || 'unconfigured';
+        }
     }
 
     async refreshClockodoConfigurationStatus() {
-        if (!this.clockodoClient) return;
+        if (!this.clockodoClient || this.clockodoSaveInProgress) return;
+        const version = ++this.clockodoConfigVersion;
+        this.clockodoStatus = 'checking';
+        this.setClockodoStatus(this.t('clockodoStatusChecking'));
         try {
             const config = await this.clockodoClient.getConfig(this.getPushClientId(), this.getClockodoAccessToken());
-            this.clockodoConfigured = config.configured === true;
-            if (this.clockodoConfigured && config.apiUser) {
+            if (version !== this.clockodoConfigVersion) return;
+            this.clockodoConfigured = config.configured === true &&
+                typeof config.apiUser === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(config.apiUser);
+            if (this.clockodoConfigured) {
                 this.clockodoEmail = config.apiUser;
                 await this.storage.setSetting('clockodoEmail', this.clockodoEmail);
                 document.getElementById('clockodoEmailInput').value = this.clockodoEmail;
             }
-            this.setClockodoStatus(this.clockodoConfigured ? this.t('clockodoConfigSaved') : this.t('clockodoConfigMissing'));
+            this.clockodoStatus = this.clockodoConfigured ? 'configured' : 'unconfigured';
+            this.setClockodoStatus(this.t(this.clockodoConfigured ? 'clockodoStatusConfigured' : 'clockodoStatusNotConfigured'));
         } catch (error) {
-            this.clockodoConfigured = false;
-            this.setClockodoStatus(this.clockodoErrorMessage(error));
+            if (version !== this.clockodoConfigVersion) return;
+            this.clockodoStatus = 'failed';
+            this.setClockodoStatus(`${this.t('clockodoStatusFailed')}: ${this.clockodoErrorMessage(error)}`);
         }
     }
 
@@ -3021,14 +3049,8 @@ class TimerHubApp {
         const customerId = document.getElementById('clockodoCustomerIdInput').value.trim();
         const projectId = document.getElementById('clockodoProjectIdInput').value.trim();
         const serviceId = document.getElementById('clockodoServiceIdInput').value.trim();
-        const validId = value => value === '' || /^\d+$/.test(value);
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !apiKey || !customerId || !serviceId) {
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !apiKey) {
             this.setClockodoStatus(this.t('clockodoRequiredFields'));
-            apiKeyInput.value = '';
-            return false;
-        }
-        if (![customerId, projectId, serviceId].every(validId)) {
-            this.setClockodoStatus(this.t('clockodoInvalidIds'));
             apiKeyInput.value = '';
             return false;
         }
@@ -3038,9 +3060,12 @@ class TimerHubApp {
             return false;
         }
         const button = document.getElementById('clockodoSaveBtn');
+        this.clockodoConfigVersion += 1;
+        this.clockodoSaveInProgress = true;
         button.disabled = true;
         try {
-            await this.clockodoClient.saveConfig(this.getPushClientId(), this.getClockodoAccessToken(), { apiUser: email, apiKey });
+            const result = await this.clockodoClient.saveConfig(this.getPushClientId(), this.getClockodoAccessToken(), { apiUser: email, apiKey });
+            if (result?.configured !== true || Object.hasOwn(result, 'apiKey')) throw new Error('invalid_configuration_response');
             this.clockodoEmail = email;
             this.clockodoCustomerId = customerId;
             this.clockodoProjectId = projectId;
@@ -3054,32 +3079,40 @@ class TimerHubApp {
                 this.storage.setSetting('clockodoBillable', this.clockodoBillable)
             ]);
             this.clockodoConfigured = true;
-            this.setClockodoStatus(this.t('clockodoConfigSaved'));
+            this.clockodoStatus = 'configured';
+            this.setClockodoStatus(this.t('clockodoStatusConfigured'));
             this.showToast(this.t('clockodoConfigSaved'));
             return true;
         } catch (error) {
-            this.setClockodoStatus(this.clockodoErrorMessage(error));
+            this.clockodoStatus = 'failed';
+            this.setClockodoStatus(`${this.t('clockodoStatusFailed')}: ${this.clockodoErrorMessage(error)}`);
             return false;
         } finally {
             apiKeyInput.value = '';
             button.disabled = false;
+            this.clockodoSaveInProgress = false;
         }
     }
 
     async testClockodoConnection() {
-        if (!this.clockodoConfigured || !this.clockodoClient) {
-            this.setClockodoStatus(this.t('clockodoConfigMissing'));
+        if (!this.clockodoConfigured || !this.clockodoClient || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.clockodoEmail)) {
+            this.clockodoStatus = 'unconfigured';
+            this.setClockodoStatus(this.t('clockodoStatusNotConfigured'));
             return false;
         }
         const button = document.getElementById('clockodoTestBtn');
+        this.clockodoStatus = 'checking';
+        this.setClockodoStatus(this.t('clockodoStatusChecking'));
         button.disabled = true;
         try {
             await this.clockodoClient.testConnection(this.getPushClientId(), this.getClockodoAccessToken());
-            this.setClockodoStatus(this.t('clockodoTestSuccess'));
+            this.clockodoStatus = 'connected';
+            this.setClockodoStatus(this.t('clockodoStatusConnected'));
             this.showToast(this.t('clockodoTestSuccess'));
             return true;
         } catch (error) {
-            this.setClockodoStatus(this.clockodoErrorMessage(error));
+            this.clockodoStatus = 'failed';
+            this.setClockodoStatus(`${this.t('clockodoStatusFailed')}: ${this.clockodoErrorMessage(error)}`);
             return false;
         } finally {
             button.disabled = false;
@@ -3106,13 +3139,15 @@ class TimerHubApp {
         this.clockodoServiceId = '';
         this.clockodoBillable = true;
         this.clockodoConfigured = false;
+        this.clockodoStatus = 'unconfigured';
+        this.clockodoConfigVersion += 1;
         document.getElementById('clockodoEmailInput').value = '';
         document.getElementById('clockodoApiKeyInput').value = '';
         document.getElementById('clockodoCustomerIdInput').value = '';
         document.getElementById('clockodoProjectIdInput').value = '';
         document.getElementById('clockodoServiceIdInput').value = '';
         document.getElementById('clockodoBillableSelect').value = 'true';
-        this.setClockodoStatus(this.t('clockodoConfigRemoved'));
+        this.setClockodoStatus(this.t('clockodoStatusNotConfigured'));
         this.showToast(this.t('clockodoConfigRemoved'));
         return true;
     }

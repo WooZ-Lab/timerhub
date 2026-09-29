@@ -779,7 +779,9 @@ test('Clockodo Worker stores credentials encrypted, proxies documented operation
         body: JSON.stringify({ apiUser: 'person@example.test', apiKey })
     });
     assert.equal(configured.status, 200);
-    assert.deepEqual(await configured.json(), { configured: true });
+    const saveBody = await configured.text();
+    assert.deepEqual(JSON.parse(saveBody), { configured: true });
+    assert.equal(saveBody.includes(apiKey), false, 'save response must not contain the API key');
     const stored = backend.records.get(clientId);
     assert.equal(JSON.stringify([...stored.entries()]).includes(apiKey), false);
     assert.equal(stored.get('clockodoCredentials').apiUser, 'person@example.test');
@@ -789,7 +791,9 @@ test('Clockodo Worker stores credentials encrypted, proxies documented operation
     });
     assert.equal(unauthorized.status, 401);
     const config = await backend.request(`/api/clockodo/config?clientId=${clientId}`, { headers: auth });
-    assert.deepEqual(await config.json(), { configured: true, apiUser: 'person@example.test' });
+    const configBody = await config.text();
+    assert.deepEqual(JSON.parse(configBody), { configured: true, apiUser: 'person@example.test' });
+    assert.equal(configBody.includes(apiKey), false, 'configuration reads must not contain the API key');
 
     const tested = await backend.request(`/api/clockodo/test?clientId=${clientId}`, {
         method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' }, body: '{}'
@@ -823,6 +827,11 @@ test('Clockodo Worker stores credentials encrypted, proxies documented operation
     const collectionDelete = await backend.request(createPath, { method: 'DELETE', headers: auth });
     assert.equal(collectionDelete.status, 405);
     assert.equal(requests.length, 2, 'UPDATE and DELETE paths must not reach Clockodo');
+
+    const removed = await backend.request(`/api/clockodo/config?clientId=${clientId}`, { method: 'DELETE', headers: auth });
+    assert.deepEqual(await removed.json(), { configured: false });
+    const unconfigured = await backend.request(`/api/clockodo/config?clientId=${clientId}`, { headers: auth });
+    assert.deepEqual(await unconfigured.json(), { configured: false, apiUser: '' });
 });
 
 test('Clockodo Worker reports authentication and uncertain malformed-create outcomes safely', async t => {

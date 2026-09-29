@@ -4,6 +4,7 @@ import test from 'node:test';
 import vm from 'node:vm';
 
 const source = await readFile(new URL('../app.js', import.meta.url), 'utf8');
+const clockodoClientSource = await readFile(new URL('../clockodo-client.js', import.meta.url), 'utf8');
 
 function createTestApp(initialData = {}) {
     const storageData = {
@@ -96,8 +97,7 @@ function createTestApp(initialData = {}) {
         'entryEditDeleteBtn', 'entryEditSaveBtn', 'entryEditLockedNotice', 'entryConflictWarning', 'entryEditModal',
         'syncConfirmEntriesList', 'syncConfirmDesc', 'syncConfirmSummary',
         'syncConfirmAlreadySyncedNotice', 'syncConfirmSubmitBtn', 'syncConfirmModal',
-        'clockodoEmailInput', 'clockodoApiKeyInput', 'clockodoCustomerIdInput',
-        'clockodoProjectIdInput', 'clockodoServiceIdInput', 'clockodoSaveBtn',
+        'clockodoEmailInput', 'clockodoApiKeyInput', 'clockodoCustomerIdInput', 'clockodoProjectIdInput', 'clockodoServiceIdInput', 'clockodoSaveBtn',
         'clockodoBillableSelect', 'clockodoTestBtn', 'clockodoRemoveBtn', 'clockodoStatusValue', 'clockodoToggleKeyBtn'
     ]) {
         elements.set(id, {
@@ -107,6 +107,7 @@ function createTestApp(initialData = {}) {
             disabled: false,
             innerHTML: '',
             textContent: '',
+            dataset: {},
             style: {},
             classList: { add() {}, remove() {} },
             setAttribute() {},
@@ -151,8 +152,120 @@ function createTestApp(initialData = {}) {
     vm.runInContext(source, context, { filename: 'app.js' });
     const app = vm.runInContext('new TimerHubApp()', context);
     app.storage = mockStorage;
-    return { app, storageData, document: testDocument, localStorageData };
+    app.clockodoClient = initialData.clockodoClient || null;
+    const toasts = [];
+    app.showToast = message => toasts.push(message);
+    return { app, storageData, document: testDocument, localStorageData, toasts };
 }
+
+function makeClockodoSettingsService() {
+    const state = { configured: false, apiUser: '', connection: 'ok', saveFails: false };
+    const client = {
+        async getConfig() { return { configured: state.configured, apiUser: state.apiUser }; },
+        async saveConfig(_clientId, _token, credentials) {
+            if (state.saveFails) throw Object.assign(new Error('safe failure'), { code: 'network_error' });
+            state.configured = true;
+            state.apiUser = credentials.apiUser;
+            return { configured: true };
+        },
+        async testConnection() {
+            if (state.connection !== 'ok') throw Object.assign(new Error('safe failure'), { code: state.connection });
+            return { connected: true };
+        },
+        async removeConfig() { state.configured = false; state.apiUser = ''; return { configured: false }; }
+    };
+    return { client, state };
+}
+
+function fillClockodoSettings(document, apiKey = 'test-only-placeholder') {
+    document.getElementById('clockodoEmailInput').value = 'worker@example.test';
+    document.getElementById('clockodoApiKeyInput').value = apiKey;
+    document.getElementById('clockodoCustomerIdInput').value = '12';
+    document.getElementById('clockodoProjectIdInput').value = '34';
+    document.getElementById('clockodoServiceIdInput').value = '56';
+}
+
+test('Clockodo credentials save as configured without returning the key or claiming connection success', async () => {
+    const service = makeClockodoSettingsService();
+    const { app, document, toasts, localStorageData } = createTestApp({ clockodoClient: service.client });
+    fillClockodoSettings(document);
+
+    assert.equal(await app.saveClockodoSettings(), true);
+    assert.equal(app.clockodoConfigured, true);
+    assert.equal(app.clockodoStatus, 'configured');
+    assert.match(document.getElementById('clockodoStatusValue').textContent, /credentials configured/i);
+    assert.equal(document.getElementById('clockodoApiKeyInput').value, '');
+    assert.deepEqual(toasts, ['Clockodo settings saved']);
+    assert.deepEqual(service.state, { configured: true, apiUser: 'worker@example.test', connection: 'ok', saveFails: false });
+    assert.equal(JSON.stringify([...localStorageData.entries()]).includes('test-only-placeholder'), false);
+});
+
+test('Clockodo configured state survives reload and removing settings clears it', async () => {
+    const service = makeClockodoSettingsService();
+    service.state.configured = true;
+    service.state.apiUser = 'worker@example.test';
+    const original = createTestApp({ clockodoClient: service.client });
+    await original.app.refreshClockodoConfigurationStatus();
+    assert.equal(original.app.clockodoConfigured, true);
+    assert.equal(original.app.clockodoStatus, 'configured');
+
+    original.app.clockodoConfigured = true;
+    assert.equal(await original.app.removeClockodoSettings(), true);
+    assert.equal(original.app.clockodoConfigured, false);
+    assert.equal(original.app.clockodoStatus, 'unconfigured');
+    assert.equal(original.document.getElementById('clockodoStatusValue').textContent, 'Credentials not configured');
+
+    const reloaded = createTestApp({ clockodoClient: service.client });
+    await reloaded.app.refreshClockodoConfigurationStatus();
+    assert.equal(reloaded.app.clockodoConfigured, false);
+    assert.equal(reloaded.app.clockodoStatus, 'unconfigured');
+});
+
+test('Clockodo connection checks distinguish checking, success, and failure', async () => {
+    const service = makeClockodoSettingsService();
+    service.state.configured = true;
+    const { app, document } = createTestApp({ clockodoClient: service.client });
+    app.clockodoConfigured = true;
+    app.clockodoEmail = 'worker@example.test';
+    assert.equal(await app.testClockodoConnection(), true);
+    assert.equal(app.clockodoStatus, 'connected');
+    assert.equal(document.getElementById('clockodoStatusValue').textContent, 'Connection successful');
+
+    service.state.connection = 'invalid_credentials';
+    assert.equal(await app.testClockodoConnection(), false);
+    assert.equal(app.clockodoStatus, 'failed');
+    assert.match(document.getElementById('clockodoStatusValue').textContent, /Connection check failed/);
+});
+
+test('Clockodo save failure clears the field but does not mark credentials configured', async () => {
+    const service = makeClockodoSettingsService();
+    service.state.saveFails = true;
+    const { app, document, toasts } = createTestApp({ clockodoClient: service.client });
+    fillClockodoSettings(document);
+
+    assert.equal(await app.saveClockodoSettings(), false);
+    assert.equal(app.clockodoConfigured, false);
+    assert.equal(app.clockodoStatus, 'failed');
+    assert.equal(document.getElementById('clockodoApiKeyInput').value, '');
+    assert.deepEqual(toasts, []);
+});
+
+test('stale Clockodo configuration reads cannot overwrite a successful save', async () => {
+    let resolveRead;
+    const client = {
+        getConfig: () => new Promise(resolve => { resolveRead = resolve; }),
+        saveConfig: async () => ({ configured: true })
+    };
+    const { app, document } = createTestApp({ clockodoClient: client });
+    fillClockodoSettings(document);
+    const staleRefresh = app.refreshClockodoConfigurationStatus();
+    await app.saveClockodoSettings();
+    resolveRead({ configured: false, apiUser: '' });
+    await staleRefresh;
+    assert.equal(app.clockodoConfigured, true);
+    assert.equal(app.clockodoStatus, 'configured');
+    assert.match(document.getElementById('clockodoStatusValue').textContent, /credentials configured/i);
+});
 
 test('Task 2: Migration and backward compatibility for legacy time entries', async () => {
     const legacyEntry1 = {
@@ -462,6 +575,7 @@ test('Task 7: Clockodo settings save, reload, replace, test, remove, and keep th
             remote.apiUser = config.apiUser;
             remote.keys.push(config.apiKey);
             remote.accessToken = token;
+            return { configured: true };
         },
         async testConnection() { return { connected: true }; },
         async removeConfig() { remote.configured = false; remote.apiUser = ''; }
@@ -497,10 +611,10 @@ test('Task 7: Clockodo settings save, reload, replace, test, remove, and keep th
     assert.equal(storageData.settings.clockodoApiKey, undefined);
 });
 
-test('Task 7: Clockodo settings reject incomplete credentials and invalid numeric IDs', async () => {
+test('Task 7: Clockodo settings require email and API key but do not require valid entry assignments', async () => {
     const { app, document } = createTestApp();
     let saved = false;
-    app.clockodoClient = { async saveConfig() { saved = true; } };
+    app.clockodoClient = { async saveConfig() { saved = true; return { configured: true }; } };
     app.showToast = () => {};
     document.getElementById('clockodoEmailInput').value = 'bad-email';
     document.getElementById('clockodoApiKeyInput').value = 'private-key';
@@ -511,10 +625,54 @@ test('Task 7: Clockodo settings reject incomplete credentials and invalid numeri
     assert.match(document.getElementById('clockodoStatusValue').textContent, /valid Clockodo email/);
 
     document.getElementById('clockodoEmailInput').value = 'worker@example.test';
+    document.getElementById('clockodoApiKeyInput').value = 'test-only-placeholder';
     document.getElementById('clockodoCustomerIdInput').value = '12';
     document.getElementById('clockodoProjectIdInput').value = '3.4';
-    assert.equal(await app.saveClockodoSettings(), false);
-    assert.equal(saved, false);
+    assert.equal(await app.saveClockodoSettings(), true);
+    assert.equal(saved, true);
+});
+
+test('Clockodo connection test accepts email and saved API key without customer or service IDs', async () => {
+    const service = makeClockodoSettingsService();
+    const { app, document } = createTestApp({ clockodoClient: service.client });
+    fillClockodoSettings(document, '');
+    document.getElementById('clockodoCustomerIdInput').value = '';
+    document.getElementById('clockodoServiceIdInput').value = '';
+    document.getElementById('clockodoProjectIdInput').value = '';
+    document.getElementById('clockodoApiKeyInput').value = 'test-only-placeholder';
+
+    assert.equal(await app.saveClockodoSettings(), true);
+    assert.equal(document.getElementById('clockodoApiKeyInput').value, '');
+    assert.equal(await app.testClockodoConnection(), true);
+    assert.equal(app.clockodoStatus, 'connected');
+});
+
+test('Clockodo connection test is blocked when email or saved credentials are missing', async () => {
+    let checkCalls = 0;
+    const client = { async testConnection() { checkCalls += 1; return { connected: true }; } };
+    const { app, document } = createTestApp({ clockodoClient: client });
+    app.clockodoConfigured = true;
+    app.clockodoEmail = '';
+    assert.equal(await app.testClockodoConnection(), false);
+    assert.equal(checkCalls, 0);
+    assert.equal(app.clockodoStatus, 'unconfigured');
+
+    app.clockodoEmail = 'worker@example.test';
+    app.clockodoConfigured = false;
+    assert.equal(await app.testClockodoConnection(), false);
+    assert.equal(checkCalls, 0);
+    assert.equal(document.getElementById('clockodoStatusValue').textContent, 'Credentials not configured');
+});
+
+test('Clockodo entry payload still validates customer and service assignments at send time', async () => {
+    const context = vm.createContext({ fetch: async () => Response.json({}), AbortController, setTimeout, clearTimeout, encodeURIComponent });
+    vm.runInContext(clockodoClientSource, context);
+    const Client = context.ClockodoClient;
+    assert.throws(() => Client.buildEntryPayload({
+        startTimestamp: Date.parse('2026-09-28T08:00:00Z'),
+        endTimestamp: Date.parse('2026-09-28T09:00:00Z'),
+        activityNameSnapshot: 'Work'
+    }, {}), error => error.code === 'missing_clockodo_assignment');
 });
 
 test('Task 8: Confirmed batches send exact snapshots, persist successes, and prevent duplicate sends', async () => {
