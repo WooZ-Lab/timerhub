@@ -41,18 +41,17 @@
         <!-- Main screen -->
         <div id="mainScreen" class="screen active">
             <div class="safe-area-top"></div>
-            <header class="timer-heading"><h2 data-i18n="activity">Activity</h2><div id="timerRunningStatus" class="timer-running-status" role="status" aria-live="polite"></div></header>
-            <p id="canvasHelp" class="canvas-help" data-i18n="canvasHelp">Drag an activity to move it. Drag empty space to pan. Use its corner handle to resize.</p>
+            <div id="timerRunningStatus" class="timer-running-status" role="status" aria-live="polite"></div>
             <div class="canvas-viewport" id="activityCanvasViewport" role="region" aria-label="Activity canvas" data-i18n-aria-label="activityCanvas">
                 <div class="activities-grid" id="activitiesGrid">
                     <!-- Activity nodes are rendered on this persistent free-position stage. -->
                 </div>
             </div>
             
-            <button id="addActivityBtn" class="add-button" aria-label="Add new activity" data-i18n-aria-label="addActivity">+</button>
-            
             <div class="safe-area-bottom"></div>
         </div>
+
+        <button id="addActivityBtn" class="add-button" aria-label="Add new activity" data-i18n-aria-label="addActivity">+</button>
 
         <!-- Day Review screen -->
         <div id="reviewScreen" class="screen">
