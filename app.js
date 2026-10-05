@@ -3954,13 +3954,18 @@ class TimerHubApp {
             return;
         }
 
-        const editing = this.timeEntries.find(entry => entry.id === this.editingEntryId);
+        const editingId = this.editingEntryId === null || this.editingEntryId === undefined
+            ? null
+            : String(this.editingEntryId);
+        const editing = editingId === null
+            ? undefined
+            : this.timeEntries.find(entry => String(entry.id) === editingId);
         if ([SYNC_STATUS.CONFIRMED, SYNC_STATUS.SYNCING].includes(editing?.syncStatus)) {
             this.showToast(this.t('confirmedEntryLocked'));
             return;
         }
         const hasConflict = this.timeEntries.some(entry => {
-            if (entry.id === editing?.id) return false;
+            if (editingId !== null && String(entry.id) === editingId) return false;
             const otherEnd = entry.endTimestamp === null ? Infinity : entry.endTimestamp;
             return start < otherEnd && end > entry.startTimestamp;
         });

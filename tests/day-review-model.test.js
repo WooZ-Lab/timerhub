@@ -2222,3 +2222,106 @@ test('Day Review preview and Clockodo payload share rounded timestamps while raw
     assert.equal(storageData.timeEntries.find(entry => entry.id === 'round-me').startTimestamp, start);
     assert.equal(storageData.timeEntries.find(entry => entry.id === 'round-me').endTimestamp, end);
 });
+
+async function createOverlapApp() {
+    const { app, document, storageData } = createTestApp();
+    const t = (h, m, s = 0) => new Date(2026, 8, 28, h, m, s).getTime();
+    await app.addEntry({ id: 'entry-a', activityId: 'act-1', activityNameSnapshot: 'A', startTimestamp: t(12, 0), endTimestamp: t(12, 30) });
+    await app.addEntry({ id: 'entry-b', activityId: 'act-2', activityNameSnapshot: 'B', startTimestamp: t(12, 30), endTimestamp: t(13, 0) });
+    app.activities = [{ id: 'act-1', name: 'A' }, { id: 'act-2', name: 'B' }];
+    app.reviewDate = '2026-09-28';
+    app.renderLog = () => {};
+    app.renderReview = () => {};
+    app.showToast = () => {};
+    const setTimes = (start, end, date = '2026-09-28') => {
+        document.getElementById('entryEditDate').value = date;
+        document.getElementById('entryEditStart').value = start;
+        document.getElementById('entryEditEndDate').value = date;
+        document.getElementById('entryEditEnd').value = end;
+    };
+    return { app, document, storageData, t, setTimes };
+}
+
+test('editing an existing entry without changing its interval does not overlap with itself', async () => {
+    const { app, document, storageData, t, setTimes } = await createOverlapApp();
+    app.showEntryEditModal('entry-a');
+    setTimes('12:00', '12:30');
+    await app.saveTimeEntry();
+    assert.equal(document.getElementById('entryConflictWarning').style.display, 'none');
+    assert.equal(storageData.timeEntries.find(entry => entry.id === 'entry-a').startTimestamp, t(12, 0));
+    assert.equal(storageData.timeEntries.find(entry => entry.id === 'entry-a').endTimestamp, t(12, 30));
+});
+
+test('moving an existing entry into another entry reports an overlap and keeps stored data', async () => {
+    const { app, document, storageData, t, setTimes } = await createOverlapApp();
+    app.showEntryEditModal('entry-a');
+    setTimes('12:05', '12:35');
+    await app.saveTimeEntry();
+    assert.equal(document.getElementById('entryConflictWarning').style.display, 'block');
+    assert.equal(storageData.timeEntries.find(entry => entry.id === 'entry-a').startTimestamp, t(12, 0));
+    assert.equal(storageData.timeEntries.find(entry => entry.id === 'entry-a').endTimestamp, t(12, 30));
+});
+
+test('moving an existing entry to a non-overlapping interval is accepted', async () => {
+    const { app, document, storageData, t, setTimes } = await createOverlapApp();
+    app.showEntryEditModal('entry-a');
+    setTimes('11:55', '12:25');
+    await app.saveTimeEntry();
+    assert.equal(document.getElementById('entryConflictWarning').style.display, 'none');
+    assert.equal(storageData.timeEntries.find(entry => entry.id === 'entry-a').startTimestamp, t(11, 55));
+    assert.equal(storageData.timeEntries.find(entry => entry.id === 'entry-a').endTimestamp, t(12, 25));
+});
+
+test('overlap validation respects exact seconds', async () => {
+    const { app, document, storageData } = createTestApp();
+    const t = (h, m, s = 0) => new Date(2026, 8, 28, h, m, s).getTime();
+    await app.addEntry({ id: 'entry-a', activityId: 'act-1', activityNameSnapshot: 'A', startTimestamp: t(12, 0), endTimestamp: t(12, 30) });
+    await app.addEntry({ id: 'entry-b', activityId: 'act-2', activityNameSnapshot: 'B', startTimestamp: t(12, 29, 45), endTimestamp: t(13, 0) });
+    app.activities = [{ id: 'act-1', name: 'A' }, { id: 'act-2', name: 'B' }];
+    app.reviewDate = '2026-09-28';
+    app.renderLog = () => {};
+    app.renderReview = () => {};
+    app.showToast = () => {};
+    app.showEntryEditModal('entry-a');
+    document.getElementById('entryEditDate').value = '2026-09-28';
+    document.getElementById('entryEditStart').value = '12:00';
+    document.getElementById('entryEditEndDate').value = '2026-09-28';
+    document.getElementById('entryEditEnd').value = '12:30';
+    await app.saveTimeEntry();
+    assert.equal(document.getElementById('entryConflictWarning').style.display, 'block');
+    assert.equal(storageData.timeEntries.find(entry => entry.id === 'entry-a').endTimestamp, t(12, 30));
+});
+
+test('the edited entry is excluded by stable ID rather than object identity', async () => {
+    const { app, document, storageData } = createTestApp();
+    const t = (h, m, s = 0) => new Date(2026, 8, 28, h, m, s).getTime();
+    await app.addEntry({ id: '1', activityId: 'act-1', activityNameSnapshot: 'A', startTimestamp: t(12, 0), endTimestamp: t(12, 30) });
+    app.activities = [{ id: 'act-1', name: 'A' }];
+    app.reviewDate = '2026-09-28';
+    app.renderLog = () => {};
+    app.renderReview = () => {};
+    app.showToast = () => {};
+    app.editingEntryId = 1;
+    document.getElementById('entryEditDate').value = '2026-09-28';
+    document.getElementById('entryEditStart').value = '12:00';
+    document.getElementById('entryEditEndDate').value = '2026-09-28';
+    document.getElementById('entryEditEnd').value = '12:30';
+    await app.saveTimeEntry();
+    assert.equal(document.getElementById('entryConflictWarning').style.display, 'none');
+    assert.equal(app.timeEntries.length, 1);
+    assert.equal(app.timeEntries[0].id, '1');
+    assert.equal(storageData.timeEntries.length, 1);
+    assert.equal(storageData.timeEntries[0].endTimestamp, t(12, 30));
+});
+
+test('newly created entries still detect real overlaps', async () => {
+    const { app, document } = await createOverlapApp();
+    app.showAddEntryModal();
+    document.getElementById('entryEditDate').value = '2026-09-28';
+    document.getElementById('entryEditStart').value = '12:45';
+    document.getElementById('entryEditEndDate').value = '2026-09-28';
+    document.getElementById('entryEditEnd').value = '13:15';
+    await app.saveTimeEntry();
+    assert.equal(document.getElementById('entryConflictWarning').style.display, 'block');
+    assert.equal(app.timeEntries.length, 2);
+});
