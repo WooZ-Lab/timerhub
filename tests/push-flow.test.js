@@ -1271,3 +1271,25 @@ test('activity rendering derives text color from the centralized contrast helper
     assert.equal(/#activitiesGrid \.activity-btn\.activity-node \{[^}]*color:\s*#fff/i.test(styleSource), false);
     assert.match(styleSource, /\.activity-node \.btn-name,[\s\S]*?\.btn-hint \{\s*color:\s*var\(--activity-text-color/);
 });
+
+test('activity names longer than 30 characters are accepted and preserved', async () => {
+    assert.equal(/id="activityName"[^>]*maxlength/.test(htmlSource), false);
+    const browser = makeBrowserHarness(makeBackend());
+    const saved = [];
+    const longName = 'Снимал замеры для дерева и интерьера с очень длинным названием';
+    assert.ok(longName.length > 30);
+    const colorOption = { style: { backgroundColor: 'rgb(255, 255, 255)' } };
+    const nodes = {
+        activityName: { value: longName },
+        activityModal: { classList: { remove() {} } }
+    };
+    browser.document.getElementById = id => nodes[id] || null;
+    browser.document.querySelector = selector => selector === '.color-option.selected' ? colorOption : null;
+    browser.app.storage = { saveActivity: async activity => saved.push({ ...activity }) };
+    browser.app.generateId = () => 'long-name-activity';
+    browser.app.renderMain = () => {};
+
+    await browser.app.saveActivity();
+    assert.equal(saved.at(-1).name, longName);
+    assert.equal(saved.at(-1).id, 'long-name-activity');
+});

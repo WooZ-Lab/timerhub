@@ -2816,3 +2816,11 @@ test('activity buttons derive their text color from the centralized contrast rul
     assert.equal(buttons.find(button => button.dataset.activityId === 'yellow-activity').style['--activity-text-color'], '#000000');
     assert.equal(buttons.find(button => button.dataset.activityId === 'navy-activity').style['--activity-text-color'], '#ffffff');
 });
+
+test('editing an activity loads a long name without truncation', () => {
+    const { app, document } = createTestApp();
+    const longName = 'A very long activity name that exceeds the old thirty character limit';
+    app.activities = [{ id: 'long-name', name: longName, color: '#ffffff', shape: 'circle', size: 'medium', archived: false }];
+    app.showActivityModal('long-name');
+    assert.equal(document.getElementById('activityName').value, longName);
+});
