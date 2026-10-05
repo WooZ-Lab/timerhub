@@ -346,6 +346,15 @@ const extendedTranslations = {
         retryDiagnosticUnavailable: 'The batch is not in a retryable state.',
         resendSyncNotice: 'These entries have already been synced to Clockodo. Do you really want to send them again? This can create duplicate Clockodo entries.',
         resendSyncBtn: 'Send again',
+        createGroup: 'Create Group', createGroupFromSelection: 'Group selection ({count})',
+        groupName: 'Group name', groupNamePlaceholder: 'e.g., Site A',
+        groupDefaultName: 'Group {number}', groupCreated: 'Group "{name}" created',
+        groupCreateFailed: 'Could not create the group. Try again.',
+        selectActivitiesFirst: 'Select at least one activity first',
+        collapseGroup: 'Collapse group', expandGroup: 'Expand group',
+        collapseAllGroups: 'Collapse all', expandAllGroups: 'Expand all',
+        duplicateGroup: 'Duplicate group', groupCopyName: '{name} (copy)',
+        groupDuplicated: 'Group "{name}" duplicated',
     },
     de: {
         activityFilter: 'Aktivitätsfilter',
@@ -509,6 +518,15 @@ const extendedTranslations = {
         retryDiagnosticUnavailable: 'Der Stapel kann derzeit nicht wiederholt werden.',
         resendSyncNotice: 'Diese Einträge wurden bereits mit Clockodo synchronisiert. Möchtest du sie wirklich erneut senden? Dadurch können doppelte Clockodo-Einträge entstehen.',
         resendSyncBtn: 'Erneut senden',
+        createGroup: 'Gruppe erstellen', createGroupFromSelection: 'Auswahl gruppieren ({count})',
+        groupName: 'Gruppenname', groupNamePlaceholder: 'z. B. Baustelle A',
+        groupDefaultName: 'Gruppe {number}', groupCreated: 'Gruppe "{name}" erstellt',
+        groupCreateFailed: 'Gruppe konnte nicht erstellt werden. Bitte erneut versuchen.',
+        selectActivitiesFirst: 'Wähle zuerst mindestens eine Aktivität aus',
+        collapseGroup: 'Gruppe einklappen', expandGroup: 'Gruppe ausklappen',
+        collapseAllGroups: 'Alle einklappen', expandAllGroups: 'Alle ausklappen',
+        duplicateGroup: 'Gruppe duplizieren', groupCopyName: '{name} (Kopie)',
+        groupDuplicated: 'Gruppe "{name}" dupliziert',
     },
     ru: {
         activityFilter: 'Фильтр занятий',
@@ -672,6 +690,15 @@ const extendedTranslations = {
         retryDiagnosticUnavailable: 'Пакет сейчас нельзя повторить.',
         resendSyncNotice: 'Эти записи уже синхронизированы с Clockodo. Вы действительно хотите отправить их снова? Это может создать дубликаты записей Clockodo.',
         resendSyncBtn: 'Отправить повторно',
+        createGroup: 'Создать группу', createGroupFromSelection: 'Сгруппировать ({count})',
+        groupName: 'Название группы', groupNamePlaceholder: 'например, Объект A',
+        groupDefaultName: 'Группа {number}', groupCreated: 'Группа «{name}» создана',
+        groupCreateFailed: 'Не удалось создать группу. Попробуйте ещё раз.',
+        selectActivitiesFirst: 'Сначала выберите хотя бы одно занятие',
+        collapseGroup: 'Свернуть группу', expandGroup: 'Развернуть группу',
+        collapseAllGroups: 'Свернуть все', expandAllGroups: 'Развернуть все',
+        duplicateGroup: 'Дублировать группу', groupCopyName: '{name} (копия)',
+        groupDuplicated: 'Группа «{name}» дублирована',
     }
 };
 for (const language of Object.keys(translations)) {
@@ -696,6 +723,11 @@ const SYNC_STATUS = Object.freeze({
 const CANVAS_GRID_SIZE = 16;
 const CANVAS_SELECT_LONG_PRESS_MS = 1000;
 const CANVAS_SELECT_MOVE_TOLERANCE = 12;
+const CANVAS_GROUP_PADDING = 20;
+const CANVAS_GROUP_HEADER = 36;
+const CANVAS_GROUP_COLLAPSED_WIDTH = 220;
+const CANVAS_GROUP_COLLAPSED_HEIGHT = 46;
+const CANVAS_GROUP_DUPLICATE_OFFSET = 48;
 
 // ============================================================================
 // STORAGE REPOSITORY
@@ -704,7 +736,7 @@ const CANVAS_SELECT_MOVE_TOLERANCE = 12;
 class StorageRepository {
     constructor() {
         this.dbName = 'TimerHubDB';
-        this.version = 3;
+        this.version = 4;
         this.db = null;
         this.mutationQueue = Promise.resolve();
         this.snapshotSequence = 0;
@@ -755,6 +787,11 @@ class StorageRepository {
                 if (!db.objectStoreNames.contains('snapshots')) {
                     const snapshotStore = db.createObjectStore('snapshots', { keyPath: 'id' });
                     snapshotStore.createIndex('createdAt', 'createdAt', { unique: false });
+                }
+
+                // Groups store (canvas activity groups)
+                if (!db.objectStoreNames.contains('groups')) {
+                    db.createObjectStore('groups', { keyPath: 'id' });
                 }
             };
         });
@@ -952,6 +989,21 @@ class StorageRepository {
         return this.persistMutation(['layout'], tx => { tx.objectStore('layout').put(layout); });
     }
 
+    // Groups
+    async getGroups() {
+        const tx = this.db.transaction(['groups'], 'readonly');
+        const store = tx.objectStore('groups');
+        return new Promise((resolve, reject) => {
+            const request = store.getAll();
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async saveGroup(group) {
+        return this.persistMutation(['groups'], tx => { tx.objectStore('groups').put(group); });
+    }
+
     async replaceWorkData(activities, timeEntries) {
         return this.persistMutation(['activities', 'timeEntries'], tx => {
             const activityStore = tx.objectStore('activities');
@@ -980,7 +1032,7 @@ class StorageRepository {
     }
 
     async exportAll() {
-        const [activities, timeEntries, settings, syncBatches, layout] = await Promise.all([
+        const [activities, timeEntries, settings, syncBatches, layout, groups] = await Promise.all([
             this.getActivities(),
             this.getTimeEntries(),
             new Promise((resolve, reject) => {
@@ -990,7 +1042,8 @@ class StorageRepository {
                 request.onerror = () => reject(request.error);
             }),
             this.getSyncBatches(),
-            this.getLayout()
+            this.getLayout(),
+            this.getGroups()
         ]);
 
         return {
@@ -1000,6 +1053,7 @@ class StorageRepository {
             timeEntries: this.stripSensitiveBackupFields(timeEntries),
             syncBatches: this.stripSensitiveBackupFields(syncBatches),
             layout: this.stripSensitiveBackupFields(layout),
+            groups: this.stripSensitiveBackupFields(groups),
             settings: Object.fromEntries(settings
                 .filter(s => !/(clockodo|api.?key|token|secret|password|credential|auth)/i.test(s.key))
                 .map(s => [s.key, this.stripSensitiveBackupFields(s.value)])),
@@ -1013,6 +1067,7 @@ class StorageRepository {
             !Array.isArray(data.activities) || !Array.isArray(data.timeEntries) ||
             (data.syncBatches !== undefined && !Array.isArray(data.syncBatches)) ||
             (data.layout !== undefined && !Array.isArray(data.layout)) ||
+            (data.groups !== undefined && !Array.isArray(data.groups)) ||
             (data.settings !== undefined && !isRecord(data.settings))) {
             throw new Error('invalid_backup');
         }
@@ -1021,23 +1076,26 @@ class StorageRepository {
 
     async importAll(data, merge = false) {
         this.validateBackupData(data);
-        const stores = ['activities', 'timeEntries', 'settings', 'syncBatches', 'layout'];
+        const stores = ['activities', 'timeEntries', 'settings', 'syncBatches', 'layout', 'groups'];
         return this.persistMutation(stores, tx => {
             const activities = tx.objectStore('activities');
             const timeEntries = tx.objectStore('timeEntries');
             const syncBatches = tx.objectStore('syncBatches');
             const layout = tx.objectStore('layout');
+            const groups = tx.objectStore('groups');
             const settings = tx.objectStore('settings');
             if (!merge) {
                 activities.clear();
                 timeEntries.clear();
                 syncBatches.clear();
                 layout.clear();
+                groups.clear();
             }
             data.activities.forEach(item => activities.put(this.stripSensitiveBackupFields(item)));
             data.timeEntries.forEach(item => timeEntries.put(this.stripSensitiveBackupFields(item)));
             (data.syncBatches || []).forEach(item => syncBatches.put(this.stripSensitiveBackupFields(item)));
             (data.layout || []).forEach(item => layout.put(this.stripSensitiveBackupFields(item)));
+            (data.groups || []).forEach(item => groups.put(this.stripSensitiveBackupFields(item)));
             for (const [key, value] of Object.entries(data.settings || {})) {
                 if (/(clockodo|api.?key|token|secret|password|credential|auth)/i.test(key)) continue;
                 settings.put({ key, value: this.stripSensitiveBackupFields(value) });
@@ -1061,6 +1119,7 @@ class TimerHubApp {
         this.backupSnapshots = [];
         this.activities = [];
         this.archivedActivities = [];
+        this.groups = [];
         this.timeEntries = [];
         this.activeActivityId = null;
         this.currentLanguage = 'en';
@@ -1202,6 +1261,7 @@ class TimerHubApp {
             await this.loadSettings();
             await this.refreshClockodoConfigurationStatus();
             await this.loadActivities();
+            await this.loadGroups();
             await this.loadTimeEntries();
             this.applyTranslations();
             this.setupUI();
@@ -1268,6 +1328,23 @@ class TimerHubApp {
         this.activities = activities
             .filter(a => !a.archived)
             .sort((a, b) => (a.position || 0) - (b.position || 0));
+    }
+
+    async loadGroups() {
+        const groups = typeof this.storage.getGroups === 'function'
+            ? await this.storage.getGroups()
+            : [];
+        this.groups = Array.isArray(groups)
+            ? groups
+                .filter(group => group && typeof group === 'object')
+                .map(group => ({
+                    id: String(group.id || this.generateId()),
+                    name: String(group.name || ''),
+                    x: this.clampCanvasCoordinate(group.x, 0, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY),
+                    y: this.clampCanvasCoordinate(group.y, 0, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY),
+                    collapsed: group.collapsed === true
+                }))
+            : [];
     }
 
     normalizeClockodoId(value) {
@@ -1637,6 +1714,20 @@ class TimerHubApp {
         sel('modalCloseBtn')?.addEventListener('click', () => this.closeActivityModal());
         sel('modalCancelBtn')?.addEventListener('click', () => this.closeActivityModal());
         sel('modalSaveBtn')?.addEventListener('click', () => this.saveActivity());
+
+        // Group creation
+        sel('createGroupBtn')?.addEventListener('click', () => this.openGroupModal());
+        sel('groupToggleAllBtn')?.addEventListener('click', () => {
+            if (this.groups.some(group => !group.collapsed)) this.collapseAllGroups();
+            else this.expandAllGroups();
+        });
+        sel('groupModalCloseBtn')?.addEventListener('click', () => this.closeGroupModal());
+        sel('groupModalCancelBtn')?.addEventListener('click', () => this.closeGroupModal());
+        sel('groupModalSaveBtn')?.addEventListener('click', async () => {
+            const input = document.getElementById('groupNameInput');
+            const group = await this.createGroupFromSelection(input?.value);
+            if (group) this.closeGroupModal();
+        });
 
         // Activity menu modal
         sel('menuCloseBtn')?.addEventListener('click', () => this.closeActivityMenu());
@@ -2561,6 +2652,7 @@ class TimerHubApp {
         const grid = document.getElementById('activitiesGrid');
         this.updateTimerStatus();
         if (!grid) return;
+        this.updateCanvasGroupAction();
         grid.setAttribute('aria-busy', String(Boolean(this.timerActionInProgress)));
         grid.replaceChildren();
         this.canvasZIndex = 1;
@@ -2579,7 +2671,10 @@ class TimerHubApp {
             return;
         }
 
+        this.renderGroups(grid);
+
         this.activities.forEach((activity, index) => {
+            if (this.activityGroup(activity)?.collapsed) return;
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.className = `activity-btn activity-node ${activity.size || 'medium'}`;
@@ -2692,19 +2787,234 @@ class TimerHubApp {
         this.populateActivityFilter();
     }
 
+    renderGroups(grid) {
+        for (const group of this.groups) {
+            const members = this.activities.filter(activity => activity.groupId === group.id);
+            if (!members.length) continue;
+            const container = document.createElement('div');
+            container.className = `group-container${group.collapsed ? ' is-collapsed' : ''}`;
+            container.dataset.groupId = group.id;
+            container.style.zIndex = '0';
+
+            const title = document.createElement('div');
+            title.className = 'group-title';
+            title.dataset.groupId = group.id;
+
+            const collapseButton = document.createElement('button');
+            collapseButton.type = 'button';
+            collapseButton.className = 'group-collapse-btn';
+            collapseButton.dataset.groupId = group.id;
+            collapseButton.setAttribute('aria-expanded', String(!group.collapsed));
+            collapseButton.setAttribute('aria-label', group.collapsed ? this.t('expandGroup') : this.t('collapseGroup'));
+            collapseButton.textContent = group.collapsed ? '▸' : '▾';
+            collapseButton.addEventListener('pointerdown', event => event.stopPropagation());
+            collapseButton.addEventListener('click', event => {
+                event.stopPropagation();
+                this.toggleGroupCollapsed(group.id);
+            });
+
+            const titleText = document.createElement('span');
+            titleText.className = 'group-title-text';
+            titleText.textContent = group.name;
+
+            const duplicateButton = document.createElement('button');
+            duplicateButton.type = 'button';
+            duplicateButton.className = 'group-duplicate-btn';
+            duplicateButton.dataset.groupId = group.id;
+            duplicateButton.setAttribute('aria-label', this.t('duplicateGroup'));
+            duplicateButton.textContent = '⧉';
+            duplicateButton.addEventListener('pointerdown', event => event.stopPropagation());
+            duplicateButton.addEventListener('click', event => {
+                event.stopPropagation();
+                this.duplicateGroup(group.id);
+            });
+
+            title.appendChild(collapseButton);
+            title.appendChild(titleText);
+            title.appendChild(duplicateButton);
+            container.appendChild(title);
+
+            if (group.collapsed) {
+                container.style.left = `${group.x - CANVAS_GROUP_PADDING}px`;
+                container.style.top = `${group.y - CANVAS_GROUP_HEADER}px`;
+                container.style.width = `${CANVAS_GROUP_COLLAPSED_WIDTH}px`;
+                container.style.height = `${CANVAS_GROUP_COLLAPSED_HEIGHT}px`;
+            } else {
+                this.applyGroupGeometry(container, this.groupMemberBoxes(group));
+            }
+
+            grid.appendChild(container);
+        }
+    }
+
+    groupMemberBoxes(group) {
+        return this.activities
+            .filter(activity => activity.groupId === group.id)
+            .map(activity => this.getActivityCanvasLayout(activity, this.activities.indexOf(activity)));
+    }
+
+    applyGroupGeometry(container, boxes) {
+        const minX = Math.min(...boxes.map(box => box.x));
+        const minY = Math.min(...boxes.map(box => box.y));
+        const maxX = Math.max(...boxes.map(box => box.x + box.width));
+        const maxY = Math.max(...boxes.map(box => box.y + box.height));
+        container.style.left = `${minX - CANVAS_GROUP_PADDING}px`;
+        container.style.top = `${minY - CANVAS_GROUP_HEADER}px`;
+        container.style.width = `${(maxX - minX) + CANVAS_GROUP_PADDING * 2}px`;
+        container.style.height = `${(maxY - minY) + CANVAS_GROUP_HEADER + CANVAS_GROUP_PADDING}px`;
+    }
+
+    positionGroupVisuals(group) {
+        const stage = document.getElementById('activitiesGrid');
+        if (!stage) return;
+        const boxes = [];
+        for (const activity of this.activities) {
+            if (activity.groupId !== group.id) continue;
+            const layout = this.getActivityCanvasLayout(activity, this.activities.indexOf(activity));
+            const button = stage.querySelector(
+                `.activity-btn[data-activity-id="${CSS.escape(activity.id)}"]`
+            );
+            if (button) {
+                button.style.left = `${layout.x}px`;
+                button.style.top = `${layout.y}px`;
+            }
+            this.positionActivityResizeHandle(activity.id, layout);
+            boxes.push(layout);
+        }
+        const container = stage.querySelector(
+            `.group-container[data-group-id="${CSS.escape(group.id)}"]`
+        );
+        if (!container) return;
+        container.children[0]?.classList.add('dragging');
+        if (group.collapsed) {
+            container.style.left = `${group.x - CANVAS_GROUP_PADDING}px`;
+            container.style.top = `${group.y - CANVAS_GROUP_HEADER}px`;
+        } else if (boxes.length) {
+            this.applyGroupGeometry(container, boxes);
+        }
+    }
+
+    async toggleGroupCollapsed(groupId) {
+        const group = this.groups.find(item => item.id === groupId);
+        if (!group) return null;
+        group.collapsed = !group.collapsed;
+        try {
+            await this.storage.saveGroup?.(group);
+        } catch {
+            this.showToast(this.t('groupCreateFailed'));
+        }
+        this.renderMain();
+        return group;
+    }
+
+    async setAllGroupsCollapsed(collapsed) {
+        if (!this.groups.length) return false;
+        for (const group of this.groups) group.collapsed = collapsed;
+        for (const group of this.groups) {
+            try {
+                await this.storage.saveGroup?.(group);
+            } catch {
+                this.showToast(this.t('groupCreateFailed'));
+            }
+        }
+        this.renderMain();
+        return true;
+    }
+
+    async collapseAllGroups() {
+        return this.setAllGroupsCollapsed(true);
+    }
+
+    async expandAllGroups() {
+        return this.setAllGroupsCollapsed(false);
+    }
+
+    async duplicateGroup(groupId) {
+        const group = this.groups.find(item => item.id === groupId);
+        if (!group) return null;
+        const members = this.activities.filter(activity => activity.groupId === group.id);
+        const duplicate = {
+            id: this.generateId(),
+            name: this.t('groupCopyName', { name: group.name }),
+            x: this.snapToCanvasGrid(group.x + CANVAS_GROUP_DUPLICATE_OFFSET),
+            y: this.snapToCanvasGrid(group.y + CANVAS_GROUP_DUPLICATE_OFFSET),
+            collapsed: false
+        };
+        const now = Date.now();
+        let position = Math.max(0, ...this.activities.map(activity => Number(activity.position) || 0));
+        const copies = members.map(activity => {
+            const { id, groupId: _groupId, ...rest } = activity;
+            const copy = {
+                ...rest,
+                id: this.generateId(),
+                groupId: duplicate.id,
+                position: ++position,
+                createdAt: now,
+                updatedAt: now
+            };
+            const saved = this.activityLayouts.get(activity.id);
+            const layout = saved
+                ? { ...saved, activityId: copy.id }
+                : { activityId: copy.id, x: 0, y: 0, width: 260, height: 150 };
+            return { copy, layout };
+        });
+        this.groups.push(duplicate);
+        try {
+            await this.storage.saveGroup?.(duplicate);
+            for (const { copy, layout } of copies) {
+                await this.storage.saveActivity(copy);
+                await this.storage.saveLayout(layout);
+                this.activities.push(copy);
+                this.activityLayouts.set(copy.id, layout);
+            }
+        } catch {
+            this.groups = this.groups.filter(item => item.id !== duplicate.id);
+            for (const { copy } of copies) {
+                this.activities = this.activities.filter(item => item.id !== copy.id);
+                this.activityLayouts.delete(copy.id);
+            }
+            this.showToast(this.t('groupCreateFailed'));
+            return null;
+        }
+        this.renderMain();
+        this.showToast(this.t('groupDuplicated', { name: duplicate.name }));
+        return duplicate;
+    }
+
     getActivityCanvasLayout(activity, index) {
         const saved = this.activityLayouts.get(activity.id);
+        const group = this.activityGroup(activity);
         const sizeDefaults = { small: [220, 120], medium: [260, 150], large: [320, 190] };
         const [defaultWidth, defaultHeight] = sizeDefaults[activity.size] || sizeDefaults.medium;
         const order = Number.isFinite(Number(activity.position)) ? Number(activity.position) : index;
         const angle = order * 2.399963229728653;
         const radius = 82 * Math.sqrt(Math.max(0, order));
-        return {
-            x: this.clampCanvasCoordinate(saved?.x, 24 + radius * (1 + Math.cos(angle)), 0, 2800),
-            y: this.clampCanvasCoordinate(saved?.y, 24 + radius * (1 + Math.sin(angle)), 0, 1600),
+        const layout = {
+            x: this.clampCanvasCoordinate(
+                saved?.x,
+                24 + radius * (1 + Math.cos(angle)),
+                group ? -10000 : 0,
+                group ? 10000 : 2800
+            ),
+            y: this.clampCanvasCoordinate(
+                saved?.y,
+                24 + radius * (1 + Math.sin(angle)),
+                group ? -10000 : 0,
+                group ? 10000 : 1600
+            ),
             width: this.clampCanvasCoordinate(saved?.width, defaultWidth, 160, 640),
             height: this.clampCanvasCoordinate(saved?.height, defaultHeight, 110, 520)
         };
+        if (group) {
+            layout.x += group.x;
+            layout.y += group.y;
+        }
+        return layout;
+    }
+
+    activityGroup(activity) {
+        if (!activity?.groupId) return null;
+        return this.groups.find(group => group.id === activity.groupId) || null;
     }
 
     clampCanvasCoordinate(value, fallback, min, max) {
@@ -2781,6 +3091,91 @@ class TimerHubApp {
         for (const button of buttons) {
             button.classList.toggle('selected', this.selectedActivityIds.has(button.dataset.activityId));
         }
+        this.updateCanvasGroupAction();
+    }
+
+    updateCanvasGroupAction() {
+        const button = document.getElementById('createGroupBtn');
+        if (button) {
+            const count = this.selectedActivityIds?.size || 0;
+            button.hidden = count === 0;
+            button.textContent = this.t('createGroupFromSelection', { count });
+            button.setAttribute('aria-label', this.t('createGroupFromSelection', { count }));
+        }
+        const toggleAll = document.getElementById('groupToggleAllBtn');
+        if (toggleAll) {
+            const hasGroups = this.groups.length > 0;
+            const anyExpanded = this.groups.some(group => !group.collapsed);
+            const label = anyExpanded ? this.t('collapseAllGroups') : this.t('expandAllGroups');
+            toggleAll.hidden = !hasGroups;
+            toggleAll.textContent = label;
+            toggleAll.setAttribute('aria-label', label);
+            toggleAll.dataset.action = anyExpanded ? 'collapse' : 'expand';
+        }
+    }
+
+    openGroupModal() {
+        if (!this.selectedActivityIds?.size) {
+            this.showToast(this.t('selectActivitiesFirst'));
+            return false;
+        }
+        const modal = document.getElementById('groupModal');
+        const input = document.getElementById('groupNameInput');
+        if (input) input.value = '';
+        modal?.classList.add('active');
+        input?.focus?.();
+        return true;
+    }
+
+    closeGroupModal() {
+        document.getElementById('groupModal')?.classList.remove('active');
+    }
+
+    async createGroupFromSelection(name) {
+        const selected = [...(this.selectedActivityIds || [])];
+        const members = this.activities.filter(activity => selected.includes(activity.id));
+        if (!members.length) {
+            this.showToast(this.t('selectActivitiesFirst'));
+            return null;
+        }
+        const entries = members.map(activity => ({
+            activity,
+            layout: this.getActivityCanvasLayout(activity, this.activities.indexOf(activity))
+        }));
+        const minX = Math.min(...entries.map(entry => entry.layout.x));
+        const minY = Math.min(...entries.map(entry => entry.layout.y));
+        const group = {
+            id: this.generateId(),
+            name: String(name || '').trim() || this.t('groupDefaultName', { number: this.groups.length + 1 }),
+            x: this.snapToCanvasGrid(minX),
+            y: this.snapToCanvasGrid(minY),
+            collapsed: false
+        };
+        this.groups.push(group);
+        try {
+            await this.storage.saveGroup?.(group);
+            for (const { activity, layout } of entries) {
+                activity.groupId = group.id;
+                await this.storage.saveActivity(activity);
+                const stored = {
+                    activityId: activity.id,
+                    x: layout.x - group.x,
+                    y: layout.y - group.y,
+                    width: layout.width,
+                    height: layout.height
+                };
+                this.activityLayouts.set(activity.id, stored);
+                await this.storage.saveLayout(stored);
+            }
+        } catch {
+            this.groups = this.groups.filter(item => item.id !== group.id);
+            this.showToast(this.t('groupCreateFailed'));
+            return null;
+        }
+        this.renderMain();
+        this.setCanvasSelection(selected);
+        this.showToast(this.t('groupCreated', { name: group.name }));
+        return group;
     }
 
     finishCanvasSelection(gesture) {
@@ -2997,6 +3392,7 @@ class TimerHubApp {
                 if (this.canvasGesture) {
                     clearTimeout(this.canvasGesture.longPressTimer);
                     this.canvasGesture.activityButton?.classList.remove('dragging');
+                    this.canvasGesture.groupTitle?.classList.remove('dragging');
                     if (this.canvasGesture.mode === 'select') this.hideCanvasSelectionRect();
                     this.canvasGesture = null;
                 }
@@ -3017,12 +3413,20 @@ class TimerHubApp {
                 ? this.getActivityCanvasLayout(activity, this.activities.indexOf(activity))
                 : null;
 
+            const groupTitle = event.target.closest?.('.group-title');
+            const group = groupTitle && this.groups.find(item => item.id === groupTitle.dataset.groupId);
+
             this.canvasGesture = {
                 pointerId: event.pointerId,
-                mode,
+                mode: group ? 'group-move' : mode,
                 activityId,
                 activityButton,
                 resizeHandle,
+                groupId: group?.id || null,
+                group,
+                groupTitle: group ? groupTitle : null,
+                groupStartX: group?.x,
+                groupStartY: group?.y,
                 startX: event.clientX,
                 startY: event.clientY,
                 lastX: event.clientX,
@@ -3104,6 +3508,15 @@ class TimerHubApp {
                 return;
             }
 
+            if (gesture.mode === 'group-move') {
+                const worldDx = dx / this.canvasZoom;
+                const worldDy = dy / this.canvasZoom;
+                gesture.group.x = this.snapToCanvasGrid(gesture.groupStartX + worldDx);
+                gesture.group.y = this.snapToCanvasGrid(gesture.groupStartY + worldDy);
+                this.positionGroupVisuals(gesture.group);
+                return;
+            }
+
             if (gesture.mode === 'move') {
                 const worldDx = dx / this.canvasZoom;
                 const worldDy = dy / this.canvasZoom;
@@ -3176,6 +3589,16 @@ class TimerHubApp {
             clearTimeout(gesture.longPressTimer);
             this.canvasGesture = null;
             gesture.activityButton?.classList.remove('dragging');
+            gesture.groupTitle?.classList.remove('dragging');
+
+            if (gesture.mode === 'group-move') {
+                if (gesture.started) {
+                    Promise.resolve(this.storage.saveGroup?.(gesture.group)).catch(() => {
+                        this.showToast(this.t('groupCreateFailed'));
+                    });
+                }
+                return;
+            }
 
             if (gesture.mode === 'select') {
                 if (event.type === 'pointercancel') {
@@ -3365,12 +3788,20 @@ class TimerHubApp {
     }
 
     async saveActivityCanvasLayout(layout) {
-        this.activityLayouts.set(layout.activityId, layout);
+        const stored = this.toStoredActivityLayout(layout);
+        this.activityLayouts.set(layout.activityId, stored);
         try {
-            await this.storage.saveLayout(layout);
+            await this.storage.saveLayout(stored);
         } catch {
             this.showToast(this.t('canvasLayoutSaveFailed'));
         }
+    }
+
+    toStoredActivityLayout(layout) {
+        const activity = this.activities.find(item => item.id === layout.activityId);
+        const group = this.activityGroup(activity);
+        if (!group) return layout;
+        return { ...layout, x: layout.x - group.x, y: layout.y - group.y };
     }
 
     getPushClientId() {
@@ -5351,6 +5782,7 @@ class TimerHubApp {
             await this.storage.importAll(this.pendingRestoreData, merge);
             this.cancelPendingRestore();
             await this.loadActivities();
+            await this.loadGroups();
             await this.loadTimeEntries();
             this.renderAll();
             await this.refreshAutomaticBackupStatus();

@@ -11,6 +11,8 @@ function createTestApp(initialData = {}) {
         activities: initialData.activities || [],
         timeEntries: initialData.timeEntries || [],
         syncBatches: initialData.syncBatches || [],
+        groups: initialData.groups || [],
+        layout: initialData.layout || [],
         settings: initialData.settings || {}
     };
     const localStorageData = new Map(Object.entries(initialData.localStorage || {}));
@@ -38,6 +40,20 @@ function createTestApp(initialData = {}) {
             storageData.timeEntries = storageData.timeEntries.filter(e => e.id !== id);
         },
         async getSyncBatches() { return structuredClone(storageData.syncBatches); },
+        async getGroups() { return structuredClone(storageData.groups); },
+        async saveGroup(group) {
+            const idx = storageData.groups.findIndex(item => item.id === group.id);
+            if (idx >= 0) storageData.groups[idx] = structuredClone(group);
+            else storageData.groups.push(structuredClone(group));
+            return group;
+        },
+        async getLayout() { return structuredClone(storageData.layout); },
+        async saveLayout(layout) {
+            const idx = storageData.layout.findIndex(item => item.activityId === layout.activityId);
+            if (idx >= 0) storageData.layout[idx] = structuredClone(layout);
+            else storageData.layout.push(structuredClone(layout));
+            return layout;
+        },
         async saveConfirmedBatch(batch, entries) {
             storageData.syncBatches.push(structuredClone(batch));
             for (const entry of entries) {
@@ -206,7 +222,7 @@ function createTestApp(initialData = {}) {
 }
 
 function createIndexedDbHarness() {
-    const keyPaths = { activities: 'id', timeEntries: 'id', settings: 'key', syncBatches: 'id', layout: 'activityId', snapshots: 'id' };
+    const keyPaths = { activities: 'id', timeEntries: 'id', settings: 'key', syncBatches: 'id', layout: 'activityId', snapshots: 'id', groups: 'id' };
     const data = Object.fromEntries(Object.keys(keyPaths).map(name => [name, new Map()]));
     const stats = { snapshotTransactions: 0, failMutation: false, failSnapshot: false };
     const db = {
@@ -261,6 +277,110 @@ function createIndexedDbHarness() {
         }
     };
     return { db, data, stats };
+}
+
+function createGroupCanvasHarness() {
+    const { app, context, storageData } = createTestApp();
+    context.CSS = { escape: value => value };
+    context.setTimeout = (callback, delay) => setTimeout(callback, delay);
+
+    const makeElement = (className = '') => {
+        const handlers = new Map();
+        const classes = new Set(className.split(/\s+/).filter(Boolean));
+        const element = {
+            className,
+            dataset: {},
+            style: { setProperty() {} },
+            children: [],
+            hidden: false,
+            textContent: '',
+            parent: null,
+            classList: {
+                add(value) { classes.add(value); },
+                remove(value) { classes.delete(value); },
+                contains(value) { return classes.has(value) || element.className.split(/\s+/).includes(value); },
+                toggle(value, enabled) {
+                    if (enabled === undefined) enabled = !classes.has(value);
+                    enabled ? classes.add(value) : classes.delete(value);
+                }
+            },
+            setAttribute(name, value) { this[name] = String(value); },
+            appendChild(item) { item.parent = element; element.children.push(item); return item; },
+            replaceChildren(...items) { element.children = items; },
+            addEventListener(type, handler) { handlers.set(type, handler); },
+            setPointerCapture() {},
+            closest(selector) {
+                const match = /^\.([\w-]+)/.exec(selector);
+                let node = element;
+                while (node) {
+                    if (match && node.classList?.contains(match[1])) return node;
+                    node = node.parent;
+                }
+                return null;
+            },
+            get handlers() { return handlers; }
+        };
+        return element;
+    };
+
+    const viewport = makeElement();
+    viewport.dataset = {};
+    viewport.getBoundingClientRect = () => ({ left: 0, top: 0, width: 800, height: 600 });
+    const buttons = [];
+    const handles = [];
+    const containers = [];
+    const stage = makeElement();
+    stage.querySelector = selector => {
+        const id = /data-activity-id="([^"]+)"/.exec(selector)?.[1]
+            ?? /data-group-id="([^"]+)"/.exec(selector)?.[1];
+        if (selector.startsWith('.group-container')) {
+            return containers.find(node => node.dataset.groupId === id) || null;
+        }
+        if (selector.startsWith('.activity-resize-handle')) {
+            return handles.find(node => node.dataset.activityId === id) || null;
+        }
+        return buttons.find(node => node.dataset.activityId === id) || null;
+    };
+    stage.appendChild = item => {
+        if (item.classList.contains('group-container')) containers.push(item);
+        else if (item.classList.contains('activity-resize-handle')) handles.push(item);
+        else buttons.push(item);
+        return item;
+    };
+    stage.replaceChildren = () => { buttons.length = 0; handles.length = 0; containers.length = 0; };
+
+    const status = makeElement();
+    const filter = makeElement();
+    filter.value = '';
+    const createGroupBtn = makeElement();
+    createGroupBtn.hidden = true;
+    const groupToggleAllBtn = makeElement();
+    groupToggleAllBtn.hidden = true;
+    const originalGetById = context.document.getElementById;
+    context.document.getElementById = id => ({
+        activityCanvasViewport: viewport,
+        activitiesGrid: stage,
+        timerRunningStatus: status,
+        logActivityFilter: filter,
+        createGroupBtn,
+        groupToggleAllBtn
+    })[id] || originalGetById(id);
+    context.document.querySelector = selector => stage.querySelector(selector);
+    context.document.querySelectorAll = selector => selector === '.activity-btn' ? buttons : [];
+    context.document.createElement = () => makeElement();
+    app.toggleActivity = async () => {};
+    app.setupActivityCanvasInteractions();
+
+    const pointer = (type, target, x, y) => viewport.handlers.get(type)?.({
+        isPrimary: true, pointerType: 'mouse', button: 0, pointerId: 1,
+        clientX: x, clientY: y, target, type, preventDefault() {}
+    });
+
+    return {
+        app, context, storageData, viewport, stage,
+        buttons, handles, containers, status, createGroupBtn, groupToggleAllBtn,
+        pointer, makeElement
+    };
 }
 
 function makeClockodoSettingsService() {
@@ -1524,6 +1644,348 @@ test('long-press rectangle selection respects tolerance, bounds, pan, and zoom',
     assert.equal(app.canvasGesture.mode, 'pan', 'movement past the tolerance cancels the long press');
     pointer('pointerup', viewport, 120, 100);
     assert.ok(localStorageData.has('timerhubActivityCanvasView'), 'pan persists the canvas view');
+});
+
+test('creating a group from a selection stores a snapped position and relative member layouts', async () => {
+    const { app, storageData } = createTestApp();
+    const first = { id: 'group-layout-a', name: 'First', position: 0, size: 'medium' };
+    const second = { id: 'group-layout-b', name: 'Second', position: 1, size: 'medium' };
+    app.activities = [first, second];
+    app.activityLayouts = new Map([
+        ['group-layout-a', { activityId: 'group-layout-a', x: 140, y: 90, width: 260, height: 150 }],
+        ['group-layout-b', { activityId: 'group-layout-b', x: 420, y: 250, width: 220, height: 120 }]
+    ]);
+    app.selectedActivityIds = new Set(['group-layout-a', 'group-layout-b']);
+    app.renderMain = () => {};
+
+    const group = await app.createGroupFromSelection('Crew');
+
+    assert.equal(app.groups.length, 1);
+    assert.equal(group.name, 'Crew');
+    assert.equal(group.collapsed, false);
+    assert.equal(group.x, 144, 'group position snaps to the 16px grid');
+    assert.equal(group.y, 96, 'group position snaps to the 16px grid');
+    assert.equal(storageData.groups[0].id, group.id, 'the group is persisted');
+    assert.deepEqual(new Set([first.groupId, second.groupId]), new Set([group.id]), 'membership is persisted on every member');
+
+    const storedFirst = app.activityLayouts.get('group-layout-a');
+    const storedSecond = app.activityLayouts.get('group-layout-b');
+    assert.equal(storedFirst.x, -4);
+    assert.equal(storedFirst.y, -6);
+    assert.equal(storedSecond.x, 276);
+    assert.equal(storedSecond.y, 154);
+    assert.equal(storedSecond.x - storedFirst.x, 280, 'relative positions are preserved');
+    assert.equal(storedSecond.y - storedFirst.y, 160, 'relative positions are preserved');
+
+    assert.deepEqual({ ...app.getActivityCanvasLayout(first, 0) }, { x: 140, y: 90, width: 260, height: 150 });
+    assert.deepEqual({ ...app.getActivityCanvasLayout(second, 1) }, { x: 420, y: 250, width: 220, height: 120 });
+    assert.deepEqual([...app.selectedActivityIds].sort(), ['group-layout-a', 'group-layout-b'], 'members stay selected after creation');
+});
+
+test('group creation requires a non-empty selection', async () => {
+    const { app, toasts } = createTestApp();
+    app.selectedActivityIds = new Set();
+    const group = await app.createGroupFromSelection('Crew');
+    assert.equal(group, null);
+    assert.equal(app.groups.length, 0);
+    assert.equal(toasts.at(-1), 'Select at least one activity first');
+});
+
+test('activities without groups keep their absolute canvas layout', () => {
+    const { app } = createTestApp();
+    const activity = { id: 'ungrouped', name: 'Solo', position: 0, size: 'medium' };
+    app.activities = [activity];
+    app.activityLayouts = new Map([['ungrouped', { activityId: 'ungrouped', x: 140, y: 90, width: 260, height: 150 }]]);
+    assert.equal(app.activityGroup(activity), null);
+    assert.deepEqual({ ...app.getActivityCanvasLayout(activity, 0) }, { x: 140, y: 90, width: 260, height: 150 });
+});
+
+test('group containers render around member activity bounding boxes', () => {
+    const { app, document } = createTestApp();
+    const grid = document.createElement('div');
+    app.activities = [
+        { id: 'render-a', name: 'A', position: 0, groupId: 'render-group' },
+        { id: 'render-b', name: 'B', position: 1, groupId: 'render-group' }
+    ];
+    app.activityLayouts = new Map([
+        ['render-a', { activityId: 'render-a', x: 100, y: 100, width: 200, height: 120 }],
+        ['render-b', { activityId: 'render-b', x: 400, y: 300, width: 200, height: 140 }]
+    ]);
+    app.groups = [{ id: 'render-group', name: 'Crew', x: 0, y: 0, collapsed: false }];
+
+    app.renderGroups(grid);
+
+    const container = grid.children.find(node => node.className === 'group-container');
+    assert.ok(container, 'a container is rendered for the group');
+    assert.equal(container.dataset.groupId, 'render-group');
+    assert.equal(container.style.left, '80px');
+    assert.equal(container.style.top, '64px');
+    assert.equal(container.style.width, '540px');
+    assert.equal(container.style.height, '396px');
+    assert.equal(container.style.zIndex, '0');
+    assert.equal(container.children[0].className, 'group-title');
+    assert.equal(container.children[0].children[0].className, 'group-collapse-btn');
+    assert.equal(container.children[0].children[1].className, 'group-title-text');
+    assert.equal(container.children[0].children[1].textContent, 'Crew');
+    assert.equal(container.children[0].children[2].className, 'group-duplicate-btn');
+});
+
+test('groups and memberships persist, export, and stay compatible with legacy backups', async () => {
+    const { context } = createTestApp();
+    const harness = createIndexedDbHarness();
+    const repository = vm.runInContext('new StorageRepository()', context);
+    repository.db = harness.db;
+
+    const group = { id: 'persisted-group', name: 'Crew', x: 144, y: 96, collapsed: false };
+    await repository.saveGroup(group);
+    await repository.saveActivity({ id: 'member', name: 'Member', groupId: 'persisted-group' });
+    await repository.saveActivity({ id: 'solo', name: 'Solo' });
+    await repository.saveLayout({ activityId: 'member', x: -4, y: -6, width: 260, height: 150 });
+
+    const reloaded = vm.runInContext('new StorageRepository()', context);
+    reloaded.db = harness.db;
+    const groups = await reloaded.getGroups();
+    assert.equal(groups.length, 1);
+    assert.deepEqual({ ...groups[0] }, group);
+    const activities = await reloaded.getActivities();
+    assert.equal(activities.find(item => item.id === 'member').groupId, 'persisted-group');
+    assert.equal(activities.find(item => item.id === 'solo').groupId, undefined, 'activities without groups are unchanged');
+    const savedLayout = (await reloaded.getLayout()).find(item => item.activityId === 'member');
+    assert.deepEqual({ ...savedLayout }, { activityId: 'member', x: -4, y: -6, width: 260, height: 150 });
+
+    const exported = await reloaded.exportAll();
+    assert.equal(exported.groups.length, 1);
+    assert.equal(exported.groups[0].name, 'Crew');
+
+    const legacy = {
+        format: 'timerhub-backup',
+        version: 1,
+        activities: [{ id: 'legacy', name: 'Legacy' }],
+        timeEntries: []
+    };
+    assert.doesNotThrow(() => reloaded.validateBackupData(legacy));
+    const migrated = vm.runInContext('new StorageRepository()', context);
+    const migratedHarness = createIndexedDbHarness();
+    migrated.db = migratedHarness.db;
+    await migrated.importAll(legacy, false);
+    assert.equal((await migrated.getGroups()).length, 0, 'legacy backups migrate with no groups');
+    assert.equal((await migrated.getActivities())[0].name, 'Legacy');
+});
+
+test('dragging a group moves every member through snapped group coordinates and persists', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, containers, buttons, pointer, storageData } = harness;
+    const group = { id: 'drag-group', name: 'Crew', x: 144, y: 96, collapsed: false };
+    app.activities = [
+        { id: 'drag-a', name: 'A', position: 0, groupId: 'drag-group', size: 'medium' },
+        { id: 'drag-b', name: 'B', position: 1, groupId: 'drag-group', size: 'medium' }
+    ];
+    app.activityLayouts = new Map([
+        ['drag-a', { activityId: 'drag-a', x: 16, y: 8, width: 200, height: 120 }],
+        ['drag-b', { activityId: 'drag-b', x: 280, y: 160, width: 220, height: 140 }]
+    ]);
+    app.groups = [group];
+    app.canvasZoom = 2;
+    app.savedGroups = [];
+    app.storage.saveGroup = async saved => { app.savedGroups.push(structuredClone(saved)); };
+    app.renderMain();
+
+    const title = containers[0].children[0];
+    pointer('pointerdown', title, 100, 100);
+    assert.equal(app.canvasGesture.mode, 'group-move', 'the title starts a group drag');
+    pointer('pointermove', title, 164, 132);
+    assert.equal(group.x, 176, 'group x uses the shared grid helper');
+    assert.equal(group.y, 112, 'group y uses the shared grid helper');
+    assert.equal(buttons.find(button => button.dataset.activityId === 'drag-a').style.left, '192px');
+    assert.equal(buttons.find(button => button.dataset.activityId === 'drag-a').style.top, '120px');
+    assert.equal(buttons.find(button => button.dataset.activityId === 'drag-b').style.left, '456px');
+    assert.equal(app.canvasPan.x, 0, 'group dragging never pans the canvas');
+    pointer('pointerup', title, 164, 132);
+    assert.equal(app.activityLayouts.get('drag-a').x, 16, 'relative member layouts stay unchanged');
+    assert.equal(app.activityLayouts.get('drag-b').y, 160, 'relative member layouts stay unchanged');
+    assert.equal(app.savedGroups.at(-1).x, 176, 'the group position is persisted');
+    assert.equal(app.savedGroups.at(-1).y, 112, 'the group position is persisted');
+
+    pointer('pointerdown', title, 500, 500);
+    pointer('pointermove', title, 0, 500);
+    pointer('pointerup', title, 0, 500);
+    assert.ok(group.x < 0, 'negative group coordinates are supported');
+    assert.ok(group.x % 16 === 0, 'negative values stay on the grid');
+    assert.ok(storageData.groups.length <= 1, 'no extra groups were created');
+});
+
+test('collapsing a group hides members, keeps running timers, and expands back in place', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, containers, buttons, storageData } = harness;
+    const group = { id: 'collapse-group', name: 'Crew', x: 144, y: 96, collapsed: false };
+    app.activities = [
+        { id: 'collapse-a', name: 'A', position: 0, groupId: 'collapse-group', size: 'medium' },
+        { id: 'collapse-b', name: 'B', position: 1, groupId: 'collapse-group', size: 'medium' }
+    ];
+    app.activityLayouts = new Map([
+        ['collapse-a', { activityId: 'collapse-a', x: 16, y: 8, width: 200, height: 120 }],
+        ['collapse-b', { activityId: 'collapse-b', x: 280, y: 160, width: 220, height: 140 }]
+    ]);
+    app.groups = [group];
+    const runningEntry = { id: 'running-entry', activityId: 'collapse-a', startTimestamp: 1, endTimestamp: null, syncStatus: 'unsynced' };
+    app.timeEntries = [runningEntry];
+    app.activeActivityId = 'collapse-a';
+    app.renderMain();
+    const leftBefore = buttons.find(button => button.dataset.activityId === 'collapse-a').style.left;
+    const storedBefore = { ...app.activityLayouts.get('collapse-a') };
+
+    await app.toggleGroupCollapsed('collapse-group');
+    assert.equal(group.collapsed, true, 'collapse state flips');
+    assert.equal(storageData.groups[0].collapsed, true, 'collapse state is persisted');
+    assert.equal(containers[0].classList.contains('is-collapsed'), true);
+    assert.equal(buttons.length, 0, 'collapsed members are not rendered');
+    assert.equal(app.activeActivityId, 'collapse-a', 'the running timer is untouched');
+    assert.equal(app.timeEntries[0], runningEntry, 'activity history is untouched');
+    assert.equal(app.activeTimerEntry()?.id, 'running-entry', 'the running entry is still active');
+
+    await app.toggleGroupCollapsed('collapse-group');
+    assert.equal(group.collapsed, false);
+    assert.equal(storageData.groups[0].collapsed, false);
+    assert.equal(buttons.length, 2, 'expanding restores member rendering');
+    assert.equal(buttons.find(button => button.dataset.activityId === 'collapse-a').style.left, leftBefore, 'member positions restore exactly');
+    assert.deepEqual({ ...app.activityLayouts.get('collapse-a') }, storedBefore, 'relative layouts are preserved');
+    assert.equal(group.x, 144, 'group position is unchanged');
+});
+
+test('collapse all and expand all update every group without touching members or timers', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, buttons, groupToggleAllBtn, storageData } = harness;
+    app.activities = [
+        { id: 'all-a', name: 'A', position: 0, groupId: 'all-one', size: 'medium' },
+        { id: 'all-b', name: 'B', position: 1, groupId: 'all-one', size: 'medium' },
+        { id: 'all-c', name: 'C', position: 2, groupId: 'all-two', size: 'medium' }
+    ];
+    app.activityLayouts = new Map([
+        ['all-a', { activityId: 'all-a', x: 16, y: 8, width: 200, height: 120 }],
+        ['all-b', { activityId: 'all-b', x: 280, y: 160, width: 220, height: 140 }],
+        ['all-c', { activityId: 'all-c', x: 16, y: 8, width: 200, height: 120 }]
+    ]);
+    app.groups = [
+        { id: 'all-one', name: 'One', x: 144, y: 96, collapsed: false },
+        { id: 'all-two', name: 'Two', x: 800, y: 96, collapsed: false }
+    ];
+    app.activeActivityId = 'all-b';
+    app.timeEntries = [{ id: 'all-running', activityId: 'all-b', startTimestamp: 1, endTimestamp: null, syncStatus: 'unsynced' }];
+    app.renderMain();
+    const layoutSnapshot = JSON.stringify([...app.activityLayouts.entries()]);
+    const membershipSnapshot = JSON.stringify(app.activities.map(activity => activity.groupId));
+
+    await app.collapseAllGroups();
+    assert.equal(app.groups.every(group => group.collapsed), true);
+    assert.equal(storageData.groups.every(group => group.collapsed), true, 'collapse all persists');
+    assert.equal(buttons.length, 0, 'all members are hidden');
+    assert.equal(groupToggleAllBtn.hidden, false);
+    assert.equal(groupToggleAllBtn.dataset.action, 'expand');
+    assert.equal(app.activeActivityId, 'all-b', 'running timers survive collapse all');
+
+    await app.expandAllGroups();
+    assert.equal(app.groups.every(group => !group.collapsed), true);
+    assert.equal(storageData.groups.every(group => !group.collapsed), true, 'expand all persists');
+    assert.equal(buttons.length, 3, 'all members are visible again');
+    assert.equal(groupToggleAllBtn.dataset.action, 'collapse');
+    assert.equal(JSON.stringify([...app.activityLayouts.entries()]), layoutSnapshot, 'positions are untouched');
+    assert.equal(JSON.stringify(app.activities.map(activity => activity.groupId)), membershipSnapshot, 'membership is untouched');
+
+    app.groups = [];
+    assert.equal(await app.collapseAllGroups(), false, 'collapse all is safe with zero groups');
+    assert.equal(await app.expandAllGroups(), false, 'expand all is safe with zero groups');
+});
+
+test('duplicating a group copies members with fresh ids, snapped offset, and no runtime state', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, storageData } = harness;
+    const original = { id: 'dup-group', name: 'Crew', x: 150, y: 100, collapsed: false };
+    const memberA = {
+        id: 'dup-a', name: 'A', color: '#E74C3C', shape: 'circle', size: 'medium', position: 0,
+        groupId: 'dup-group', customerId: 7, serviceId: 9, customerName: 'ACME', serviceName: 'Paint'
+    };
+    const memberB = {
+        id: 'dup-b', name: 'B', color: '#3498DB', shape: 'square', size: 'large', position: 1,
+        groupId: 'dup-group', customerId: null, serviceId: null, customerName: '', serviceName: ''
+    };
+    app.activities = [memberA, memberB];
+    app.groups = [original];
+    app.activityLayouts = new Map([
+        ['dup-a', { activityId: 'dup-a', x: 16, y: 8, width: 200, height: 120 }],
+        ['dup-b', { activityId: 'dup-b', x: 280, y: 160, width: 220, height: 140 }]
+    ]);
+    const runningEntry = { id: 'dup-running', activityId: 'dup-a', startTimestamp: 1, endTimestamp: null, syncStatus: 'unsynced' };
+    app.timeEntries = [runningEntry];
+    app.activeActivityId = 'dup-a';
+    app.renderMain();
+
+    const duplicate = await app.duplicateGroup('dup-group');
+    assert.notEqual(duplicate.id, original.id, 'the duplicate gets a unique group id');
+    assert.equal(duplicate.name, 'Crew (copy)');
+    assert.equal(duplicate.x, 192, 'the duplicate offset snaps to the existing grid');
+    assert.equal(duplicate.y, 144, 'the duplicate offset snaps to the existing grid');
+    assert.equal(duplicate.collapsed, false);
+    assert.equal(app.groups.length, 2);
+    assert.equal(original.x, 150, 'the original group position is unchanged');
+    assert.equal(original.name, 'Crew');
+    assert.equal(memberA.groupId, 'dup-group', 'original membership is unchanged');
+
+    const copies = app.activities.filter(activity => activity.groupId === duplicate.id);
+    assert.equal(copies.length, 2, 'both members are duplicated');
+    assert.equal(new Set(copies.map(activity => activity.id)).size, 2, 'copied activities get fresh ids');
+    const copyA = copies.find(activity => activity.name === 'A');
+    assert.equal(copyA.color, '#E74C3C', 'canvas properties are preserved');
+    assert.equal(copyA.shape, 'circle');
+    assert.equal(copyA.size, 'medium');
+    assert.equal(copyA.customerId, 7, 'customer assignment is preserved');
+    assert.equal(copyA.serviceId, 9, 'service assignment is preserved');
+    assert.equal(app.activityLayouts.get(copyA.id).x, 16, 'group-relative positions are preserved');
+    assert.equal(app.activityLayouts.get(copyA.id).y, 8);
+    assert.equal(app.activeActivityId, 'dup-a', 'runtime state is not copied');
+    assert.equal(app.timeEntries.length, 1, 'time entries are not copied');
+    assert.equal(app.timeEntries[0], runningEntry);
+    assert.ok(storageData.groups.some(group => group.id === duplicate.id), 'the duplicate group is persisted');
+    assert.ok(storageData.activities.some(activity => activity.id === copyA.id), 'copied activities are persisted');
+    assert.ok(storageData.layout.some(layout => layout.activityId === copyA.id), 'copied layouts are persisted');
+});
+
+test('group dragging coexists with activity dragging and canvas panning', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, containers, buttons, viewport, pointer } = harness;
+    const group = { id: 'mix-group', name: 'Crew', x: 144, y: 96, collapsed: false };
+    app.activities = [
+        { id: 'mix-a', name: 'A', position: 0, groupId: 'mix-group', size: 'medium' },
+        { id: 'mix-free', name: 'Free', position: 1, size: 'medium' }
+    ];
+    app.activityLayouts = new Map([
+        ['mix-a', { activityId: 'mix-a', x: 16, y: 8, width: 200, height: 120 }],
+        ['mix-free', { activityId: 'mix-free', x: 900, y: 700, width: 200, height: 120 }]
+    ]);
+    app.groups = [group];
+    app.renderMain();
+
+    const title = containers[0].children[0];
+    pointer('pointerdown', title, 10, 10);
+    pointer('pointermove', title, 42, 26);
+    pointer('pointerup', title, 42, 26);
+    assert.equal(app.canvasPan.x, 0, 'group dragging does not pan');
+    assert.equal(app.canvasPan.y, 0);
+    const groupPosition = { x: group.x, y: group.y };
+
+    const memberButton = buttons.find(button => button.dataset.activityId === 'mix-a');
+    pointer('pointerdown', memberButton, 0, 0);
+    assert.equal(app.canvasGesture.mode, 'move', 'activity dragging still wins on activity buttons');
+    pointer('pointermove', memberButton, 30, 40);
+    pointer('pointerup', memberButton, 30, 40);
+    assert.equal(group.x, groupPosition.x, 'activity dragging never moves the group');
+    assert.equal(group.y, groupPosition.y);
+    assert.notEqual(app.activityLayouts.get('mix-a').x, 16, 'the member keeps its new relative position');
+
+    pointer('pointerdown', viewport, 500, 500);
+    pointer('pointermove', viewport, 540, 530);
+    assert.deepEqual({ ...app.canvasPan }, { x: 40, y: 30 }, 'canvas panning still works');
+    pointer('pointerup', viewport, 540, 530);
+    assert.equal(group.x, groupPosition.x, 'panning never moves groups');
 });
 
 test('automatic snapshot failures are observable but do not fail saved user data', async () => {

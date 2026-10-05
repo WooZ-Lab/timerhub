@@ -52,6 +52,8 @@
         </div>
 
         <button id="addActivityBtn" class="add-button" aria-label="Add new activity" data-i18n-aria-label="addActivity">+</button>
+        <button id="createGroupBtn" class="add-button group-add-button" aria-label="Create group from selection" data-i18n-aria-label="createGroupFromSelection" hidden>Group</button>
+        <button id="groupToggleAllBtn" class="add-button group-toggle-all-button" aria-label="Collapse all groups" data-i18n-aria-label="collapseAllGroups" hidden>Collapse all</button>
 
         <!-- Day Review screen -->
         <div id="reviewScreen" class="screen">
@@ -500,6 +502,28 @@
                 <div class="modal-footer">
                     <button id="syncConfirmCancelBtn" class="btn-secondary" data-i18n="cancel">Cancel</button>
                     <button id="syncConfirmSubmitBtn" class="btn-primary-green" data-i18n="confirmDayBtn">Confirm Day for Clockodo</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: Create Group from selection -->
+        <div id="groupModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="groupModalTitle">
+            <div class="modal-content modal-small">
+                <div class="modal-header">
+                    <h3 id="groupModalTitle" data-i18n="createGroup">Create Group</h3>
+                    <button id="groupModalCloseBtn" class="modal-close" aria-label="Close" data-i18n-aria-label="close"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+                </div>
+
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="groupNameInput" data-i18n="groupName">Group name</label>
+                        <input type="text" id="groupNameInput" class="form-input" placeholder="e.g., Site A" data-i18n-placeholder="groupNamePlaceholder">
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button id="groupModalCancelBtn" class="btn-secondary" data-i18n="cancel">Cancel</button>
+                    <button id="groupModalSaveBtn" class="btn-primary" data-i18n="createGroup">Create Group</button>
                 </div>
             </div>
         </div>
