@@ -2715,3 +2715,51 @@ test('a partially synced day keeps the normal flow without a resend prompt', asy
     assert.equal(dayApp.syncResendMode, false);
     assert.deepEqual(JSON.parse(JSON.stringify(dayApp.confirmedSyncEntries.map(entry => entry.id))), ["partial-unsynced"]);
 });
+
+test('editing an activity scrolls both picker rows to center the selected items', () => {
+    const { app, document } = createTestApp();
+    const selectedColor = { offsetLeft: 400, offsetWidth: 48 };
+    const selectedShape = { offsetLeft: 100, offsetWidth: 48 };
+    const colorPicker = { clientWidth: 200, scrollLeft: 0, querySelector: () => selectedColor };
+    const shapePicker = { clientWidth: 200, scrollLeft: 0, querySelector: () => selectedShape };
+    const original = document.getElementById.bind(document);
+    document.getElementById = id => id === 'colorPicker'
+        ? colorPicker
+        : id === 'shapePicker' ? shapePicker : original(id);
+    app.revealActivityPickerSelections();
+    document.getElementById = original;
+
+    assert.equal(colorPicker.scrollLeft, 400 - (200 - 48) / 2);
+    assert.equal(shapePicker.scrollLeft, 100 - (200 - 48) / 2);
+});
+
+test('opening the activity editor for an existing activity reveals its selections', () => {
+    const { app, document } = createTestApp();
+    app.activities = [{ id: 'act-edit', name: 'Existing', color: '#FFFFFF', shape: 'diamond', size: 'large' }];
+    const colorPicker = { clientWidth: 200, scrollLeft: 0, querySelector: () => ({ offsetLeft: 300, offsetWidth: 48 }) };
+    const shapePicker = { clientWidth: 200, scrollLeft: 0, querySelector: () => ({ offsetLeft: 150, offsetWidth: 48 }) };
+    const original = document.getElementById.bind(document);
+    document.getElementById = id => id === 'colorPicker'
+        ? colorPicker
+        : id === 'shapePicker' ? shapePicker : original(id);
+    app.showActivityModal('act-edit');
+    document.getElementById = original;
+
+    assert.equal(colorPicker.scrollLeft, 300 - (200 - 48) / 2);
+    assert.equal(shapePicker.scrollLeft, 150 - (200 - 48) / 2);
+});
+
+test('creating a new activity does not auto-scroll the picker rows', () => {
+    const { app, document } = createTestApp();
+    const colorPicker = { clientWidth: 200, scrollLeft: 0, querySelector: () => ({ offsetLeft: 300, offsetWidth: 48 }) };
+    const shapePicker = { clientWidth: 200, scrollLeft: 0, querySelector: () => ({ offsetLeft: 150, offsetWidth: 48 }) };
+    const original = document.getElementById.bind(document);
+    document.getElementById = id => id === 'colorPicker'
+        ? colorPicker
+        : id === 'shapePicker' ? shapePicker : original(id);
+    app.showActivityModal();
+    document.getElementById = original;
+
+    assert.equal(colorPicker.scrollLeft, 0);
+    assert.equal(shapePicker.scrollLeft, 0);
+});

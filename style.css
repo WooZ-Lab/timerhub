@@ -665,14 +665,31 @@ button:focus-visible,
     gap: 8px;
 }
 
+.activity-name-input {
+    min-height: var(--control-height);
+    font-size: 16px;
+}
+
 .color-picker {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    display: flex;
+    flex-wrap: nowrap;
     gap: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 6px 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+
+.color-picker::-webkit-scrollbar {
+    display: none;
 }
 
 .color-option {
-    aspect-ratio: 1;
+    flex: 0 0 var(--touch-target);
+    width: var(--touch-target);
+    height: var(--touch-target);
+    aspect-ratio: auto;
     border: 3px solid transparent;
     border-radius: 8px;
     cursor: pointer;
@@ -712,13 +729,25 @@ button:focus-visible,
 }
 
 .shape-picker {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    display: flex;
+    flex-wrap: nowrap;
     gap: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 6px 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+
+.shape-picker::-webkit-scrollbar {
+    display: none;
 }
 
 .shape-option {
-    aspect-ratio: 1;
+    flex: 0 0 var(--touch-target);
+    width: var(--touch-target);
+    height: var(--touch-target);
+    aspect-ratio: auto;
     border: 2px solid var(--border-color);
     background-color: var(--bg-secondary);
     border-radius: 4px;

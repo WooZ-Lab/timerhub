@@ -3773,6 +3773,23 @@ class TimerHubApp {
 
         modal.classList.add('active');
         document.getElementById('activityName').focus();
+        if (activityId) this.revealActivityPickerSelections();
+    }
+
+    revealActivityPickerSelections() {
+        const reveal = pickerId => {
+            const picker = document.getElementById(pickerId);
+            const selected = picker?.querySelector?.('.selected');
+            if (!picker || !selected) return;
+            const itemLeft = Number(selected.offsetLeft);
+            const itemWidth = Number(selected.offsetWidth) || Number(selected.clientWidth);
+            const viewWidth = Number(picker.clientWidth);
+            if (!Number.isFinite(itemLeft) || !Number.isFinite(itemWidth) ||
+                !Number.isFinite(viewWidth) || viewWidth <= 0) return;
+            picker.scrollLeft = Math.max(0, itemLeft - (viewWidth - itemWidth) / 2);
+        };
+        reveal('colorPicker');
+        reveal('shapePicker');
     }
 
     closeActivityModal() {

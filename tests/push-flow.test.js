@@ -1178,3 +1178,48 @@ test('Clockodo Worker forwards customer service assignments without leaking othe
     });
     assert.equal(text.includes('private'), false);
 });
+
+test('activity color and shape selectors render as single horizontal scrollable rows', () => {
+    const colorRule = styleSource.match(/\.color-picker\s*\{([^}]*)\}/s)?.[1] || '';
+    assert.match(colorRule, /display:\s*flex/);
+    assert.match(colorRule, /flex-wrap:\s*nowrap/);
+    assert.match(colorRule, /overflow-x:\s*auto/);
+    assert.equal(/grid-template-columns/.test(colorRule), false);
+
+    const shapeRule = styleSource.match(/\.shape-picker\s*\{([^}]*)\}/s)?.[1] || '';
+    assert.match(shapeRule, /display:\s*flex/);
+    assert.match(shapeRule, /flex-wrap:\s*nowrap/);
+    assert.match(shapeRule, /overflow-x:\s*auto/);
+    assert.equal(/grid-template-columns/.test(shapeRule), false);
+
+    const nameRule = styleSource.match(/\.activity-name-input\s*\{([^}]*)\}/s)?.[1] || '';
+    assert.match(nameRule, /min-height/);
+    assert.match(nameRule, /font-size:\s*16px/);
+});
+
+test('activity name, color, and shape selections persist when saving', async () => {
+    const browser = makeBrowserHarness(makeBackend());
+    const saved = [];
+    const colorOption = { style: { backgroundColor: 'rgb(255, 255, 255)' } };
+    const shapeOption = { dataset: { shape: 'diamond' } };
+    const sizeOption = { dataset: { size: 'large' } };
+    const nodes = {
+        activityName: { value: 'Diamond activity' },
+        activityModal: { classList: { remove() {} } }
+    };
+    browser.document.getElementById = id => nodes[id] || null;
+    browser.document.querySelector = selector => ({
+        '.color-option.selected': colorOption,
+        '.shape-option.selected': shapeOption,
+        '.size-btn.selected': sizeOption
+    })[selector] || null;
+    browser.app.storage = { saveActivity: async activity => saved.push({ ...activity }) };
+    browser.app.generateId = () => 'shape-activity';
+    browser.app.renderMain = () => {};
+
+    await browser.app.saveActivity();
+    assert.equal(saved.at(-1).name, 'Diamond activity');
+    assert.equal(saved.at(-1).color, 'rgb(255, 255, 255)');
+    assert.equal(saved.at(-1).shape, 'diamond');
+    assert.equal(saved.at(-1).size, 'large');
+});
