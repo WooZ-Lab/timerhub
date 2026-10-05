@@ -338,6 +338,11 @@ const extendedTranslations = {
         syncPartialFailureToast: '{success} entries synced, {failed} failed. Failed entries can be retried.',
         syncFailedToast: 'Clockodo synchronization failed: {error}',
         retry: 'Retry',
+        retryDiagnosticTitle: 'Retry failed',
+        retryDiagnosticError: 'Error',
+        retryDiagnosticStatus: 'Status',
+        retryDiagnosticDetails: 'Details',
+        retryDiagnosticUnavailable: 'The batch is not in a retryable state.',
     },
     de: {
         activityFilter: 'Aktivitätsfilter',
@@ -493,6 +498,11 @@ const extendedTranslations = {
         syncPartialFailureToast: '{success} Einträge synchronisiert, {failed} fehlgeschlagen. Fehlgeschlagene können wiederholt werden.',
         syncFailedToast: 'Clockodo-Synchronisation fehlgeschlagen: {error}',
         retry: 'Wiederholen',
+        retryDiagnosticTitle: 'Wiederholung fehlgeschlagen',
+        retryDiagnosticError: 'Fehler',
+        retryDiagnosticStatus: 'Status',
+        retryDiagnosticDetails: 'Details',
+        retryDiagnosticUnavailable: 'Der Stapel kann derzeit nicht wiederholt werden.',
     },
     ru: {
         activityFilter: 'Фильтр занятий',
@@ -648,6 +658,11 @@ const extendedTranslations = {
         syncPartialFailureToast: 'Синхронизировано: {success}, с ошибкой: {failed}. Записи с ошибкой можно отправить повторно.',
         syncFailedToast: 'Ошибка синхронизации с Clockodo: {error}',
         retry: 'Повторить',
+        retryDiagnosticTitle: 'Повторная попытка не удалась',
+        retryDiagnosticError: 'Ошибка',
+        retryDiagnosticStatus: 'Статус',
+        retryDiagnosticDetails: 'Подробности',
+        retryDiagnosticUnavailable: 'Пакет сейчас нельзя повторить.',
     }
 };
 for (const language of Object.keys(translations)) {
@@ -1051,6 +1066,7 @@ class TimerHubApp {
         this.suppressActivityClick = null;
         this.editingActivityId = null;
         this.editingEntryId = null;
+        this.retryDiagnostic = null;
         this.deletedEntry = null;
         this.uiUpdateInterval = null;
         this.notificationTimeout = null;
@@ -2134,12 +2150,15 @@ class TimerHubApp {
             const batch = entry.syncBatchId ? this.syncBatches.find(item => item.id === entry.syncBatchId) : null;
             const activityLabel = activity?.name || entry.activityNameSnapshot || this.t('activity');
             const retryButton = entry.syncStatus === SYNC_STATUS.FAILED && batch
-                ? `<button class="review-action-btn review-retry-entry" type="button" data-batch-id="${this.escapeHtml(batch.id)}" aria-label="${this.escapeHtml(`${this.t('retry')}: ${activityLabel}`)}"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 7v5h-5M4.8 9a7.5 7.5 0 0 1 12.7-2L20 12M4 17v-5h5m10.2 3a7.5 7.5 0 0 1-12.7 2L4 12"/></svg>${this.t('retry')}</button>`
+                ? `<button class="review-action-btn review-retry-entry" type="button" data-batch-id="${this.escapeHtml(batch.id)}" data-entry-id="${this.escapeHtml(entry.id)}" aria-label="${this.escapeHtml(`${this.t('retry')}: ${activityLabel}`)}"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 7v5h-5M4.8 9a7.5 7.5 0 0 1 12.7-2L20 12M4 17v-5h5m10.2 3a7.5 7.5 0 0 1-12.7 2L4 12"/></svg>${this.t('retry')}</button>`
                 : '';
             const unknownNotice = entry.syncStatus === SYNC_STATUS.UNKNOWN ? `<small>${this.t('syncOutcomeUnknown')}</small>` : '';
             const localOnlyNotice = entry.syncStatus === SYNC_STATUS.LOCAL_ONLY ? `<small>${this.t('syncLocalOnlyNotice')}</small>` : '';
             const errorNotice = entry.clockodoError && entry.syncStatus === SYNC_STATUS.FAILED
                 ? `<small>${this.escapeHtml(this.clockodoErrorMessage({ code: entry.clockodoError, details: entry.clockodoErrorDetails }))}</small>`
+                : '';
+            const retryDiagnostic = this.retryDiagnostic && !this.retryDiagnostic.pending && String(this.retryDiagnostic.entryId) === String(entry.id)
+                ? this.renderRetryDiagnostic(this.retryDiagnostic)
                 : '';
             return `${gap}<article class="review-entry-card${issues.length ? ' suspicious-entry' : ''}" data-entry-id="${this.escapeHtml(entry.id)}">
                 <div class="review-entry-header">
@@ -2147,11 +2166,11 @@ class TimerHubApp {
                 <span class="review-entry-duration">${this.escapeHtml(duration)}</span></div>
                 <div class="review-entry-title"><span class="review-activity-dot" style="background-color:${this.escapeHtml(activity?.color || '#27AE60')}"></span>${this.escapeHtml(activityLabel)}</div>
                 ${meta ? `<div class="review-entry-tags">${entry.project ? `<span class="review-tag">${this.escapeHtml(entry.project)}</span>` : ''}${entry.service ? `<span class="review-tag">${this.escapeHtml(entry.service)}</span>` : ''}</div>` : ''}${notes}${issueText ? `<small>${this.escapeHtml(issueText)}</small>` : ''}${errorNotice}${unknownNotice}${localOnlyNotice}
-                <div class="review-entry-footer"><span class="sync-badge ${this.escapeHtml(entry.syncStatus)}">${this.escapeHtml(status)}</span><div class="review-entry-actions"><button class="review-action-btn review-edit-entry" type="button" data-entry-id="${this.escapeHtml(entry.id)}" aria-label="${this.escapeHtml(`${this.t('edit')}: ${activityLabel}`)}" ${entry.syncStatus === SYNC_STATUS.CONFIRMED || entry.syncStatus === SYNC_STATUS.SYNCING ? `disabled title="${this.escapeHtml(this.t('confirmedEntryLocked'))}"` : ''}><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m4 16.5-.8 4.3 4.3-.8L19 8.5 15.5 5 4 16.5Z"/><path d="m13.5 7 3.5 3.5"/></svg>${this.t('edit')}</button>${retryButton}</div></div>
+                <div class="review-entry-footer"><span class="sync-badge ${this.escapeHtml(entry.syncStatus)}">${this.escapeHtml(status)}</span><div class="review-entry-actions"><button class="review-action-btn review-edit-entry" type="button" data-entry-id="${this.escapeHtml(entry.id)}" aria-label="${this.escapeHtml(`${this.t('edit')}: ${activityLabel}`)}" ${entry.syncStatus === SYNC_STATUS.CONFIRMED || entry.syncStatus === SYNC_STATUS.SYNCING ? `disabled title="${this.escapeHtml(this.t('confirmedEntryLocked'))}"` : ''}><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m4 16.5-.8 4.3 4.3-.8L19 8.5 15.5 5 4 16.5Z"/><path d="m13.5 7 3.5 3.5"/></svg>${this.t('edit')}</button>${retryButton}</div></div>${retryDiagnostic}
             </article>`;
         }).join('');
         list.querySelectorAll('.review-edit-entry').forEach(button => button.addEventListener('click', () => this.showEntryEditModal(button.dataset.entryId)));
-        list.querySelectorAll('.review-retry-entry').forEach(button => button.addEventListener('click', () => this.retrySyncBatch(button.dataset.batchId)));
+        list.querySelectorAll('.review-retry-entry').forEach(button => button.addEventListener('click', () => this.retryFailedEntry(button.dataset.batchId, button.dataset.entryId)));
     }
 
     showSyncConfirmationModal() {
@@ -2388,6 +2407,82 @@ class TimerHubApp {
 
     retrySyncBatch(batchId) {
         return this.syncConfirmedBatch(batchId);
+    }
+
+    async retryFailedEntry(batchId, entryId) {
+        this.retryDiagnostic = { entryId: String(entryId), pending: true };
+        this.renderReview();
+        let thrown = null;
+        let result = null;
+        try {
+            result = await this.retrySyncBatch(batchId);
+        } catch (error) {
+            thrown = error;
+        }
+        const batch = this.syncBatches.find(item => item.id === batchId) || null;
+        const entries = Array.isArray(batch?.entries) ? batch.entries : [];
+        const pressed = entries.find(entry => String(entry.id) === String(entryId));
+        const failedEntry = pressed && pressed.syncStatus === SYNC_STATUS.FAILED
+            ? pressed
+            : entries.find(entry => entry.syncStatus === SYNC_STATUS.FAILED) || null;
+        if (failedEntry || thrown || result === false) {
+            this.retryDiagnostic = this.buildRetryDiagnostic({
+                entryId: failedEntry?.id ?? entryId,
+                entry: failedEntry,
+                error: thrown,
+                batchState: batch?.state ?? null,
+                retryResult: result
+            });
+        } else {
+            this.retryDiagnostic = null;
+        }
+        this.renderReview();
+        return result;
+    }
+
+    buildRetryDiagnostic({ entryId, entry, error, batchState, retryResult }) {
+        const details = this.normalizeClockodoErrorDetails(entry?.clockodoErrorDetails)
+            || this.normalizeClockodoErrorDetails(error?.details);
+        const code = this.sanitizeRetryText(error?.code || entry?.clockodoError || '');
+        const statusValue = Number(details?.status ?? error?.status);
+        const status = Number.isSafeInteger(statusValue) && statusValue > 0 ? statusValue : null;
+        let message = this.sanitizeRetryText(details?.message || '');
+        if (!message && error?.message && !error?.code) message = this.sanitizeRetryText(error.message);
+        if (!message && code) message = this.sanitizeRetryText(this.clockodoErrorMessage({ code, details }));
+        if (!message && retryResult === false) {
+            message = this.sanitizeRetryText(`${this.t('retryDiagnosticUnavailable')}${batchState ? ` [${batchState}]` : ''}`);
+        }
+        const detailParts = [];
+        if (details?.code && String(details.code) !== code) detailParts.push(String(details.code));
+        if (details?.path) detailParts.push(`path: ${details.path}`);
+        if (Array.isArray(details?.fields) && details.fields.length) detailParts.push(`fields: ${details.fields.join(', ')}`);
+        if (batchState) detailParts.push(`batch: ${batchState}`);
+        return {
+            entryId: String(entryId),
+            code: code || null,
+            status,
+            message: message || null,
+            details: detailParts.length ? this.sanitizeRetryText(detailParts.join(' · ')) : null
+        };
+    }
+
+    sanitizeRetryText(value) {
+        return String(value ?? '')
+            .replace(/[\u0000-\u001f\u007f]+/g, ' ')
+            .replace(/\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]+/gi, '$1 [redacted]')
+            .replace(/((?:api[_-]?key|token|secret|password|authorization|client[_-]?id)\s*[=:]\s*)[^\s,;]+/gi, '$1[redacted]')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 300);
+    }
+
+    renderRetryDiagnostic(diagnostic) {
+        const lines = [];
+        const errorText = [diagnostic.code, diagnostic.message].filter(Boolean).join(' · ');
+        if (errorText) lines.push(`${this.t('retryDiagnosticError')}: ${errorText}`);
+        if (diagnostic.status) lines.push(`${this.t('retryDiagnosticStatus')}: ${diagnostic.status}`);
+        if (diagnostic.details) lines.push(`${this.t('retryDiagnosticDetails')}: ${diagnostic.details}`);
+        return `<div class="warning retry-diagnostic" role="alert" style="display:block;margin-top:8px;"><strong>${this.escapeHtml(this.t('retryDiagnosticTitle'))}</strong>${lines.map(line => `<small style="display:block;">${this.escapeHtml(line)}</small>`).join('')}</div>`;
     }
 
     renderAll() {

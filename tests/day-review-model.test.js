@@ -2383,3 +2383,99 @@ test('overlap validation does not apply five-minute rounding', async () => {
     assert.equal(storageData.timeEntries.find(entry => entry.id === 'entry-a').endTimestamp, t(12, 32, 0));
     assert.equal(storageData.timeEntries.find(entry => entry.id === 'entry-b').startTimestamp, t(12, 33, 0));
 });
+
+test('retry failures render a visible diagnostic with the real error details', async () => {
+    const { app, document } = createTestApp();
+    const start = new Date(2026, 8, 28, 8, 0).getTime();
+    await app.addEntry({ id: 'diag-entry', activityId: 'act-1', activityNameSnapshot: 'Painting', startTimestamp: start, endTimestamp: start + 60000 });
+    app.reviewDate = '2026-09-28';
+    app.clockodoConfigured = true;
+    app.clockodoCustomerId = '12';
+    app.clockodoServiceId = '56';
+    app.showToast = () => {};
+    app.getPushClientId = () => 'client_1234567890abcdef';
+    app.getClockodoAccessToken = () => 'a'.repeat(48);
+    app.clockodoClient = {
+        buildEntryPayload: () => ({ id: 'diag-entry' }),
+        async createEntry() {
+            const error = Object.assign(new Error('clockodo_rejected'), { code: 'clockodo_rejected', status: 422 });
+            error.details = {
+                status: 422, code: 'Validation', message: 'Service is not available for this customer.',
+                path: '/services_id', fields: ['services_id'], apiKey: 'secret-token', authorization: 'Bearer secret-token'
+            };
+            throw error;
+        }
+    };
+
+    app.showSyncConfirmationModal();
+    const batch = await app.confirmAndSyncClockodo();
+    assert.equal(batch.state, 'failed');
+
+    await app.retryFailedEntry(batch.id, 'diag-entry');
+    const html = document.getElementById('reviewEntriesList').innerHTML;
+    assert.equal(html.includes(app.t('retryDiagnosticTitle')), true);
+    assert.equal(html.includes('422'), true);
+    assert.equal(html.includes('Service is not available for this customer.'), true);
+    assert.equal(html.includes('/services_id'), true);
+    assert.equal(html.includes('secret-token'), false);
+    assert.equal(html.includes('Bearer'), false);
+});
+
+test('successful retry clears the diagnostic and keeps the existing behavior', async () => {
+    const { app, document } = createTestApp();
+    const start = new Date(2026, 8, 28, 8, 0).getTime();
+    await app.addEntry({ id: 'diag-success', activityId: 'act-1', activityNameSnapshot: 'Painting', startTimestamp: start, endTimestamp: start + 60000 });
+    app.reviewDate = '2026-09-28';
+    app.clockodoConfigured = true;
+    app.clockodoCustomerId = '12';
+    app.clockodoServiceId = '56';
+    app.showToast = () => {};
+    app.getPushClientId = () => 'client_1234567890abcdef';
+    app.getClockodoAccessToken = () => 'a'.repeat(48);
+    let attempts = 0;
+    app.clockodoClient = {
+        buildEntryPayload: () => ({ id: 'diag-success' }),
+        async createEntry() {
+            attempts += 1;
+            if (attempts === 1) {
+                const error = Object.assign(new Error('clockodo_rejected'), { code: 'clockodo_rejected', status: 422 });
+                error.details = { status: 422, message: 'Service is not available for this customer.' };
+                throw error;
+            }
+            return { created: true, entryId: 777 };
+        }
+    };
+
+    app.showSyncConfirmationModal();
+    const batch = await app.confirmAndSyncClockodo();
+    assert.equal(batch.state, 'failed');
+    await app.retryFailedEntry(batch.id, 'diag-success');
+    assert.equal(app.retryDiagnostic, null);
+    assert.equal(document.getElementById('reviewEntriesList').innerHTML.includes(app.t('retryDiagnosticTitle')), false);
+    assert.equal(app.timeEntries.find(entry => entry.id === 'diag-success').syncStatus, 'synced');
+    assert.equal(app.timeEntries.find(entry => entry.id === 'diag-success').clockodoEntryId, 777);
+});
+
+test('retrying an unavailable batch shows a diagnostic instead of failing silently', async () => {
+    const { app, document } = createTestApp();
+    const start = new Date(2026, 8, 28, 8, 0).getTime();
+    app.timeEntries = [{
+        id: 'done-entry', activityId: 'act-1', activityNameSnapshot: 'Painting',
+        startTimestamp: start, endTimestamp: start + 60000,
+        syncStatus: 'synced', syncBatchId: 'synced-batch'
+    }];
+    app.activities = [{ id: 'act-1', name: 'Painting' }];
+    app.syncBatches = [{
+        id: 'synced-batch', date: '2026-09-28', version: 1, state: 'synced',
+        entries: [{ id: 'done-entry', syncStatus: 'synced' }]
+    }];
+    app.reviewDate = '2026-09-28';
+    app.clockodoConfigured = true;
+    app.showToast = () => {};
+
+    const result = await app.retryFailedEntry('synced-batch', 'done-entry');
+    assert.equal(result, false);
+    const html = document.getElementById('reviewEntriesList').innerHTML;
+    assert.equal(html.includes(app.t('retryDiagnosticTitle')), true);
+    assert.equal(html.includes(app.t('retryDiagnosticUnavailable')), true);
+});
