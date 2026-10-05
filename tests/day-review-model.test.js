@@ -1480,7 +1480,8 @@ test('Clockodo assignment fields render saved IDs, fallbacks, and unconfigured s
     assert.equal(customerInput.value, 'Beta');
     assert.equal(serviceInput.value, 'Repair');
     assert.equal(customerInput.disabled, false);
-    assert.equal(customerInput.placeholder, 'No Clockodo assignment');
+    assert.equal(customerInput.placeholder, app.t('clockodoCustomerSelectLabel'));
+    assert.equal(serviceInput.placeholder, app.t('clockodoServiceSelectLabel'));
 
     app.openClockodoCombobox('activity', 'customer');
     assert.deepEqual(
@@ -2762,4 +2763,25 @@ test('creating a new activity does not auto-scroll the picker rows', () => {
 
     assert.equal(colorPicker.scrollLeft, 0);
     assert.equal(shapePicker.scrollLeft, 0);
+});
+
+test('Clockodo customer and service fields show descriptive placeholders when empty', () => {
+    const { app, document } = createTestApp();
+    makeCustomerServiceApp(app);
+    const ids = app.clockodoAssignmentIds('entry');
+
+    app.populateClockodoAssignmentSelects('entry');
+    assert.equal(document.getElementById(ids.customerInput).placeholder, app.t('clockodoCustomerSelectLabel'));
+    assert.equal(document.getElementById(ids.serviceInput).placeholder, app.t('clockodoServiceSelectLabel'));
+    assert.equal(document.getElementById(ids.customerInput).value, '');
+    assert.equal(document.getElementById(ids.serviceInput).value, '');
+
+    app.populateClockodoAssignmentSelects('entry', '1', '12', 'Customer A', 'Service 2');
+    assert.equal(document.getElementById(ids.customerInput).value, 'Customer A');
+    assert.equal(document.getElementById(ids.serviceInput).value, 'Service 2');
+    assert.equal(document.getElementById(ids.customerInput).placeholder, app.t('clockodoCustomerSelectLabel'));
+
+    app.clockodoReferenceStatus = 'unconfigured';
+    app.populateClockodoAssignmentSelects('entry');
+    assert.match(document.getElementById(ids.customerInput).placeholder, /not configured/);
 });

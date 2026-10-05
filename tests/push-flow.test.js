@@ -1223,3 +1223,13 @@ test('activity name, color, and shape selections persist when saving', async () 
     assert.equal(saved.at(-1).shape, 'diamond');
     assert.equal(saved.at(-1).size, 'large');
 });
+
+test('Clockodo customer and service fields use input placeholders instead of separate labels', () => {
+    for (const inputId of ['activityCustomerInput', 'activityServiceInput', 'entryEditCustomerInput', 'entryEditServiceInput']) {
+        assert.equal(htmlSource.includes(`for="${inputId}"`), false);
+    }
+    assert.match(htmlSource, /id="activityCustomerInput"[^>]*data-i18n-aria-label="clockodoCustomerSelectLabel"/);
+    assert.match(htmlSource, /id="activityServiceInput"[^>]*data-i18n-aria-label="clockodoServiceSelectLabel"/);
+    assert.match(htmlSource, /id="entryEditCustomerInput"[^>]*data-i18n-aria-label="clockodoCustomerSelectLabel"/);
+    assert.match(htmlSource, /id="entryEditServiceInput"[^>]*data-i18n-aria-label="clockodoServiceSelectLabel"/);
+});

@@ -4358,12 +4358,15 @@ class TimerHubApp {
             serviceName
         );
         const serviceCleared = this.enforceClockodoServiceForCustomer(context);
-        const placeholder = this.clockodoAssignmentPlaceholder();
-        for (const inputId of [ids.customerInput, ids.serviceInput]) {
+        const statePlaceholder = this.clockodoAssignmentPlaceholder();
+        for (const [inputId, labelKey] of [
+            [ids.customerInput, 'clockodoCustomerSelectLabel'],
+            [ids.serviceInput, 'clockodoServiceSelectLabel']
+        ]) {
             const input = document.getElementById(inputId);
             if (input) {
                 input.disabled = !ready;
-                input.placeholder = placeholder;
+                input.placeholder = ready ? this.t(labelKey) : statePlaceholder;
             }
         }
         const open = this.clockodoCombobox;
