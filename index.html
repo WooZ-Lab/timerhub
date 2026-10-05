@@ -361,12 +361,16 @@
                         <label data-i18n="clockodoAssignment">Clockodo assignment</label>
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="activityCustomerSelect" data-i18n="clockodoCustomerSelectLabel">Clockodo customer</label>
-                                <select id="activityCustomerSelect" class="form-input"></select>
+                                <label for="activityCustomerInput" data-i18n="clockodoCustomerSelectLabel">Clockodo customer</label>
+                                <input type="search" id="activityCustomerInput" class="form-input" list="activityCustomerOptions" autocomplete="off" spellcheck="false">
+                                <datalist id="activityCustomerOptions"></datalist>
+                                <input type="hidden" id="activityCustomerSelect" value="">
                             </div>
                             <div class="form-group">
-                                <label for="activityServiceSelect" data-i18n="clockodoServiceSelectLabel">Clockodo service</label>
-                                <select id="activityServiceSelect" class="form-input"></select>
+                                <label for="activityServiceInput" data-i18n="clockodoServiceSelectLabel">Clockodo service</label>
+                                <input type="search" id="activityServiceInput" class="form-input" list="activityServiceOptions" autocomplete="off" spellcheck="false">
+                                <datalist id="activityServiceOptions"></datalist>
+                                <input type="hidden" id="activityServiceSelect" value="">
                             </div>
                         </div>
                         <small id="activityClockodoHint" class="settings-help"></small>
@@ -448,12 +452,16 @@
                         <label data-i18n="clockodoAssignment">Clockodo assignment</label>
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="entryEditCustomerSelect" data-i18n="clockodoCustomerSelectLabel">Clockodo customer</label>
-                                <select id="entryEditCustomerSelect" class="form-input"></select>
+                                <label for="entryEditCustomerInput" data-i18n="clockodoCustomerSelectLabel">Clockodo customer</label>
+                                <input type="search" id="entryEditCustomerInput" class="form-input" list="entryEditCustomerOptions" autocomplete="off" spellcheck="false">
+                                <datalist id="entryEditCustomerOptions"></datalist>
+                                <input type="hidden" id="entryEditCustomerSelect" value="">
                             </div>
                             <div class="form-group">
-                                <label for="entryEditServiceSelect" data-i18n="clockodoServiceSelectLabel">Clockodo service</label>
-                                <select id="entryEditServiceSelect" class="form-input"></select>
+                                <label for="entryEditServiceInput" data-i18n="clockodoServiceSelectLabel">Clockodo service</label>
+                                <input type="search" id="entryEditServiceInput" class="form-input" list="entryEditServiceOptions" autocomplete="off" spellcheck="false">
+                                <datalist id="entryEditServiceOptions"></datalist>
+                                <input type="hidden" id="entryEditServiceSelect" value="">
                             </div>
                         </div>
                         <small id="entryEditClockodoHint" class="settings-help"></small>
