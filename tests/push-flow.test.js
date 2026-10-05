@@ -1197,6 +1197,24 @@ test('activity color and shape selectors render as single horizontal scrollable 
     assert.match(nameRule, /font-size:\s*16px/);
 });
 
+test('day review statistics keep a mobile-first grid that cannot collapse', () => {
+    const barRule = styleSource.match(/\.review-summary-bar\s*\{([^}]*)\}/s)?.[1] || '';
+    assert.match(barRule, /display:\s*grid/);
+    assert.match(barRule, /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
+    assert.match(barRule, /flex-shrink:\s*0/);
+
+    const statRule = styleSource.match(/\.review-summary-stat\s*\{([^}]*)\}/s)?.[1] || '';
+    assert.match(statRule, /min-width:\s*0/);
+    assert.equal(/white-space:\s*nowrap/.test(statRule), false);
+    assert.match(styleSource, /\.review-summary-stat\s*\{\s*min-height:\s*68px;\s*\}/);
+
+    const fullWidthRule = styleSource.match(/\.review-summary-stat:nth-child\(5\)\s*\{([^}]*)\}/s)?.[1] || '';
+    assert.match(fullWidthRule, /grid-column:\s*1\s*\/\s*-1/);
+
+    const desktopBlock = styleSource.match(/@media \(min-width: 601px\)[\s\S]*?\.review-summary-bar\s*\{([^}]*)\}/)?.[1] || '';
+    assert.match(desktopBlock, /display:\s*flex/);
+});
+
 test('activity name, color, and shape selections persist when saving', async () => {
     const browser = makeBrowserHarness(makeBackend());
     const saved = [];
