@@ -344,6 +344,8 @@ const extendedTranslations = {
         retryDiagnosticStatus: 'Status',
         retryDiagnosticDetails: 'Details',
         retryDiagnosticUnavailable: 'The batch is not in a retryable state.',
+        resendSyncNotice: 'These entries have already been synced to Clockodo. Do you really want to send them again? This can create duplicate Clockodo entries.',
+        resendSyncBtn: 'Send again',
     },
     de: {
         activityFilter: 'Aktivitätsfilter',
@@ -505,6 +507,8 @@ const extendedTranslations = {
         retryDiagnosticStatus: 'Status',
         retryDiagnosticDetails: 'Details',
         retryDiagnosticUnavailable: 'Der Stapel kann derzeit nicht wiederholt werden.',
+        resendSyncNotice: 'Diese Einträge wurden bereits mit Clockodo synchronisiert. Möchtest du sie wirklich erneut senden? Dadurch können doppelte Clockodo-Einträge entstehen.',
+        resendSyncBtn: 'Erneut senden',
     },
     ru: {
         activityFilter: 'Фильтр занятий',
@@ -666,6 +670,8 @@ const extendedTranslations = {
         retryDiagnosticStatus: 'Статус',
         retryDiagnosticDetails: 'Подробности',
         retryDiagnosticUnavailable: 'Пакет сейчас нельзя повторить.',
+        resendSyncNotice: 'Эти записи уже синхронизированы с Clockodo. Вы действительно хотите отправить их снова? Это может создать дубликаты записей Clockodo.',
+        resendSyncBtn: 'Отправить повторно',
     }
 };
 for (const language of Object.keys(translations)) {
@@ -1089,6 +1095,7 @@ class TimerHubApp {
         this.clockodoConfigVersion = 0;
         this.confirmedSyncEntries = [];
         this.syncConfirmationOpen = false;
+        this.syncResendMode = false;
         this.syncBatches = [];
         this.syncOperations = new Map();
         this.clockodoClient = window.ClockodoClient ? new window.ClockodoClient() : null;
@@ -2183,10 +2190,14 @@ class TimerHubApp {
             .includes(latestBatch.state) && latestBatch.entries.some(entry => [SYNC_STATUS.CONFIRMED, SYNC_STATUS.SYNCING, SYNC_STATUS.FAILED].includes(entry.syncStatus))
             ? latestBatch
             : null;
+        const unsynced = entries.filter(entry => [SYNC_STATUS.UNSYNCED, SYNC_STATUS.FAILED].includes(entry.syncStatus));
+        const synced = entries.filter(entry => entry.syncStatus === SYNC_STATUS.SYNCED);
+        const resend = this.clockodoConfigured && !pendingBatch && unsynced.length === 0 && synced.length > 0;
+        this.syncResendMode = resend;
         const eligible = pendingBatch
             ? pendingBatch.entries.filter(entry => [SYNC_STATUS.CONFIRMED, SYNC_STATUS.SYNCING, SYNC_STATUS.FAILED].includes(entry.syncStatus))
-            : entries.filter(entry => [SYNC_STATUS.UNSYNCED, SYNC_STATUS.FAILED].includes(entry.syncStatus));
-        const alreadySynced = entries.filter(entry => entry.syncStatus === SYNC_STATUS.SYNCED).length;
+            : (resend ? synced : unsynced);
+        const alreadySynced = synced.length;
         const invalid = eligible.some(entry => entry.endTimestamp === null || this.getEntryDuration(entry) <= 0 || this.getEntryDuration(entry) > 24 * 60 * 60 * 1000);
         const list = document.getElementById('syncConfirmEntriesList');
         const desc = document.getElementById('syncConfirmDesc');
@@ -2208,10 +2219,14 @@ class TimerHubApp {
         }).join('') || `<div class="review-empty">${this.t('noEntriesToSync')}</div>`;
         const total = eligible.reduce((sum, entry) => sum + this.getEntryDuration(entry), 0);
         summary.innerHTML = `<span>${this.t('syncSummaryTotal')}</span><strong>${this.formatDuration(total)}</strong>`;
-        notice.textContent = this.t('alreadySyncedNotice', { count: alreadySynced });
-        notice.style.display = alreadySynced ? '' : 'none';
+        notice.textContent = resend
+            ? this.t('resendSyncNotice')
+            : this.t('alreadySyncedNotice', { count: alreadySynced });
+        notice.style.display = resend || alreadySynced ? '' : 'none';
         submit.disabled = invalid || eligible.length === 0;
-        submit.textContent = this.clockodoConfigured ? this.t('confirmSyncBtn') : this.t('confirmDayBtn');
+        submit.textContent = resend
+            ? this.t('resendSyncBtn')
+            : (this.clockodoConfigured ? this.t('confirmSyncBtn') : this.t('confirmDayBtn'));
         if (invalid) {
             notice.textContent = this.t('dayReviewInvalid');
             notice.style.display = '';
@@ -2223,11 +2238,15 @@ class TimerHubApp {
         document.getElementById('syncConfirmModal')?.classList.remove('active');
         this.confirmedSyncEntries = [];
         this.syncConfirmationOpen = false;
+        this.syncResendMode = false;
     }
 
-    async confirmDayReview() {
+    async confirmDayReview({ resend = false } = {}) {
+        const statuses = resend
+            ? [SYNC_STATUS.SYNCED]
+            : [SYNC_STATUS.UNSYNCED, SYNC_STATUS.FAILED];
         const entries = this.getDayEntries(this.reviewDate)
-            .filter(entry => [SYNC_STATUS.UNSYNCED, SYNC_STATUS.FAILED].includes(entry.syncStatus));
+            .filter(entry => statuses.includes(entry.syncStatus));
         if (!entries.length) return false;
         if (entries.some(entry => entry.endTimestamp === null || entry.endTimestamp <= entry.startTimestamp || entry.endTimestamp - entry.startTimestamp > 24 * 60 * 60 * 1000)) {
             this.showToast(this.t('dayReviewInvalid'));
@@ -2241,7 +2260,10 @@ class TimerHubApp {
         const frozenEntries = entries.map(entry => ({
             ...entry,
             syncStatus: SYNC_STATUS.CONFIRMED,
-            syncBatchId: batchId
+            syncBatchId: batchId,
+            clockodoResend: resend,
+            clockodoIdempotencyKey: resend ? `timerhub-entry:${entry.id}:resend:${batchId}` : null,
+            clockodoPayload: null
         }));
         const batch = {
             id: batchId,
@@ -2264,11 +2286,15 @@ class TimerHubApp {
 
     async confirmAndSyncClockodo() {
         if (!this.syncConfirmationOpen) return false;
-        let batch = this.syncBatches.filter(item => item.date === this.reviewDate)
-            .sort((a, b) => b.version - a.version)
-            .find(item => [SYNC_STATUS.CONFIRMED, SYNC_STATUS.FAILED, SYNC_STATUS.SYNCING, 'partial'].includes(item.state) &&
-                item.entries.some(entry => [SYNC_STATUS.CONFIRMED, SYNC_STATUS.FAILED, SYNC_STATUS.SYNCING].includes(entry.syncStatus)));
-        if (!batch) batch = await this.confirmDayReview();
+        const resend = this.syncResendMode === true;
+        let batch = null;
+        if (!resend) {
+            batch = this.syncBatches.filter(item => item.date === this.reviewDate)
+                .sort((a, b) => b.version - a.version)
+                .find(item => [SYNC_STATUS.CONFIRMED, SYNC_STATUS.FAILED, SYNC_STATUS.SYNCING, 'partial'].includes(item.state) &&
+                    item.entries.some(entry => [SYNC_STATUS.CONFIRMED, SYNC_STATUS.FAILED, SYNC_STATUS.SYNCING].includes(entry.syncStatus)));
+        }
+        if (!batch) batch = await this.confirmDayReview({ resend });
         else this.closeSyncConfirmationModal();
         if (!batch) return false;
         if (!this.clockodoConfigured) {
@@ -2320,7 +2346,7 @@ class TimerHubApp {
 
         for (const snapshot of pending) {
             const entry = batch.entries.find(item => item.id === snapshot.id);
-            if (entry.clockodoEntryId) {
+            if (entry.clockodoEntryId && !entry.clockodoResend) {
                 entry.syncStatus = SYNC_STATUS.LOCAL_ONLY;
                 entry.clockodoError = null;
                 entry.clockodoErrorDetails = null;
@@ -2357,7 +2383,7 @@ class TimerHubApp {
             try {
                 // Use the local entry identity across batch versions. A restored older backup
                 // must not create a second Clockodo record for an entry already accepted.
-                const idempotencyKey = `timerhub-entry:${entry.id}`;
+                const idempotencyKey = entry.clockodoIdempotencyKey || `timerhub-entry:${entry.id}`;
                 const result = await this.clockodoClient.createEntry(clientId, accessToken, entry.clockodoPayload, idempotencyKey);
                 if (result.created !== true || !Number.isSafeInteger(Number(result.entryId)) || Number(result.entryId) <= 0) {
                     entry.syncStatus = SYNC_STATUS.UNKNOWN;

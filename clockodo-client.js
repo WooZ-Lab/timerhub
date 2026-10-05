@@ -198,15 +198,7 @@
             if (!Number.isFinite(entry.startTimestamp) || !Number.isFinite(entry.endTimestamp) || entry.endTimestamp <= entry.startTimestamp) {
                 throw new ClockodoClientError('invalid_time_entry');
             }
-            const description = [
-                entry.activityNameSnapshot,
-                entry.project && !/^\d+$/.test(String(entry.project)) ? entry.project : '',
-                entry.service && !/^\d+$/.test(String(entry.service)) ? entry.service : '',
-                entry.notes
-            ]
-                .filter(value => typeof value === 'string' && value.trim())
-                .join(' · ')
-                .slice(0, 1000);
+            const notes = typeof entry.notes === 'string' ? entry.notes.trim().slice(0, 1000) : '';
             return {
                 time_since: ClockodoClient.formatTimestamp(ClockodoClient.roundUpToFiveMinutes(entry.startTimestamp)),
                 time_until: ClockodoClient.formatTimestamp(ClockodoClient.roundUpToFiveMinutes(entry.endTimestamp)),
@@ -214,7 +206,7 @@
                 services_id: serviceId,
                 ...(projectId === null ? {} : { projects_id: projectId }),
                 billable: config.billable === false ? 0 : 1,
-                text: description || null
+                text: notes || null
             };
         }
     }

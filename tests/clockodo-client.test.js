@@ -27,7 +27,7 @@ test('Clockodo client builds the documented v2 entry payload', () => {
         services_id: 55,
         projects_id: 321,
         billable: 1,
-        text: 'Painting · First coat'
+        text: 'First coat'
     });
     assert.throws(() => Client.buildEntryPayload({ startTimestamp: 1, endTimestamp: 2 }, {}), error => error.code === 'missing_clockodo_assignment');
 });
@@ -258,4 +258,28 @@ test('Clockodo client keeps customer service assignments and drops invalid IDs',
             { id: 2, name: 'Customer B', active: true }
         ]
     });
+});
+
+test('Clockodo entry text is notes only and never the activity or project name', () => {
+    const { Client } = makeClient(async () => new Response('{}'));
+    const base = {
+        startTimestamp: Date.parse('2026-10-05T12:38:02Z'),
+        endTimestamp: Date.parse('2026-10-05T12:40:00Z'),
+        activityNameSnapshot: 'Снимал замеры для дерева и инт',
+        customerId: '3', serviceId: '9'
+    };
+    const withoutNotes = Client.buildEntryPayload(base, { billable: true });
+    assert.equal(withoutNotes.text, null);
+    assert.equal(JSON.stringify(withoutNotes).includes('Снимал'), false);
+
+    const withNotes = Client.buildEntryPayload({ ...base, notes: '  Measured the tree  ', project: 'Alpha', service: 'Beta' }, { billable: true });
+    assert.equal(withNotes.text, 'Measured the tree');
+    const serialized = JSON.stringify(withNotes);
+    assert.equal(serialized.includes('Снимал'), false);
+    assert.equal(serialized.includes('Alpha'), false);
+    assert.equal(serialized.includes('Beta'), false);
+    assert.equal(withNotes.customers_id, 3);
+    assert.equal(withNotes.services_id, 9);
+    assert.equal(withNotes.time_since, '2026-10-05T12:40:00Z');
+    assert.equal(withNotes.time_until, '2026-10-05T12:40:00Z');
 });

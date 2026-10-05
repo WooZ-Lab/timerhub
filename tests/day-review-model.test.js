@@ -2173,7 +2173,8 @@ test('Cyrillic activity assignment survives to the Clockodo payload through an a
     assert.equal(sent.length, 1);
     assert.equal(sent[0].body.customers_id, 11);
     assert.equal(sent[0].body.services_id, 21);
-    assert.equal(sent[0].body.text.includes(name), true);
+    assert.equal(sent[0].body.text, null);
+    assert.equal(JSON.stringify(sent[0].body).includes(name), false);
     assert.equal(sent[0].key, 'timerhub-entry:cyr-entry');
 });
 
@@ -2605,4 +2606,112 @@ test('customer service filtering keeps numeric IDs in the Clockodo payload', asy
     assert.equal(batch.state, 'synced');
     assert.equal(sent[0].customers_id, 1);
     assert.equal(sent[0].services_id, 12);
+});
+
+function makeResendClient(sent) {
+    return {
+        buildEntryPayload(entry) {
+            return {
+                id: entry.id,
+                customers_id: Number(entry.customerId),
+                services_id: Number(entry.serviceId),
+                text: entry.notes || null
+            };
+        },
+        async createEntry(clientId, token, payload, idempotencyKey) {
+            sent.push({ payload, idempotencyKey });
+            return { created: true, entryId: 900 + sent.length };
+        }
+    };
+}
+
+async function createSyncedDayApp() {
+    const { app, document } = createTestApp();
+    const start = new Date(2026, 9, 5, 8, 0).getTime();
+    await app.addEntry({
+        id: 'resend-entry', activityId: 'act-1', activityNameSnapshot: 'Painting',
+        startTimestamp: start, endTimestamp: start + 60000,
+        customerId: '12', serviceId: '56', notes: 'Measured the tree'
+    });
+    app.reviewDate = '2026-10-05';
+    app.clockodoConfigured = true;
+    app.showToast = () => {};
+    app.renderReview = () => {};
+    app.getPushClientId = () => 'client_1234567890abcdef';
+    app.getClockodoAccessToken = () => 'a'.repeat(48);
+    const sent = [];
+    app.clockodoClient = makeResendClient(sent);
+    app.showSyncConfirmationModal();
+    const firstBatch = await app.confirmAndSyncClockodo();
+    assert.equal(firstBatch.state, 'synced');
+    assert.equal(sent.length, 1);
+    return { app, document, sent, firstBatch };
+}
+
+test('first Review & Sync does not ask for a resend', async () => {
+    const { app, document } = await createSyncedDayApp();
+    assert.equal(app.syncResendMode, false);
+    assert.equal(document.getElementById('syncConfirmSubmitBtn').textContent, app.t('confirmSyncBtn'));
+});
+
+test('Review & Sync after a successful sync requires explicit confirmation to resend', async () => {
+    const { app, document, sent, firstBatch } = await createSyncedDayApp();
+
+    app.showSyncConfirmationModal();
+    assert.equal(app.syncResendMode, true);
+    assert.equal(document.getElementById('syncConfirmSubmitBtn').textContent, app.t('resendSyncBtn'));
+    assert.equal(document.getElementById('syncConfirmAlreadySyncedNotice').textContent, app.t('resendSyncNotice'));
+
+    app.closeSyncConfirmationModal();
+    assert.equal(sent.length, 1);
+
+    app.showSyncConfirmationModal();
+    const second = await app.confirmAndSyncClockodo();
+    assert.equal(second.state, 'synced');
+    assert.equal(sent.length, 2);
+    assert.deepEqual(sent[1].payload, sent[0].payload);
+    assert.notEqual(sent[1].idempotencyKey, sent[0].idempotencyKey);
+    assert.match(sent[1].idempotencyKey, /^timerhub-entry:resend-entry:resend:/);
+
+    const original = app.syncBatches.find(item => item.id === firstBatch.id);
+    assert.equal(original.entries[0].clockodoEntryId, 901);
+    assert.equal(original.state, 'synced');
+    assert.equal(app.timeEntries[0].clockodoEntryId, 902);
+    assert.equal(app.timeEntries[0].syncStatus, 'synced');
+});
+
+test('a retry of the same explicit resend reuses its idempotency key', async () => {
+    const { app, sent } = await createSyncedDayApp();
+    let failResend = true;
+    app.clockodoClient.createEntry = async (clientId, token, payload, idempotencyKey) => {
+        sent.push({ payload, idempotencyKey });
+        if (failResend) {
+            failResend = false;
+            throw Object.assign(new Error('rejected'), { code: 'clockodo_rejected' });
+        }
+        return { created: true, entryId: 999 };
+    };
+
+    app.showSyncConfirmationModal();
+    const resendBatch = await app.confirmAndSyncClockodo();
+    assert.equal(resendBatch.state, 'failed');
+    const resendKey = sent[1].idempotencyKey;
+    assert.match(resendKey, /:resend:/);
+
+    await app.retrySyncBatch(resendBatch.id);
+    assert.equal(sent.length, 3);
+    assert.equal(sent[2].idempotencyKey, resendKey);
+});
+
+test('a partially synced day keeps the normal flow without a resend prompt', async () => {
+    const { app: dayApp } = await createSyncedDayApp();
+    const start = new Date(2026, 9, 5, 9, 0).getTime();
+    await dayApp.addEntry({
+        id: 'partial-unsynced', activityId: 'act-1', activityNameSnapshot: 'Painting',
+        startTimestamp: start, endTimestamp: start + 60000,
+        customerId: '12', serviceId: '56'
+    });
+    dayApp.showSyncConfirmationModal();
+    assert.equal(dayApp.syncResendMode, false);
+    assert.deepEqual(JSON.parse(JSON.stringify(dayApp.confirmedSyncEntries.map(entry => entry.id))), ["partial-unsynced"]);
 });
