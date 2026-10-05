@@ -2130,8 +2130,95 @@ test('retry rebuilds cached payloads that still contain millisecond timestamps',
     const result = await app.retrySyncBatch('stale-batch');
     assert.equal(result.state, 'synced');
     assert.equal(sent.length, 1);
-    assert.equal(sent[0].time_since, '2026-10-05T06:33:25Z');
-    assert.equal(sent[0].time_until, '2026-10-05T06:33:26Z');
+    assert.equal(sent[0].time_since, '2026-10-05T06:35:00Z');
+    assert.equal(sent[0].time_until, '2026-10-05T06:35:00Z');
     assert.equal(sent[0].customers_id, 11);
     assert.equal(sent[0].services_id, 21);
+});
+
+test('Cyrillic activity assignment survives to the Clockodo payload through an archived activity', async () => {
+    const { app, context } = createTestApp();
+    vm.runInContext(clockodoClientSource, context);
+    const name = 'Снимал замеры для дерева и инт';
+    const start = Date.parse('2026-10-05T08:03:02.000Z');
+    await app.addEntry({
+        id: 'cyr-entry', activityId: 'act-cyr', activityNameSnapshot: name,
+        startTimestamp: start, endTimestamp: start + 120000
+    });
+    assert.equal(app.timeEntries[0].customerId, null);
+    assert.equal(app.timeEntries[0].serviceId, null);
+    app.activities = [];
+    app.archivedActivities = [{
+        id: 'act-cyr', name, customerId: '11', serviceId: '21',
+        customerName: 'Bauunternehmen Müller', serviceName: 'Rohbau', archived: true
+    }];
+    app.reviewDate = '2026-10-05';
+    app.clockodoConfigured = true;
+    app.clockodoCustomerId = '';
+    app.clockodoServiceId = '';
+    app.showToast = () => {};
+    app.renderReview = () => {};
+    app.getPushClientId = () => 'client_1234567890abcdef';
+    app.getClockodoAccessToken = () => 'a'.repeat(48);
+    const sent = [];
+    app.clockodoClient = new context.ClockodoClient({
+        fetchImpl: async (url, init) => {
+            sent.push({ body: JSON.parse(init.body), key: init.headers['Idempotency-Key'] });
+            return { status: 200, ok: true, json: async () => ({ created: true, entryId: 904 }) };
+        }
+    });
+    app.showSyncConfirmationModal();
+    const batch = await app.confirmAndSyncClockodo();
+    assert.equal(batch.state, 'synced');
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].body.customers_id, 11);
+    assert.equal(sent[0].body.services_id, 21);
+    assert.equal(sent[0].body.text.includes(name), true);
+    assert.equal(sent[0].key, 'timerhub-entry:cyr-entry');
+});
+
+test('Day Review preview and Clockodo payload share rounded timestamps while raw storage stays exact', async () => {
+    const { app, context, storageData, document } = createTestApp();
+    vm.runInContext(clockodoClientSource, context);
+    const start = Date.parse('2026-10-05T12:38:02.000Z');
+    const end = Date.parse('2026-10-05T17:23:01.000Z');
+    await app.addEntry({
+        id: 'round-me', activityId: 'act-1', activityNameSnapshot: 'Painting',
+        startTimestamp: start, endTimestamp: end, customerId: '11', serviceId: '21'
+    });
+    app.reviewDate = '2026-10-05';
+    app.clockodoConfigured = true;
+    app.showToast = () => {};
+    app.getPushClientId = () => 'client_1234567890abcdef';
+    app.getClockodoAccessToken = () => 'a'.repeat(48);
+    const sent = [];
+    app.clockodoClient = new context.ClockodoClient({
+        fetchImpl: async (url, init) => {
+            sent.push({ body: JSON.parse(init.body), key: init.headers['Idempotency-Key'] });
+            return { status: 200, ok: true, json: async () => ({ created: true, entryId: 905 }) };
+        }
+    });
+
+    const roundedStart = Date.parse('2026-10-05T12:40:00Z');
+    const roundedEnd = Date.parse('2026-10-05T17:25:00Z');
+    app.renderReview();
+    const reviewHtml = document.getElementById('reviewEntriesList').innerHTML;
+    assert.equal(reviewHtml.includes(app.formatTime(roundedStart)), true);
+    assert.equal(reviewHtml.includes(app.formatTime(roundedEnd)), true);
+
+    app.showSyncConfirmationModal();
+    const previewHtml = document.getElementById('syncConfirmEntriesList').innerHTML;
+    assert.equal(previewHtml.includes(app.formatTime(roundedStart)), true);
+    assert.equal(previewHtml.includes(app.formatTime(roundedEnd)), true);
+
+    const batch = await app.confirmAndSyncClockodo();
+    assert.equal(batch.state, 'synced');
+    assert.equal(sent[0].body.time_since, '2026-10-05T12:40:00Z');
+    assert.equal(sent[0].body.time_until, '2026-10-05T17:25:00Z');
+    assert.equal(/\.\d{3}Z$/.test(sent[0].body.time_since) || /\.\d{3}Z$/.test(sent[0].body.time_until), false);
+    assert.equal(sent[0].key, 'timerhub-entry:round-me');
+    assert.equal(app.timeEntries.find(entry => entry.id === 'round-me').startTimestamp, start);
+    assert.equal(app.timeEntries.find(entry => entry.id === 'round-me').endTimestamp, end);
+    assert.equal(storageData.timeEntries.find(entry => entry.id === 'round-me').startTimestamp, start);
+    assert.equal(storageData.timeEntries.find(entry => entry.id === 'round-me').endTimestamp, end);
 });

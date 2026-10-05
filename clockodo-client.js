@@ -154,8 +154,19 @@
             return ClockodoClient.isNormalizedEntryPayload(payload);
         }
 
+        roundUpToFiveMinutes(timestamp) {
+            return ClockodoClient.roundUpToFiveMinutes(timestamp);
+        }
+
         static formatTimestamp(timestamp) {
             return new Date(timestamp).toISOString().replace(/\.\d{3}Z$/, 'Z');
+        }
+
+        static roundUpToFiveMinutes(timestamp) {
+            const value = Number(timestamp);
+            if (!Number.isFinite(value)) return value;
+            const fiveMinutes = 5 * 60 * 1000;
+            return Math.ceil(value / fiveMinutes) * fiveMinutes;
         }
 
         static isNormalizedEntryPayload(payload) {
@@ -191,8 +202,8 @@
                 .join(' · ')
                 .slice(0, 1000);
             return {
-                time_since: ClockodoClient.formatTimestamp(entry.startTimestamp),
-                time_until: ClockodoClient.formatTimestamp(entry.endTimestamp),
+                time_since: ClockodoClient.formatTimestamp(ClockodoClient.roundUpToFiveMinutes(entry.startTimestamp)),
+                time_until: ClockodoClient.formatTimestamp(ClockodoClient.roundUpToFiveMinutes(entry.endTimestamp)),
                 customers_id: customerId,
                 services_id: serviceId,
                 ...(projectId === null ? {} : { projects_id: projectId }),

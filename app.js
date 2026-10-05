@@ -1032,6 +1032,7 @@ class TimerHubApp {
         this.pendingRestoreData = null;
         this.backupSnapshots = [];
         this.activities = [];
+        this.archivedActivities = [];
         this.timeEntries = [];
         this.activeActivityId = null;
         this.currentLanguage = 'en';
@@ -1231,6 +1232,7 @@ class TimerHubApp {
             typeof this.storage.getLayout === 'function' ? this.storage.getLayout() : Promise.resolve([])
         ]);
         this.activityLayouts = new Map(layouts.map(layout => [layout.activityId, layout]));
+        this.archivedActivities = activities.filter(a => a.archived);
         this.activities = activities
             .filter(a => !a.archived)
             .sort((a, b) => (a.position || 0) - (b.position || 0));
@@ -2118,13 +2120,13 @@ class TimerHubApp {
         list.innerHTML = entries.map((entry, index) => {
             const activity = this.activities.find(item => item.id === entry.activityId);
             const issues = suspicious.find(item => item.entry.id === entry.id)?.issues || [];
-            const start = this.formatTime(entry.startTimestamp);
-            const end = entry.endTimestamp === null ? '—' : this.formatTime(entry.endTimestamp);
+            const start = this.formatTime(this.clockodoSendTimestamp(entry.startTimestamp));
+            const end = entry.endTimestamp === null ? '—' : this.formatTime(this.clockodoSendTimestamp(entry.endTimestamp));
             const duration = this.formatDuration(this.getEntryDuration(entry));
             const status = statusKeys[entry.syncStatus] || this.t('statusLocal');
             const previous = entries[index - 1];
             const gap = previous?.endTimestamp !== null && previous?.endTimestamp !== undefined && previous.endTimestamp < entry.startTimestamp
-                ? `<div class="review-gap" aria-label="${this.t('gap')}"><span>${this.t('gap')}</span><time>${this.escapeHtml(this.formatTime(previous.endTimestamp))}–${this.escapeHtml(start)}</time><strong>${this.formatDuration(entry.startTimestamp - previous.endTimestamp)}</strong></div>`
+                ? `<div class="review-gap" aria-label="${this.t('gap')}"><span>${this.t('gap')}</span><time>${this.escapeHtml(this.formatTime(previous.endTimestamp))}–${this.escapeHtml(this.formatTime(entry.startTimestamp))}</time><strong>${this.formatDuration(entry.startTimestamp - previous.endTimestamp)}</strong></div>`
                 : '';
             const meta = [entry.project, entry.service].filter(Boolean).map(value => this.escapeHtml(value)).join(' · ');
             const notes = entry.notes ? `<div class="review-entry-notes">${this.escapeHtml(entry.notes)}</div>` : '';
@@ -2178,7 +2180,9 @@ class TimerHubApp {
         list.innerHTML = eligible.map(entry => {
             const activity = this.activities.find(item => item.id === entry.activityId);
             const title = activity?.name || entry.activityNameSnapshot || this.t('activity');
-            return `<div class="sync-confirm-item"><span>${this.escapeHtml(title)} · ${this.escapeHtml(this.formatTime(entry.startTimestamp))}–${this.escapeHtml(this.formatTime(entry.endTimestamp))}</span><strong>${this.formatDuration(this.getEntryDuration(entry))}</strong></div>`;
+            const sendStart = this.clockodoSendTimestamp(entry.startTimestamp);
+            const sendEnd = this.clockodoSendTimestamp(entry.endTimestamp);
+            return `<div class="sync-confirm-item"><span>${this.escapeHtml(title)} · ${this.escapeHtml(this.formatTime(sendStart))}–${this.escapeHtml(this.formatTime(sendEnd))}</span><strong>${this.formatDuration(this.getEntryDuration(entry))}</strong></div>`;
         }).join('') || `<div class="review-empty">${this.t('noEntriesToSync')}</div>`;
         const total = eligible.reduce((sum, entry) => sum + this.getEntryDuration(entry), 0);
         summary.innerHTML = `<span>${this.t('syncSummaryTotal')}</span><strong>${this.formatDuration(total)}</strong>`;
@@ -2311,7 +2315,8 @@ class TimerHubApp {
             }
             if (!entry.clockodoPayload) {
                 try {
-                    const activity = this.activities.find(item => item.id === entry.activityId);
+                    const activity = this.activities.find(item => item.id === entry.activityId)
+                        || this.archivedActivities?.find(item => item.id === entry.activityId);
                     entry.clockodoPayload = this.clockodoClient.buildEntryPayload(entry, {
                         customerId: activity?.customerId || this.clockodoCustomerId,
                         projectId: this.clockodoProjectId,
@@ -3735,6 +3740,8 @@ class TimerHubApp {
             activity.updatedAt = Date.now();
             await this.storage.saveActivity(activity);
             this.activities = this.activities.filter(a => !a.archived);
+            if (!Array.isArray(this.archivedActivities)) this.archivedActivities = [];
+            this.archivedActivities.push(activity);
         }
         this.closeActivityMenu();
         this.renderMain();
@@ -4487,6 +4494,12 @@ class TimerHubApp {
         token = btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
         localStorage.setItem(storageKey, token);
         return token;
+    }
+
+    clockodoSendTimestamp(timestamp) {
+        if (!this.clockodoConfigured || !this.clockodoClient ||
+            typeof this.clockodoClient.roundUpToFiveMinutes !== 'function') return timestamp;
+        return this.clockodoClient.roundUpToFiveMinutes(timestamp);
     }
 
     clockodoErrorMessage(error) {

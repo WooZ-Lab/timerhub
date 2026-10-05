@@ -42,8 +42,8 @@ test('Clockodo client formats entry timestamps without milliseconds', () => {
         endTimestamp: Date.parse('2026-10-05T06:33:26.987Z'),
         activityNameSnapshot: 'Painting', customerId: '11', serviceId: '21'
     }, { billable: true });
-    assert.equal(payload.time_since, '2026-10-05T06:33:25Z');
-    assert.equal(payload.time_until, '2026-10-05T06:33:26Z');
+    assert.equal(payload.time_since, '2026-10-05T06:35:00Z');
+    assert.equal(payload.time_until, '2026-10-05T06:35:00Z');
     assert.equal(/\.\d{3}Z$/.test(payload.time_since) || /\.\d{3}Z$/.test(payload.time_until), false);
     assert.equal(payload.customers_id, 11);
     assert.equal(payload.services_id, 21);
@@ -52,6 +52,27 @@ test('Clockodo client formats entry timestamps without milliseconds', () => {
     assert.equal(Client.isNormalizedEntryPayload({ time_since: '2026-10-05T06:33:25.109Z', time_until: '2026-10-05T06:33:26.109Z' }), false);
     assert.equal(Client.isNormalizedEntryPayload({ time_since: '2026-10-05T06:33:25Z', time_until: '2026-10-05T06:33:26.109Z' }), false);
     assert.equal(Client.isNormalizedEntryPayload(null), false);
+});
+
+test('Clockodo client ceilings entry timestamps up to the next five minutes', () => {
+    const { Client } = makeClient(async () => new Response('{}'));
+    const iso = timestamp => new Date(timestamp).toISOString();
+    const cases = [
+        ['2026-10-05T12:38:02.000Z', '2026-10-05T12:40:00.000Z'],
+        ['2026-10-05T17:23:01.000Z', '2026-10-05T17:25:00.000Z'],
+        ['2026-10-05T12:35:00.000Z', '2026-10-05T12:35:00.000Z'],
+        ['2026-10-05T17:25:00.000Z', '2026-10-05T17:25:00.000Z']
+    ];
+    for (const [input, expected] of cases) {
+        assert.equal(iso(Client.roundUpToFiveMinutes(Date.parse(input))), expected);
+    }
+    const payload = Client.buildEntryPayload({
+        startTimestamp: Date.parse('2026-10-05T12:38:02.000Z'),
+        endTimestamp: Date.parse('2026-10-05T17:23:01.000Z'),
+        activityNameSnapshot: 'Painting', customerId: '11', serviceId: '21'
+    }, { billable: true });
+    assert.equal(payload.time_since, '2026-10-05T12:40:00Z');
+    assert.equal(payload.time_until, '2026-10-05T17:25:00Z');
 });
 
 test('Clockodo client sends only proxy credentials and validates successful entry responses', async () => {
