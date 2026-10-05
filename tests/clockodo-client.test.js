@@ -21,8 +21,8 @@ test('Clockodo client builds the documented v2 entry payload', () => {
         activityNameSnapshot: 'Painting', project: '321', service: '55', notes: 'First coat'
     }, { customerId: '123', projectId: '654', serviceId: '99', billable: true });
     assert.deepEqual(JSON.parse(JSON.stringify(payload)), {
-        time_since: '2026-09-28T08:00:00.000Z',
-        time_until: '2026-09-28T09:15:00.000Z',
+        time_since: '2026-09-28T08:00:00Z',
+        time_until: '2026-09-28T09:15:00Z',
         customers_id: 123,
         services_id: 55,
         projects_id: 321,
@@ -30,6 +30,24 @@ test('Clockodo client builds the documented v2 entry payload', () => {
         text: 'Painting · First coat'
     });
     assert.throws(() => Client.buildEntryPayload({ startTimestamp: 1, endTimestamp: 2 }, {}), error => error.code === 'missing_clockodo_assignment');
+});
+
+test('Clockodo client formats entry timestamps without milliseconds', () => {
+    const { Client } = makeClient(async () => new Response('{}'));
+    assert.equal(Client.formatTimestamp(Date.parse('2026-10-05T06:33:25.109Z')), '2026-10-05T06:33:25Z');
+    assert.equal(Client.formatTimestamp(Date.parse('2026-10-05T08:33:25.109+02:00')), '2026-10-05T06:33:25Z');
+    assert.equal(Client.formatTimestamp(Date.parse('2026-10-05T06:33:25Z')), '2026-10-05T06:33:25Z');
+    const payload = Client.buildEntryPayload({
+        startTimestamp: Date.parse('2026-10-05T06:33:25.109Z'),
+        endTimestamp: Date.parse('2026-10-05T06:33:26.987Z'),
+        activityNameSnapshot: 'Painting', customerId: '11', serviceId: '21'
+    }, { billable: true });
+    assert.equal(payload.time_since, '2026-10-05T06:33:25Z');
+    assert.equal(payload.time_until, '2026-10-05T06:33:26Z');
+    assert.equal(/\.\d{3}Z$/.test(payload.time_since) || /\.\d{3}Z$/.test(payload.time_until), false);
+    assert.equal(payload.customers_id, 11);
+    assert.equal(payload.services_id, 21);
+    assert.equal(Number.isInteger(payload.customers_id) && Number.isInteger(payload.services_id), true);
 });
 
 test('Clockodo client sends only proxy credentials and validates successful entry responses', async () => {

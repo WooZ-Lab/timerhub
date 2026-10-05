@@ -150,6 +150,10 @@
             return ClockodoClient.buildEntryPayload(entry, config);
         }
 
+        static formatTimestamp(timestamp) {
+            return new Date(timestamp).toISOString().replace(/\.\d{3}Z$/, 'Z');
+        }
+
         static buildEntryPayload(entry, config) {
             if (!entry || !config || typeof config !== 'object') throw new ClockodoClientError('invalid_time_entry');
             const id = (value, fallback) => {
@@ -177,8 +181,8 @@
                 .join(' · ')
                 .slice(0, 1000);
             return {
-                time_since: new Date(entry.startTimestamp).toISOString(),
-                time_until: new Date(entry.endTimestamp).toISOString(),
+                time_since: ClockodoClient.formatTimestamp(entry.startTimestamp),
+                time_until: ClockodoClient.formatTimestamp(entry.endTimestamp),
                 customers_id: customerId,
                 services_id: serviceId,
                 ...(projectId === null ? {} : { projects_id: projectId }),
