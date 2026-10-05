@@ -356,6 +356,22 @@
                             <button class="size-btn" data-size="large" data-i18n="large">Large</button>
                         </div>
                     </div>
+
+                    <div class="form-group">
+                        <label data-i18n="clockodoAssignment">Clockodo assignment</label>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="activityCustomerSelect" data-i18n="clockodoCustomerSelectLabel">Clockodo customer</label>
+                                <select id="activityCustomerSelect" class="form-input"></select>
+                            </div>
+                            <div class="form-group">
+                                <label for="activityServiceSelect" data-i18n="clockodoServiceSelectLabel">Clockodo service</label>
+                                <select id="activityServiceSelect" class="form-input"></select>
+                            </div>
+                        </div>
+                        <small id="activityClockodoHint" class="settings-help"></small>
+                        <button id="activityClockodoRetryBtn" class="settings-btn" type="button" style="display:none;" data-i18n="clockodoAssignmentReload">Reload</button>
+                    </div>
                 </div>
                 
                 <div class="modal-footer">
@@ -426,6 +442,22 @@
                             <label for="entryEditService" data-i18n="service">Service</label>
                         <input type="text" id="entryEditService" class="form-input" placeholder="Service name or ID" data-i18n-placeholder="servicePlaceholder">
                         </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label data-i18n="clockodoAssignment">Clockodo assignment</label>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="entryEditCustomerSelect" data-i18n="clockodoCustomerSelectLabel">Clockodo customer</label>
+                                <select id="entryEditCustomerSelect" class="form-input"></select>
+                            </div>
+                            <div class="form-group">
+                                <label for="entryEditServiceSelect" data-i18n="clockodoServiceSelectLabel">Clockodo service</label>
+                                <select id="entryEditServiceSelect" class="form-input"></select>
+                            </div>
+                        </div>
+                        <small id="entryEditClockodoHint" class="settings-help"></small>
+                        <button id="entryEditClockodoRetryBtn" class="settings-btn" type="button" style="display:none;" data-i18n="clockodoAssignmentReload">Reload</button>
                     </div>
 
                     <div class="form-group">

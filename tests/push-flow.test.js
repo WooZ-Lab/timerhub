@@ -926,3 +926,134 @@ test('Clockodo Worker reports authentication and uncertain malformed-create outc
     assert.deepEqual(await duplicate.json(), { error: 'operation_outcome_unknown' });
     assert.equal(calls, 2);
 });
+
+test('Clockodo Worker loads customers and services from documented paginated endpoints without leaking the API key', async t => {
+    const backend = makeBackend();
+    const originalFetch = globalThis.fetch;
+    const requests = [];
+    globalThis.fetch = async (url, init) => {
+        requests.push({ url: String(url), init });
+        const parsed = new URL(String(url));
+        if (parsed.pathname === '/api/v3/customers') {
+            if (parsed.searchParams.get('page') === '1') {
+                return Response.json({
+                    paging: { items_per_page: 1000, current_page: 1, count_pages: 2, count_items: 3 },
+                    data: [
+                        { id: 5, name: 'Beta', active: true, note: 'private customer note' },
+                        { id: 3, name: 'Alpha', active: false }
+                    ]
+                });
+            }
+            return Response.json({
+                paging: { items_per_page: 1000, current_page: 2, count_pages: 2, count_items: 3 },
+                data: [{ id: 7, name: 'Gamma', active: true }]
+            });
+        }
+        if (parsed.pathname === '/api/v4/services') {
+            return Response.json({
+                paging: { items_per_page: 1000, current_page: 1, count_pages: 1, count_items: 1 },
+                data: [{ id: 9, name: 'Repair', active: true, note: 'private service note' }]
+            });
+        }
+        return Response.json({ error: 'unexpected upstream route' }, { status: 500 });
+    };
+    t.after(() => { globalThis.fetch = originalFetch; });
+
+    const clientId = 'clockodo_lists_client_123456';
+    const token = 'clockodo-lists-token'.padEnd(48, 'k');
+    const apiKey = 'list-access-api-key';
+    const auth = { Authorization: `Bearer ${token}` };
+
+    const unconfigured = await backend.request(`/api/clockodo/customers?clientId=${clientId}`, { headers: auth });
+    assert.equal(unconfigured.status, 401);
+    assert.deepEqual(await unconfigured.json(), { error: 'unauthorized' });
+
+    await backend.request(`/api/clockodo/config?clientId=${clientId}`, {
+        method: 'PUT', headers: { ...auth, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiUser: 'person@example.test', apiKey })
+    });
+
+    const unauthorized = await backend.request(`/api/clockodo/customers?clientId=${clientId}`, {
+        headers: { Authorization: `Bearer ${'z'.repeat(48)}` }
+    });
+    assert.equal(unauthorized.status, 401);
+
+    const customersResponse = await backend.request(`/api/clockodo/customers?clientId=${clientId}`, { headers: auth });
+    assert.equal(customersResponse.status, 200);
+    const customersBody = await customersResponse.text();
+    assert.deepEqual(JSON.parse(customersBody), {
+        customers: [
+            { id: 3, name: 'Alpha', active: false },
+            { id: 5, name: 'Beta', active: true },
+            { id: 7, name: 'Gamma', active: true }
+        ]
+    });
+    assert.equal(customersBody.includes('private customer note'), false);
+    assert.equal(customersBody.includes(apiKey), false);
+
+    const servicesResponse = await backend.request(`/api/clockodo/services?clientId=${clientId}`, { headers: auth });
+    assert.equal(servicesResponse.status, 200);
+    const servicesBody = await servicesResponse.text();
+    assert.deepEqual(JSON.parse(servicesBody), { services: [{ id: 9, name: 'Repair', active: true }] });
+    assert.equal(servicesBody.includes('private service note'), false);
+
+    const customerRequests = requests.filter(item => item.url.includes('/api/v3/customers'));
+    assert.equal(customerRequests.length, 2);
+    assert.ok(customerRequests.every(item => item.url.includes('items_per_page=1000')));
+    assert.ok(customerRequests.every(item => item.init.method === 'GET'));
+    assert.equal(customerRequests[0].init.headers['X-ClockodoApiKey'], apiKey);
+    assert.equal(customerRequests[0].init.headers['X-ClockodoApiUser'], 'person@example.test');
+
+    const methodNotAllowed = await backend.request(`/api/clockodo/customers?clientId=${clientId}`, {
+        method: 'POST', headers: auth
+    });
+    assert.equal(methodNotAllowed.status, 405);
+    const serviceMethodNotAllowed = await backend.request(`/api/clockodo/services?clientId=${clientId}`, {
+        method: 'DELETE', headers: auth
+    });
+    assert.equal(serviceMethodNotAllowed.status, 405);
+});
+
+test('Clockodo customer and service loads classify upstream failures without leaking details', async t => {
+    const backend = makeBackend();
+    const originalFetch = globalThis.fetch;
+    const requests = [];
+    let upstreamResponse = Response.json({ data: [] });
+    globalThis.fetch = async (url, init) => {
+        requests.push({ url: String(url), init });
+        return upstreamResponse;
+    };
+    t.after(() => { globalThis.fetch = originalFetch; });
+
+    const clientId = 'clockodo_lists_errors_123456';
+    const token = 'clockodo-error-token'.padEnd(48, 'e');
+    const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+    await backend.request(`/api/clockodo/config?clientId=${clientId}`, {
+        method: 'PUT', headers: auth,
+        body: JSON.stringify({ apiUser: 'person@example.test', apiKey: 'private-api-key' })
+    });
+    const load = resource => backend.request(`/api/clockodo/${resource}?clientId=${clientId}`, { headers: auth });
+
+    for (const [status, expectedError] of [[401, 'invalid_credentials'], [429, 'rate_limited'], [403, 'clockodo_rejected'], [503, 'service_error']]) {
+        upstreamResponse = Response.json({ error: 'sensitive upstream detail' }, { status });
+        const response = await load('customers');
+        assert.equal(response.status, status);
+        const responseText = await response.text();
+        assert.deepEqual(JSON.parse(responseText), { error: expectedError });
+        assert.equal(responseText.includes('sensitive upstream detail'), false);
+        assert.equal(responseText.includes('private-api-key'), false);
+    }
+
+    upstreamResponse = Response.json({ data: [{ id: 0, name: 'Invalid' }] });
+    const malformedItem = await load('services');
+    assert.equal(malformedItem.status, 502);
+    assert.deepEqual(await malformedItem.json(), { error: 'malformed_response' });
+
+    upstreamResponse = Response.json({ data: 'not-a-list' });
+    const malformedShape = await load('services');
+    assert.equal(malformedShape.status, 502);
+    assert.deepEqual(await malformedShape.json(), { error: 'malformed_response' });
+
+    const paths = requests.filter(item => item.url.includes('my.clockodo.com')).map(item => new URL(item.url).pathname);
+    assert.ok(paths.every(path => path === '/api/v3/customers' || path === '/api/v4/services'));
+});

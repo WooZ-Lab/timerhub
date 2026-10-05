@@ -53,6 +53,60 @@ test('Clockodo client exposes CREATE only for time entries', () => {
     assert.equal(client.updateEntry, undefined);
 });
 
+test('Clockodo client loads customers and services through the authenticated proxy', async () => {
+    const requests = [];
+    const { client } = makeClient(async (url, init) => {
+        requests.push({ url, init });
+        if (url.includes('/api/clockodo/customers')) {
+            return Response.json({ customers: [{ id: 5, name: ' Beta ', active: true }, { id: 3, name: 'Alpha', active: false }] });
+        }
+        return Response.json({ services: [{ id: 9, name: 'Repair', active: true }] });
+    });
+    const customerResult = await client.getCustomers(...Object.values(clientOptions));
+    const serviceResult = await client.getServices(...Object.values(clientOptions));
+    assert.deepEqual(JSON.parse(JSON.stringify(customerResult)), {
+        customers: [{ id: 5, name: 'Beta', active: true }, { id: 3, name: 'Alpha', active: false }]
+    });
+    assert.deepEqual(JSON.parse(JSON.stringify(serviceResult)), {
+        services: [{ id: 9, name: 'Repair', active: true }]
+    });
+    assert.match(requests[0].url, /\/api\/clockodo\/customers\?clientId=/);
+    assert.match(requests[1].url, /\/api\/clockodo\/services\?clientId=/);
+    assert.equal(requests[0].init.headers.Authorization, `Bearer ${clientOptions.accessToken}`);
+    assert.equal(JSON.stringify(requests.map(item => item.init)).includes('ClockodoApiKey'), false);
+});
+
+test('Clockodo client rejects malformed customer and service lists without exposing response bodies', async () => {
+    const missingList = makeClient(async () => Response.json({ customers: 'not-a-list' }));
+    await assert.rejects(
+        () => missingList.client.getCustomers(...Object.values(clientOptions)),
+        error => error.code === 'malformed_response'
+    );
+    const badItem = makeClient(async () => Response.json({ services: [{ id: '9', name: 'Repair' }] }));
+    await assert.rejects(
+        () => badItem.client.getServices(...Object.values(clientOptions)),
+        error => error.code === 'malformed_response' && !error.message.includes('Repair')
+    );
+    const invalidCredentials = makeClient(async () => Response.json({ error: 'secret details' }, { status: 401 }));
+    await assert.rejects(
+        () => invalidCredentials.client.getServices(...Object.values(clientOptions)),
+        error => error.code === 'invalid_credentials' && error.status === 401
+    );
+});
+
+test('Clockodo client prefers per-entry customer and service over configured defaults', () => {
+    const { Client } = makeClient(async () => new Response('{}'));
+    const payload = Client.buildEntryPayload({
+        startTimestamp: Date.parse('2026-09-28T08:00:00Z'),
+        endTimestamp: Date.parse('2026-09-28T09:15:00Z'),
+        activityNameSnapshot: 'Painting',
+        customerId: '77',
+        serviceId: '88'
+    }, { customerId: '123', serviceId: '99', billable: true });
+    assert.equal(payload.customers_id, 77);
+    assert.equal(payload.services_id, 88);
+});
+
 test('Clockodo client classifies invalid credentials and malformed responses without exposing response bodies', async () => {
     const unauthorized = makeClient(async () => Response.json({ error: 'secret must not leak' }, { status: 401 }));
     await assert.rejects(() => unauthorized.client.testConnection(...Object.values(clientOptions)), error => error.code === 'invalid_credentials' && error.status === 401);

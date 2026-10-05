@@ -198,6 +198,59 @@ export class TimerHubDurableObject {
         return new TextDecoder().decode(plaintext);
     }
 
+    clockodoErrorCode(status) {
+        return status === 401 ? "invalid_credentials"
+            : status === 429 ? "rate_limited"
+            : status >= 500 ? "service_error"
+            : "clockodo_rejected";
+    }
+
+    async clockodoListResponse(token, credentials, resource, responseKey) {
+        const items = [];
+        try {
+            for (let page = 1; page <= 5; page += 1) {
+                const response = await this.clockodoFetch(
+                    null,
+                    token,
+                    credentials,
+                    `${resource}?items_per_page=1000&page=${page}`
+                );
+                if (!response.ok) {
+                    return jsonError(this.clockodoErrorCode(response.status), response.status);
+                }
+                const data = await response.json().catch(() => null);
+                if (!data || typeof data !== "object" || Array.isArray(data) ||
+                    !Array.isArray(data.data)) {
+                    return jsonError("malformed_response", 502);
+                }
+                for (const item of data.data) {
+                    if (!item || typeof item !== "object" ||
+                        !Number.isSafeInteger(item.id) || item.id < 1 ||
+                        typeof item.name !== "string" || !item.name.trim()) {
+                        return jsonError("malformed_response", 502);
+                    }
+                    items.push({
+                        id: item.id,
+                        name: item.name.trim().slice(0, 100),
+                        active: item.active === true
+                    });
+                }
+                const countPages = data.paging && Number.isSafeInteger(data.paging.count_pages)
+                    ? data.paging.count_pages
+                    : 1;
+                if (page >= countPages) break;
+            }
+        } catch (error) {
+            return jsonError(error?.name === "AbortError" ? "timeout" : "network_error", 502);
+        }
+        items.sort((a, b) => {
+            const left = a.name.toLowerCase();
+            const right = b.name.toLowerCase();
+            return left < right ? -1 : left > right ? 1 : a.id - b.id;
+        });
+        return Response.json({ [responseKey]: items });
+    }
+
     async clockodoFetch(request, token, credentials, path, body, method = body === undefined ? "GET" : "POST") {
         const apiKey = await this.decryptClockodoKey(token, credentials);
         const controller = new AbortController();
@@ -260,14 +313,19 @@ export class TimerHubDurableObject {
         }
         if (!credentials) return jsonError("configuration_missing", 409);
 
+        if (path === "/clockodo/customers" && request.method === "GET") {
+            return this.clockodoListResponse(token, credentials, "v3/customers", "customers");
+        }
+
+        if (path === "/clockodo/services" && request.method === "GET") {
+            return this.clockodoListResponse(token, credentials, "v4/services", "services");
+        }
+
         if (path === "/clockodo/test" && request.method === "POST") {
             try {
                 const response = await this.clockodoFetch(request, token, credentials, "v4/users/me");
                 if (!response.ok) {
-                    const error = response.status === 401 ? "invalid_credentials"
-                        : response.status === 429 ? "rate_limited"
-                        : response.status >= 500 ? "service_error"
-                        : "clockodo_rejected";
+                    const error = this.clockodoErrorCode(response.status);
                     return jsonError(error, response.status);
                 }
                 const data = await response.json().catch(() => null);
@@ -427,17 +485,17 @@ export default {
         }
 
         const clockodoRoutes = new Map([
-            ["/api/clockodo/config", "/clockodo/config"],
-            ["/api/clockodo/test", "/clockodo/test"],
-            ["/api/clockodo/entries", "/clockodo/entries"]
+            ["/api/clockodo/config", { path: "/clockodo/config", methods: ["GET", "PUT", "DELETE"] }],
+            ["/api/clockodo/test", { path: "/clockodo/test", methods: ["POST"] }],
+            ["/api/clockodo/entries", { path: "/clockodo/entries", methods: ["POST"] }],
+            ["/api/clockodo/customers", { path: "/clockodo/customers", methods: ["GET"] }],
+            ["/api/clockodo/services", { path: "/clockodo/services", methods: ["GET"] }]
         ]);
         const clockodoEntryMutation = /^\/api\/clockodo\/entries\/\d+$/.test(url.pathname);
         if (clockodoEntryMutation) return jsonError("method_not_allowed", 405);
         if (clockodoRoutes.has(url.pathname)) {
-            const allowedMethods = url.pathname === "/api/clockodo/config"
-                ? ["GET", "PUT", "DELETE"]
-                : url.pathname === "/api/clockodo/test" ? ["POST"] : ["POST"];
-            if (!allowedMethods.includes(request.method)) {
+            const route = clockodoRoutes.get(url.pathname);
+            if (!route.methods.includes(request.method)) {
                 return jsonError("method_not_allowed", 405);
             }
             const clientId = url.searchParams.get("clientId");
@@ -447,7 +505,7 @@ export default {
             const id = env.TIMER_HUB.idFromName(clientId);
             const stub = env.TIMER_HUB.get(id);
             const targetUrl = new URL(request.url);
-            targetUrl.pathname = clockodoRoutes.get(url.pathname);
+            targetUrl.pathname = route.path;
             return stub.fetch(new Request(targetUrl, request));
         }
 

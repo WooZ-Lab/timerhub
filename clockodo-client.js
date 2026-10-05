@@ -82,6 +82,30 @@
             return this.request('/api/clockodo/config', { clientId, accessToken });
         }
 
+        validateReferenceList(data, key) {
+            if (!data || typeof data !== 'object' || Array.isArray(data) || !Array.isArray(data[key])) {
+                throw new ClockodoClientError('malformed_response');
+            }
+            return data[key].map(item => {
+                if (!item || typeof item !== 'object' ||
+                    !Number.isSafeInteger(item.id) || item.id < 1 ||
+                    typeof item.name !== 'string' || !item.name.trim()) {
+                    throw new ClockodoClientError('malformed_response');
+                }
+                return { id: item.id, name: item.name.trim(), active: item.active === true };
+            });
+        }
+
+        async getCustomers(clientId, accessToken) {
+            const data = await this.request('/api/clockodo/customers', { clientId, accessToken });
+            return { customers: this.validateReferenceList(data, 'customers') };
+        }
+
+        async getServices(clientId, accessToken) {
+            const data = await this.request('/api/clockodo/services', { clientId, accessToken });
+            return { services: this.validateReferenceList(data, 'services') };
+        }
+
         saveConfig(clientId, accessToken, credentials) {
             return this.request('/api/clockodo/config', { clientId, accessToken, method: 'PUT', body: credentials });
         }
@@ -112,8 +136,8 @@
                 const parsed = Number(source);
                 return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : null;
             };
-            const customerId = id(config.customerId, null);
-            const serviceId = id(entry.service, config.serviceId);
+            const customerId = id(entry.customerId, id(config.customerId, null));
+            const serviceId = id(entry.serviceId, id(entry.service, config.serviceId));
             const projectId = id(entry.project, config.projectId);
             if (!Number.isInteger(customerId) || customerId < 0 || !Number.isInteger(serviceId) || serviceId < 0) {
                 throw new ClockodoClientError('missing_clockodo_assignment');
