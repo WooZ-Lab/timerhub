@@ -150,8 +150,18 @@
             return ClockodoClient.buildEntryPayload(entry, config);
         }
 
+        isNormalizedEntryPayload(payload) {
+            return ClockodoClient.isNormalizedEntryPayload(payload);
+        }
+
         static formatTimestamp(timestamp) {
             return new Date(timestamp).toISOString().replace(/\.\d{3}Z$/, 'Z');
+        }
+
+        static isNormalizedEntryPayload(payload) {
+            if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return false;
+            const isSecondPrecision = value => typeof value === 'string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(value);
+            return isSecondPrecision(payload.time_since) && isSecondPrecision(payload.time_until);
         }
 
         static buildEntryPayload(entry, config) {

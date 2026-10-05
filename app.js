@@ -2304,6 +2304,11 @@ class TimerHubApp {
             entry.syncStatus = SYNC_STATUS.SYNCING;
             entry.clockodoError = null;
             entry.clockodoErrorDetails = null;
+            if (entry.clockodoPayload &&
+                typeof this.clockodoClient.isNormalizedEntryPayload === 'function' &&
+                !this.clockodoClient.isNormalizedEntryPayload(entry.clockodoPayload)) {
+                entry.clockodoPayload = null;
+            }
             if (!entry.clockodoPayload) {
                 try {
                     const activity = this.activities.find(item => item.id === entry.activityId);

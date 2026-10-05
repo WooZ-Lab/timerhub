@@ -48,6 +48,10 @@ test('Clockodo client formats entry timestamps without milliseconds', () => {
     assert.equal(payload.customers_id, 11);
     assert.equal(payload.services_id, 21);
     assert.equal(Number.isInteger(payload.customers_id) && Number.isInteger(payload.services_id), true);
+    assert.equal(Client.isNormalizedEntryPayload(payload), true);
+    assert.equal(Client.isNormalizedEntryPayload({ time_since: '2026-10-05T06:33:25.109Z', time_until: '2026-10-05T06:33:26.109Z' }), false);
+    assert.equal(Client.isNormalizedEntryPayload({ time_since: '2026-10-05T06:33:25Z', time_until: '2026-10-05T06:33:26.109Z' }), false);
+    assert.equal(Client.isNormalizedEntryPayload(null), false);
 });
 
 test('Clockodo client sends only proxy credentials and validates successful entry responses', async () => {

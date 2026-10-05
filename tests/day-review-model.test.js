@@ -2095,3 +2095,43 @@ test('retrying after assigning the activity uses the activity IDs', async () => 
     assert.equal(sent[0].services_id, 21);
     assert.equal(app.timeEntries.find(entry => entry.id === 'late-retry').syncStatus, 'synced');
 });
+
+test('retry rebuilds cached payloads that still contain millisecond timestamps', async () => {
+    const { app, context } = createTestApp();
+    vm.runInContext(clockodoClientSource, context);
+    app.clockodoConfigured = true;
+    app.clockodoCustomerId = '11';
+    app.clockodoServiceId = '21';
+    app.showToast = () => {};
+    app.renderReview = () => {};
+    app.getPushClientId = () => 'client_1234567890abcdef';
+    app.getClockodoAccessToken = () => 'a'.repeat(48);
+    const start = Date.parse('2026-10-05T06:33:25.109Z');
+    app.syncBatches = [{
+        id: 'stale-batch', date: '2026-10-05', version: 1, state: 'failed',
+        entries: [{
+            id: 'stale-entry', activityId: 'act-1', activityNameSnapshot: 'Painting',
+            startTimestamp: start, endTimestamp: start + 1000,
+            customerId: '11', serviceId: '21', syncStatus: 'failed', syncBatchId: 'stale-batch',
+            clockodoPayload: {
+                time_since: '2026-10-05T06:33:25.109Z', time_until: '2026-10-05T06:33:26.109Z',
+                customers_id: 11, services_id: 21, billable: 1, text: 'Painting'
+            }
+        }]
+    }];
+    const sent = [];
+    app.clockodoClient = new context.ClockodoClient({
+        fetchImpl: async (url, init) => {
+            sent.push(JSON.parse(init.body));
+            return { status: 200, ok: true, json: async () => ({ created: true, entryId: 903 }) };
+        }
+    });
+
+    const result = await app.retrySyncBatch('stale-batch');
+    assert.equal(result.state, 'synced');
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].time_since, '2026-10-05T06:33:25Z');
+    assert.equal(sent[0].time_until, '2026-10-05T06:33:26Z');
+    assert.equal(sent[0].customers_id, 11);
+    assert.equal(sent[0].services_id, 21);
+});
