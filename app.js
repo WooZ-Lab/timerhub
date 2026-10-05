@@ -694,6 +694,8 @@ const SYNC_STATUS = Object.freeze({
 });
 
 const CANVAS_GRID_SIZE = 16;
+const CANVAS_SELECT_LONG_PRESS_MS = 1000;
+const CANVAS_SELECT_MOVE_TOLERANCE = 12;
 
 // ============================================================================
 // STORAGE REPOSITORY
@@ -1074,6 +1076,8 @@ class TimerHubApp {
         this.canvasPinch = null;
         this.canvasZIndex = 1;
         this.canvasGesture = null;
+        this.canvasSelectionElement = null;
+        this.selectedActivityIds = new Set();
         this.suppressActivityClick = null;
         this.editingActivityId = null;
         this.editingEntryId = null;
@@ -2582,6 +2586,9 @@ class TimerHubApp {
             if (this.activeActivityId === activity.id) {
                 btn.classList.add('active');
             }
+            if (this.selectedActivityIds?.has(activity.id)) {
+                btn.classList.add('selected');
+            }
             btn.dataset.activityId = activity.id;
             btn.disabled = Boolean(this.timerActionInProgress);
             const layout = this.getActivityCanvasLayout(activity, index);
@@ -2710,6 +2717,98 @@ class TimerHubApp {
         return Number.isFinite(number)
             ? Math.round(number / CANVAS_GRID_SIZE) * CANVAS_GRID_SIZE
             : 0;
+    }
+
+    selectionRectFromPoints(start, current) {
+        return {
+            left: Math.min(start.x, current.x),
+            top: Math.min(start.y, current.y),
+            right: Math.max(start.x, current.x),
+            bottom: Math.max(start.y, current.y)
+        };
+    }
+
+    rectanglesIntersect(a, b) {
+        return a.left <= b.right && a.right >= b.left && a.top <= b.bottom && a.bottom >= b.top;
+    }
+
+    ensureCanvasSelectionRect(viewport) {
+        if (this.canvasSelectionElement) return this.canvasSelectionElement;
+        const element = document.createElement('div');
+        element.className = 'canvas-selection-rect';
+        element.setAttribute('aria-hidden', 'true');
+        viewport.appendChild(element);
+        this.canvasSelectionElement = element;
+        return element;
+    }
+
+    beginCanvasSelection(gesture, viewport) {
+        gesture.mode = 'select';
+        gesture.started = true;
+        gesture.selectStartX = gesture.startX;
+        gesture.selectStartY = gesture.startY;
+        this.ensureCanvasSelectionRect(viewport);
+        this.updateCanvasSelection(gesture, gesture.lastX, gesture.lastY);
+    }
+
+    updateCanvasSelection(gesture, clientX, clientY) {
+        gesture.selectCurrentX = clientX;
+        gesture.selectCurrentY = clientY;
+        const element = this.canvasSelectionElement;
+        if (!element) return;
+        const viewport = document.getElementById('activityCanvasViewport');
+        const viewportRect = viewport && typeof viewport.getBoundingClientRect === 'function'
+            ? viewport.getBoundingClientRect()
+            : { left: 0, top: 0 };
+        const bounds = this.selectionRectFromPoints(
+            { x: gesture.selectStartX, y: gesture.selectStartY },
+            { x: clientX, y: clientY }
+        );
+        element.style.display = 'block';
+        element.style.left = `${bounds.left - viewportRect.left}px`;
+        element.style.top = `${bounds.top - viewportRect.top}px`;
+        element.style.width = `${bounds.right - bounds.left}px`;
+        element.style.height = `${bounds.bottom - bounds.top}px`;
+    }
+
+    hideCanvasSelectionRect() {
+        if (this.canvasSelectionElement) this.canvasSelectionElement.style.display = 'none';
+    }
+
+    setCanvasSelection(ids) {
+        this.selectedActivityIds = new Set(ids);
+        const buttons = document.querySelectorAll?.('.activity-btn') || [];
+        for (const button of buttons) {
+            button.classList.toggle('selected', this.selectedActivityIds.has(button.dataset.activityId));
+        }
+    }
+
+    finishCanvasSelection(gesture) {
+        const bounds = this.selectionRectFromPoints(
+            { x: gesture.selectStartX, y: gesture.selectStartY },
+            { x: gesture.selectCurrentX, y: gesture.selectCurrentY }
+        );
+        const stage = document.getElementById('activitiesGrid');
+        const selected = [];
+        if (stage) {
+            for (const activity of this.activities) {
+                const button = stage.querySelector(
+                    `.activity-btn[data-activity-id="${CSS.escape(activity.id)}"]`
+                );
+                if (!button || typeof button.getBoundingClientRect !== 'function') continue;
+                const box = button.getBoundingClientRect();
+                if (this.rectanglesIntersect(bounds, {
+                    left: box.left,
+                    top: box.top,
+                    right: box.right,
+                    bottom: box.bottom
+                })) {
+                    selected.push(activity.id);
+                }
+            }
+        }
+        this.setCanvasSelection(selected);
+        this.hideCanvasSelectionRect();
     }
 
     readCanvasPan() {
@@ -2898,6 +2997,7 @@ class TimerHubApp {
                 if (this.canvasGesture) {
                     clearTimeout(this.canvasGesture.longPressTimer);
                     this.canvasGesture.activityButton?.classList.remove('dragging');
+                    if (this.canvasGesture.mode === 'select') this.hideCanvasSelectionRect();
                     this.canvasGesture = null;
                 }
 
@@ -2925,6 +3025,8 @@ class TimerHubApp {
                 resizeHandle,
                 startX: event.clientX,
                 startY: event.clientY,
+                lastX: event.clientX,
+                lastY: event.clientY,
                 layout,
                 pan: { ...this.canvasPan },
                 started: false,
@@ -2943,6 +3045,12 @@ class TimerHubApp {
                     this.suppressActivityClick = { activityId, until: Date.now() + 150 };
                     this.showActivityMenu(activityId);
                 }, 550);
+            } else if (mode === 'pan') {
+                this.canvasGesture.longPressTimer = setTimeout(() => {
+                    const gesture = this.canvasGesture;
+                    if (gesture?.pointerId !== event.pointerId || gesture.started) return;
+                    this.beginCanvasSelection(gesture, viewport);
+                }, CANVAS_SELECT_LONG_PRESS_MS);
             }
         });
 
@@ -2965,8 +3073,14 @@ class TimerHubApp {
 
             const dx = event.clientX - gesture.startX;
             const dy = event.clientY - gesture.startY;
+            const distance = Math.hypot(dx, dy);
+            gesture.lastX = event.clientX;
+            gesture.lastY = event.clientY;
 
-            if (!gesture.started && Math.hypot(dx, dy) < 6) return;
+            if (!gesture.started) {
+                if (gesture.mode === 'pan' && distance < CANVAS_SELECT_MOVE_TOLERANCE) return;
+                if (distance < 6) return;
+            }
 
             if (!gesture.started) {
                 gesture.started = true;
@@ -2984,6 +3098,11 @@ class TimerHubApp {
             }
 
             event.preventDefault();
+
+            if (gesture.mode === 'select') {
+                this.updateCanvasSelection(gesture, event.clientX, event.clientY);
+                return;
+            }
 
             if (gesture.mode === 'move') {
                 const worldDx = dx / this.canvasZoom;
@@ -3057,6 +3176,15 @@ class TimerHubApp {
             clearTimeout(gesture.longPressTimer);
             this.canvasGesture = null;
             gesture.activityButton?.classList.remove('dragging');
+
+            if (gesture.mode === 'select') {
+                if (event.type === 'pointercancel') {
+                    this.hideCanvasSelectionRect();
+                } else {
+                    this.finishCanvasSelection(gesture);
+                }
+                return;
+            }
 
             if (gesture.started && gesture.mode === 'pan') {
                 this.saveCanvasView();

@@ -1374,6 +1374,158 @@ test('canvas taps start the timer; movement and resize gestures only save their 
     assert.deepEqual([app.readCanvasPan().x, app.readCanvasPan().y], [35, 25]);
 });
 
+test('canvas selection helpers normalize rectangles and detect bounding-box intersection', () => {
+    const { app } = createTestApp();
+    assert.deepEqual(
+        { ...app.selectionRectFromPoints({ x: 100, y: 40 }, { x: 30, y: 90 }) },
+        { left: 30, top: 40, right: 100, bottom: 90 }
+    );
+    const bounds = app.selectionRectFromPoints({ x: 0, y: 0 }, { x: 50, y: 50 });
+    assert.equal(app.rectanglesIntersect(bounds, { left: 40, top: 40, right: 90, bottom: 90 }), true);
+    assert.equal(app.rectanglesIntersect(bounds, { left: 50, top: 50, right: 90, bottom: 90 }), true, 'touching edges intersect');
+    assert.equal(app.rectanglesIntersect(bounds, { left: 51, top: 0, right: 90, bottom: 90 }), false);
+    assert.equal(app.rectanglesIntersect(bounds, { left: 0, top: 51, right: 90, bottom: 90 }), false);
+});
+
+test('long-press rectangle selection respects tolerance, bounds, pan, and zoom', async () => {
+    const { app, context, localStorageData } = createTestApp();
+    context.CSS = { escape: value => value };
+    context.setTimeout = (callback, delay) => setTimeout(callback, delay);
+
+    const makeElement = (className = '') => {
+        const handlers = new Map();
+        const classes = new Set(className.split(/\s+/).filter(Boolean));
+        const element = {
+            className,
+            dataset: {},
+            style: { setProperty() {} },
+            children: [],
+            hidden: false,
+            classList: {
+                add(value) { classes.add(value); },
+                remove(value) { classes.delete(value); },
+                contains(value) { return classes.has(value) || element.className.split(/\s+/).includes(value); },
+                toggle(value, enabled) {
+                    if (enabled === undefined) enabled = !classes.has(value);
+                    enabled ? classes.add(value) : classes.delete(value);
+                }
+            },
+            setAttribute() {},
+            appendChild(item) { this.children.push(item); return item; },
+            replaceChildren(...items) { this.children = items; },
+            addEventListener(type, handler) { handlers.set(type, handler); },
+            setPointerCapture() {},
+            closest(selector) {
+                return (selector === '.activity-btn' && element.classList.contains('activity-btn')) ||
+                    (selector === '.activity-resize-handle' && element.classList.contains('activity-resize-handle'))
+                    ? element : null;
+            },
+            get handlers() { return handlers; }
+        };
+        return element;
+    };
+
+    const viewportBounds = { left: 0, top: 0, width: 800, height: 600 };
+    const viewport = makeElement();
+    viewport.dataset = {};
+    viewport.getBoundingClientRect = () => viewportBounds;
+    const buttons = [];
+    const handles = [];
+    const stage = makeElement();
+    stage.querySelector = selector => {
+        const isHandle = selector.startsWith('.activity-resize-handle');
+        const id = /data-activity-id="([^"]+)"/.exec(selector)?.[1];
+        return (isHandle ? handles : buttons).find(item => item.dataset.activityId === id) || null;
+    };
+    stage.appendChild = item => {
+        (item.classList.contains('activity-resize-handle') ? handles : buttons).push(item);
+        return item;
+    };
+    stage.replaceChildren = () => { buttons.length = 0; handles.length = 0; };
+    const status = makeElement();
+    const filter = makeElement();
+    filter.value = '';
+    const originalGetById = context.document.getElementById;
+    context.document.getElementById = id => ({
+        activityCanvasViewport: viewport, activitiesGrid: stage, timerRunningStatus: status, logActivityFilter: filter
+    })[id] || originalGetById(id);
+    context.document.querySelector = selector => stage.querySelector(selector);
+    context.document.querySelectorAll = selector => selector === '.activity-btn' ? buttons : [];
+    context.document.createElement = () => makeElement();
+
+    const inside = { id: 'inside', name: 'Inside', position: 0, size: 'medium', color: '#ffffff', shape: 'circle' };
+    const outside = { id: 'outside', name: 'Outside', position: 1, size: 'medium', color: '#ffffff', shape: 'star' };
+    const layouts = {
+        inside: { activityId: 'inside', x: 100, y: 100, width: 100, height: 80 },
+        outside: { activityId: 'outside', x: 600, y: 500, width: 100, height: 80 }
+    };
+    app.activities = [inside, outside];
+    app.activityLayouts = new Map(Object.entries(layouts));
+    const savedLayouts = [];
+    app.storage = { async saveLayout(layout) { savedLayouts.push(structuredClone(layout)); } };
+    app.toggleActivity = async () => {};
+    app.getActiveDuration = () => 0;
+    app.formatDuration = () => '00:00';
+    app.canvasPan = { x: 40, y: -20 };
+    app.canvasZoom = 1.5;
+
+    app.setupActivityCanvasInteractions();
+    app.renderMain();
+    assert.equal(buttons.length, 2);
+    for (const button of buttons) {
+        button.getBoundingClientRect = () => {
+            const layout = layouts[button.dataset.activityId];
+            const left = viewportBounds.left + app.canvasPan.x + layout.x * app.canvasZoom;
+            const top = viewportBounds.top + app.canvasPan.y + layout.y * app.canvasZoom;
+            return {
+                left,
+                top,
+                right: left + layout.width * app.canvasZoom,
+                bottom: top + layout.height * app.canvasZoom
+            };
+        };
+    }
+
+    const pointer = (type, target, x, y) => viewport.handlers.get(type)?.({
+        isPrimary: true, pointerType: 'mouse', button: 0, pointerId: 1,
+        clientX: x, clientY: y, target, type, preventDefault() {}
+    });
+
+    pointer('pointerdown', viewport, 50, 50);
+    pointer('pointermove', viewport, 56, 58);
+    assert.equal(app.canvasGesture.mode, 'pan', 'a short press stays a pan candidate');
+    assert.deepEqual(app.canvasPan, { x: 40, y: -20 }, 'small finger movement must not pan');
+    await new Promise(resolve => setTimeout(resolve, 1050));
+    assert.equal(app.canvasGesture.mode, 'select', 'long press activates rectangle selection');
+    assert.equal(app.canvasSelectionElement.style.display, 'block');
+
+    pointer('pointermove', viewport, 360, 270);
+    assert.equal(app.canvasSelectionElement.style.left, '50px');
+    assert.equal(app.canvasSelectionElement.style.top, '50px');
+    assert.equal(app.canvasSelectionElement.style.width, '310px');
+    assert.equal(app.canvasSelectionElement.style.height, '220px');
+
+    pointer('pointerup', viewport, 360, 270);
+    assert.deepEqual([...app.selectedActivityIds], ['inside'], 'only intersecting DOM boxes are selected');
+    assert.equal(buttons.find(button => button.dataset.activityId === 'inside').classList.contains('selected'), true);
+    assert.equal(buttons.find(button => button.dataset.activityId === 'outside').classList.contains('selected'), false);
+    assert.equal(app.canvasSelectionElement.style.display, 'none');
+    assert.equal(savedLayouts.length, 0, 'selection never repositions activities');
+
+    pointer('pointerdown', viewport, 400, 400);
+    pointer('pointermove', viewport, 440, 430);
+    assert.deepEqual({ ...app.canvasPan }, { x: 80, y: 10 }, 'short press with movement still pans');
+    pointer('pointerup', viewport, 440, 430);
+    assert.equal(app.canvasSelectionElement.style.display, 'none', 'panning never opens the selection rectangle');
+
+    pointer('pointerdown', viewport, 100, 100);
+    pointer('pointermove', viewport, 120, 100);
+    await new Promise(resolve => setTimeout(resolve, 1050));
+    assert.equal(app.canvasGesture.mode, 'pan', 'movement past the tolerance cancels the long press');
+    pointer('pointerup', viewport, 120, 100);
+    assert.ok(localStorageData.has('timerhubActivityCanvasView'), 'pan persists the canvas view');
+});
+
 test('automatic snapshot failures are observable but do not fail saved user data', async () => {
     const { context } = createTestApp();
     const repository = vm.runInContext('new StorageRepository()', context);
