@@ -2479,3 +2479,130 @@ test('retrying an unavailable batch shows a diagnostic instead of failing silent
     assert.equal(html.includes(app.t('retryDiagnosticTitle')), true);
     assert.equal(html.includes(app.t('retryDiagnosticUnavailable')), true);
 });
+
+function makeCustomerServiceApp(app) {
+    app.clockodoReferenceStatus = 'ready';
+    app.clockodoCustomers = [
+        { id: 1, name: 'Customer A', active: true, serviceAssignments: [11, 12] },
+        { id: 2, name: 'Customer B', active: true, serviceAssignments: [12, 13] },
+        { id: 3, name: 'Customer C', active: true }
+    ];
+    app.clockodoServices = [
+        { id: 11, name: 'Service 1', active: true },
+        { id: 12, name: 'Service 2', active: true },
+        { id: 13, name: 'Service 3', active: true }
+    ];
+    app.activities = [{ id: 'act-1', name: 'Painting', customerId: '', serviceId: '', archived: false }];
+    app.reviewDate = '2026-10-05';
+    app.renderLog = () => {};
+    app.renderReview = () => {};
+    app.renderMain = () => {};
+    app.showToast = () => {};
+}
+
+function clockodoComboLabels(app, document, context, fieldName) {
+    const ids = app.clockodoComboboxIds(context, fieldName);
+    return document.getElementById(ids.list).children.map(item => item.textContent);
+}
+
+test('service options are restricted to the selected customer', () => {
+    const { app, document } = createTestApp();
+    makeCustomerServiceApp(app);
+    app.populateClockodoAssignmentSelects('entry', '1', null, 'Customer A', '');
+    app.openClockodoCombobox('entry', 'service');
+    assert.deepEqual(clockodoComboLabels(app, document, 'entry', 'service'), ['No Clockodo assignment', 'Service 1', 'Service 2']);
+    app.closeClockodoCombobox();
+
+    app.populateClockodoAssignmentSelects('entry', '2', null, 'Customer B', '');
+    app.openClockodoCombobox('entry', 'service');
+    assert.deepEqual(clockodoComboLabels(app, document, 'entry', 'service'), ['No Clockodo assignment', 'Service 2', 'Service 3']);
+});
+
+test('a service not allowed for the customer cannot be selected or searched', () => {
+    const { app, document } = createTestApp();
+    makeCustomerServiceApp(app);
+    app.populateClockodoAssignmentSelects('entry', '1', null, 'Customer A', '');
+    app.openClockodoCombobox('entry', 'service');
+    assert.equal(app.clockodoCombobox.options.some(option => option.id === '13'), false);
+    app.closeClockodoCombobox();
+
+    const ids = app.clockodoComboboxIds('entry', 'service');
+    document.getElementById(ids.input).value = 'Service 3';
+    app.applyClockodoAssignmentInput('entry', 'service');
+    assert.equal(document.getElementById(ids.hidden).value, '');
+    assert.deepEqual(clockodoComboLabels(app, document, 'entry', 'service'), ['No Clockodo assignment']);
+});
+
+test('changing or clearing the customer recalculates the allowed services', () => {
+    const { app, document } = createTestApp();
+    makeCustomerServiceApp(app);
+
+    app.populateClockodoAssignmentSelects('entry', '1', '11', 'Customer A', 'Service 1');
+    app.selectClockodoComboboxOption('entry', 'customer', { id: '2', label: 'Customer B' });
+    const ids = app.clockodoComboboxIds('entry', 'service');
+    assert.equal(document.getElementById(ids.hidden).value, '');
+    assert.equal(document.getElementById(ids.input).value, '');
+
+    app.populateClockodoAssignmentSelects('entry', '1', '12', 'Customer A', 'Service 2');
+    app.selectClockodoComboboxOption('entry', 'customer', { id: '2', label: 'Customer B' });
+    assert.equal(document.getElementById(ids.hidden).value, '12');
+
+    app.populateClockodoAssignmentSelects('entry', '1', '11', 'Customer A', 'Service 1');
+    app.selectClockodoComboboxOption('entry', 'customer', { id: '', label: 'No Clockodo assignment', unassigned: true });
+    assert.equal(document.getElementById(ids.hidden).value, '11');
+    app.openClockodoCombobox('entry', 'service');
+    assert.deepEqual(clockodoComboLabels(app, document, 'entry', 'service'), ['No Clockodo assignment', 'Service 1', 'Service 2', 'Service 3']);
+});
+
+test('existing valid assignments restore and invalid ones are flagged instead of substituted', () => {
+    const { app, document } = createTestApp();
+    makeCustomerServiceApp(app);
+    const ids = app.clockodoAssignmentIds('entry');
+    app.populateClockodoAssignmentSelects('entry', '1', '12', 'Customer A', 'Service 2');
+    assert.equal(document.getElementById(ids.service).value, '12');
+    assert.equal(document.getElementById(ids.serviceInput).value, 'Service 2');
+    assert.equal(document.getElementById(ids.hint).textContent, app.t('clockodoAssignmentHelp'));
+
+    app.populateClockodoAssignmentSelects('entry', '1', '13', 'Customer A', 'Service 3');
+    assert.equal(document.getElementById(ids.service).value, '');
+    assert.equal(document.getElementById(ids.serviceInput).value, '');
+    assert.equal(document.getElementById(ids.hint).textContent, app.t('clockodoServiceNotAllowedForCustomer'));
+});
+
+test('customer service filtering keeps numeric IDs in the Clockodo payload', async () => {
+    const { app, context, document } = createTestApp();
+    makeCustomerServiceApp(app);
+    app.clockodoConfigured = true;
+    app.clockodoCustomerId = '';
+    app.clockodoServiceId = '';
+    app.getPushClientId = () => 'client_1234567890abcdef';
+    app.getClockodoAccessToken = () => 'a'.repeat(48);
+
+    app.showAddEntryModal();
+    app.selectClockodoComboboxOption('entry', 'customer', { id: '1', label: 'Customer A' });
+    app.openClockodoCombobox('entry', 'service');
+    app.selectClockodoComboboxOption('entry', 'service', app.clockodoCombobox.options.find(option => option.id === '12'));
+    document.getElementById('entryEditDate').value = '2026-10-05';
+    document.getElementById('entryEditStart').value = '08:00';
+    document.getElementById('entryEditEndDate').value = '2026-10-05';
+    document.getElementById('entryEditEnd').value = '08:30';
+    await app.saveTimeEntry();
+
+    const entry = app.timeEntries[0];
+    assert.equal(entry.customerId, '1');
+    assert.equal(entry.serviceId, '12');
+
+    vm.runInContext(clockodoClientSource, context);
+    const sent = [];
+    app.clockodoClient = new context.ClockodoClient({
+        fetchImpl: async (url, init) => {
+            sent.push(JSON.parse(init.body));
+            return { status: 200, ok: true, json: async () => ({ created: true, entryId: 42 }) };
+        }
+    });
+    app.showSyncConfirmationModal();
+    const batch = await app.confirmAndSyncClockodo();
+    assert.equal(batch.state, 'synced');
+    assert.equal(sent[0].customers_id, 1);
+    assert.equal(sent[0].services_id, 12);
+});

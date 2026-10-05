@@ -262,11 +262,17 @@ export class TimerHubDurableObject {
                         typeof item.name !== "string" || !item.name.trim()) {
                         return jsonError("malformed_response", 502);
                     }
-                    items.push({
+                    const entry = {
                         id: item.id,
                         name: item.name.trim().slice(0, 100),
                         active: item.active === true
-                    });
+                    };
+                    if (responseKey === "customers" && Array.isArray(item.service_assignments)) {
+                        entry.serviceAssignments = item.service_assignments
+                            .filter(value => Number.isSafeInteger(value) && value > 0)
+                            .slice(0, 500);
+                    }
+                    items.push(entry);
                 }
                 const countPages = data.paging && Number.isSafeInteger(data.paging.count_pages)
                     ? data.paging.count_pages

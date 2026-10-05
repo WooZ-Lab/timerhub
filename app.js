@@ -333,6 +333,7 @@ const extendedTranslations = {
         clockodoAssignmentLoadFailed: 'Could not load Clockodo customers and services.',
         clockodoAssignmentReload: 'Reload',
         clockodoAssignmentHelp: 'Type to search. Leave empty for no Clockodo assignment.',
+        clockodoServiceNotAllowedForCustomer: 'The selected service is not allowed for this customer. Choose a valid service.',
         showSecret: 'Show', hideSecret: 'Hide',
         syncSuccessToast: 'Successfully synchronized {count} entries to Clockodo',
         syncPartialFailureToast: '{success} entries synced, {failed} failed. Failed entries can be retried.',
@@ -493,6 +494,7 @@ const extendedTranslations = {
         clockodoAssignmentLoadFailed: 'Clockodo-Kunden und -Leistungen konnten nicht geladen werden.',
         clockodoAssignmentReload: 'Neu laden',
         clockodoAssignmentHelp: 'Tippen zum Suchen. Leer lassen für keine Clockodo-Zuordnung.',
+        clockodoServiceNotAllowedForCustomer: 'Die gewählte Leistung ist für diesen Kunden nicht zulässig. Wähle eine gültige Leistung.',
         showSecret: 'Anzeigen', hideSecret: 'Verbergen',
         syncSuccessToast: '{count} Einträge erfolgreich nach Clockodo synchronisiert',
         syncPartialFailureToast: '{success} Einträge synchronisiert, {failed} fehlgeschlagen. Fehlgeschlagene können wiederholt werden.',
@@ -653,6 +655,7 @@ const extendedTranslations = {
         clockodoAssignmentLoadFailed: 'Не удалось загрузить клиентов и услуги Clockodo.',
         clockodoAssignmentReload: 'Обновить',
         clockodoAssignmentHelp: 'Введите текст для поиска. Оставьте пустым, чтобы не привязывать.',
+        clockodoServiceNotAllowedForCustomer: 'Выбранная услуга недоступна для этого клиента. Выберите допустимую услугу.',
         showSecret: 'Показать', hideSecret: 'Скрыть',
         syncSuccessToast: 'Успешно синхронизировано записей в Clockodo: {count}',
         syncPartialFailureToast: 'Синхронизировано: {success}, с ошибкой: {failed}. Записи с ошибкой можно отправить повторно.',
@@ -4167,8 +4170,50 @@ class TimerHubApp {
             : { input: ids.serviceInput, hidden: ids.service, list: ids.serviceList };
     }
 
-    clockodoComboboxItems(fieldName) {
-        return fieldName === 'customer' ? this.clockodoCustomers : this.clockodoServices;
+    clockodoComboboxItems(context, fieldName) {
+        if (fieldName === 'customer') return this.clockodoCustomers;
+        return this.clockodoAllowedServices(this.clockodoSelectedCustomerId(context));
+    }
+
+    clockodoCustomerById(customerId) {
+        const id = this.normalizeClockodoId(customerId);
+        if (!id) return null;
+        const customers = Array.isArray(this.clockodoCustomers) ? this.clockodoCustomers : [];
+        return customers.find(customer => String(customer.id) === id) || null;
+    }
+
+    clockodoAllowedServices(customerId) {
+        const services = Array.isArray(this.clockodoServices) ? this.clockodoServices : [];
+        const customer = this.clockodoCustomerById(customerId);
+        const assignments = customer?.serviceAssignments;
+        if (!Array.isArray(assignments) || assignments.length === 0) return services;
+        const allowed = new Set(assignments.map(String));
+        return services.filter(service => allowed.has(String(service.id)));
+    }
+
+    clockodoSelectedCustomerId(context) {
+        const { hidden } = this.clockodoComboboxIds(context, 'customer');
+        return this.normalizeClockodoId(document.getElementById(hidden)?.value);
+    }
+
+    setClockodoAssignmentHint(context, message = null) {
+        const ids = this.clockodoAssignmentIds(context);
+        const hint = document.getElementById(ids.hint);
+        if (hint) hint.textContent = message || this.clockodoAssignmentHint();
+    }
+
+    enforceClockodoServiceForCustomer(context) {
+        if (this.clockodoReferenceStatus !== 'ready') return false;
+        const { input, hidden } = this.clockodoComboboxIds(context, 'service');
+        const hiddenEl = document.getElementById(hidden);
+        const selected = this.normalizeClockodoId(hiddenEl?.value);
+        if (!selected) return false;
+        const allowed = this.clockodoAllowedServices(this.clockodoSelectedCustomerId(context));
+        if (allowed.some(service => String(service.id) === selected)) return false;
+        if (hiddenEl) hiddenEl.value = '';
+        const inputEl = document.getElementById(input);
+        if (inputEl) inputEl.value = '';
+        return true;
     }
 
     clockodoAssignmentPlaceholder() {
@@ -4221,8 +4266,8 @@ class TimerHubApp {
         }));
     }
 
-    buildClockodoComboboxOptions(fieldName, query, selectedId, fallbackName) {
-        const source = this.clockodoComboboxItems(fieldName);
+    buildClockodoComboboxOptions(context, fieldName, query, selectedId, fallbackName) {
+        const source = this.clockodoComboboxItems(context, fieldName);
         const items = Array.isArray(source) ? source : [];
         const models = this.clockodoAssignmentOptionModels(items);
         const normalizedQuery = String(query ?? '').trim().toLowerCase();
@@ -4265,10 +4310,11 @@ class TimerHubApp {
         );
         this.populateClockodoAssignmentField(
             { hidden: ids.service, input: ids.serviceInput, list: ids.serviceList },
-            ready ? this.clockodoServices : [],
+            ready ? this.clockodoAllowedServices(this.clockodoSelectedCustomerId(context)) : [],
             selectedServiceId,
             serviceName
         );
+        const serviceCleared = this.enforceClockodoServiceForCustomer(context);
         const placeholder = this.clockodoAssignmentPlaceholder();
         for (const inputId of [ids.customerInput, ids.serviceInput]) {
             const input = document.getElementById(inputId);
@@ -4283,7 +4329,11 @@ class TimerHubApp {
             else this.closeClockodoCombobox();
         }
         const hint = document.getElementById(ids.hint);
-        if (hint) hint.textContent = this.clockodoAssignmentHint();
+        if (hint) {
+            hint.textContent = serviceCleared
+                ? this.t('clockodoServiceNotAllowedForCustomer')
+                : this.clockodoAssignmentHint();
+        }
         const retry = document.getElementById(ids.retry);
         if (retry) retry.style.display = status === 'error' ? '' : 'none';
     }
@@ -4292,8 +4342,13 @@ class TimerHubApp {
         const { input, hidden } = this.clockodoComboboxIds(context, fieldName);
         const inputEl = document.getElementById(input);
         const hiddenEl = document.getElementById(hidden);
-        const match = this.findClockodoItem(this.clockodoComboboxItems(fieldName), inputEl?.value);
+        const match = this.findClockodoItem(this.clockodoComboboxItems(context, fieldName), inputEl?.value);
         if (hiddenEl) hiddenEl.value = match ? String(match.id) : '';
+        const serviceCleared = fieldName === 'customer' ? this.enforceClockodoServiceForCustomer(context) : false;
+        this.setClockodoAssignmentHint(
+            context,
+            serviceCleared ? this.t('clockodoServiceNotAllowedForCustomer') : null
+        );
         if (this.clockodoReferenceStatus === 'ready') this.openClockodoCombobox(context, fieldName, inputEl?.value || '');
         else this.closeClockodoCombobox();
     }
@@ -4305,7 +4360,7 @@ class TimerHubApp {
         const listEl = document.getElementById(list);
         if (!inputEl || !listEl) return;
         const selectedId = document.getElementById(hidden)?.value || '';
-        const options = this.buildClockodoComboboxOptions(fieldName, query, selectedId, inputEl.value);
+        const options = this.buildClockodoComboboxOptions(context, fieldName, query, selectedId, inputEl.value);
         const selectedIndex = selectedId ? options.findIndex(option => option.id === selectedId) : 0;
         this.closeClockodoCombobox();
         this.clockodoCombobox = {
@@ -4417,6 +4472,11 @@ class TimerHubApp {
         if (hiddenEl) hiddenEl.value = option.unassigned ? '' : option.id;
         if (inputEl) inputEl.value = option.unassigned ? '' : option.label;
         this.closeClockodoCombobox();
+        const serviceCleared = fieldName === 'customer' ? this.enforceClockodoServiceForCustomer(context) : false;
+        this.setClockodoAssignmentHint(
+            context,
+            serviceCleared ? this.t('clockodoServiceNotAllowedForCustomer') : null
+        );
     }
 
     scheduleClockodoComboboxClose(context, fieldName) {
@@ -4442,7 +4502,7 @@ class TimerHubApp {
         const { input } = this.clockodoComboboxIds(context, fieldName);
         const inputEl = document.getElementById(input);
         if (!inputEl) return;
-        const items = this.clockodoComboboxItems(fieldName);
+        const items = this.clockodoComboboxItems(context, fieldName);
         const match = this.findClockodoItem(items, inputEl.value);
         if (match) {
             inputEl.value = this.clockodoOptionLabel(match, this.clockodoNameCounts(items));

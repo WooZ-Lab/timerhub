@@ -114,7 +114,13 @@
                     typeof item.name !== 'string' || !item.name.trim()) {
                     throw new ClockodoClientError('malformed_response');
                 }
-                return { id: item.id, name: item.name.trim(), active: item.active === true };
+                const entry = { id: item.id, name: item.name.trim(), active: item.active === true };
+                if (key === 'customers' && Array.isArray(item.serviceAssignments)) {
+                    entry.serviceAssignments = item.serviceAssignments
+                        .filter(value => Number.isSafeInteger(value) && value > 0)
+                        .slice(0, 500);
+                }
+                return entry;
             });
         }
 

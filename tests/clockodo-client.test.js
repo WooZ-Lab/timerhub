@@ -243,3 +243,19 @@ test('Clockodo client allows retry after a rejected request and coalesces concur
     assert.equal(count, 2);
     assert.deepEqual(JSON.parse(JSON.stringify(first)), JSON.parse(JSON.stringify(duplicate)));
 });
+
+test('Clockodo client keeps customer service assignments and drops invalid IDs', async () => {
+    const { client } = makeClient(async () => Response.json({
+        customers: [
+            { id: 1, name: 'Customer A', active: true, serviceAssignments: [11, 12, 0, 'x', -1] },
+            { id: 2, name: 'Customer B', active: true }
+        ]
+    }));
+    const result = await client.getCustomers(...Object.values(clientOptions));
+    assert.deepEqual(JSON.parse(JSON.stringify(result)), {
+        customers: [
+            { id: 1, name: 'Customer A', active: true, serviceAssignments: [11, 12] },
+            { id: 2, name: 'Customer B', active: true }
+        ]
+    });
+});

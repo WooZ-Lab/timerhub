@@ -1147,3 +1147,34 @@ test('Clockodo entry rejections expose safe upstream diagnostics without leaking
     const created = await send();
     assert.deepEqual(await created.json(), { created: true, entryId: 4242 });
 });
+
+test('Clockodo Worker forwards customer service assignments without leaking other fields', async t => {
+    const backend = makeBackend();
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => Response.json({
+        paging: { items_per_page: 1000, current_page: 1, count_pages: 1, count_items: 2 },
+        data: [
+            { id: 5, name: 'Customer A', active: true, service_assignments: [11, 12, 0, 'x'], note: 'private customer note' },
+            { id: 6, name: 'Customer B', active: false }
+        ]
+    });
+    t.after(() => { globalThis.fetch = originalFetch; });
+
+    const clientId = 'clockodo_assignments_client_1';
+    const token = 'clockodo-assignments-token'.padEnd(48, 'a');
+    const auth = { Authorization: `Bearer ${token}` };
+    await backend.request(`/api/clockodo/config?clientId=${clientId}`, {
+        method: 'PUT', headers: { ...auth, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiUser: 'person@example.test', apiKey: 'private-assignment-key' })
+    });
+    const response = await backend.request(`/api/clockodo/customers?clientId=${clientId}`, { headers: auth });
+    assert.equal(response.status, 200);
+    const text = await response.text();
+    assert.deepEqual(JSON.parse(text), {
+        customers: [
+            { id: 5, name: 'Customer A', active: true, serviceAssignments: [11, 12] },
+            { id: 6, name: 'Customer B', active: false }
+        ]
+    });
+    assert.equal(text.includes('private'), false);
+});
