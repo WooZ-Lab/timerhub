@@ -3929,13 +3929,30 @@ class TimerHubApp {
     }
 
     async saveTimeEntry() {
-        const start = this.parseEntryDateTime(
+        const editingId = this.editingEntryId === null || this.editingEntryId === undefined
+            ? null
+            : String(this.editingEntryId);
+        const editing = editingId === null
+            ? undefined
+            : this.timeEntries.find(entry => String(entry.id) === editingId);
+        const resolveBoundary = (dateValue, timeValue, storedTimestamp) => {
+            if (storedTimestamp !== null && storedTimestamp !== undefined && Number.isFinite(Number(storedTimestamp))) {
+                const storedDate = new Date(Number(storedTimestamp));
+                if (dateValue === this.toDateString(storedDate) && timeValue === this.toTimeString(storedDate)) {
+                    return Number(storedTimestamp);
+                }
+            }
+            return this.parseEntryDateTime(dateValue, timeValue);
+        };
+        const start = resolveBoundary(
             document.getElementById('entryEditDate').value,
-            document.getElementById('entryEditStart').value
+            document.getElementById('entryEditStart').value,
+            editing?.startTimestamp
         );
-        const end = this.parseEntryDateTime(
+        const end = resolveBoundary(
             document.getElementById('entryEditEndDate').value,
-            document.getElementById('entryEditEnd').value
+            document.getElementById('entryEditEnd').value,
+            editing?.endTimestamp
         );
         const activityId = document.getElementById('entryEditActivity').value;
         const warning = document.getElementById('entryConflictWarning');
@@ -3954,12 +3971,6 @@ class TimerHubApp {
             return;
         }
 
-        const editingId = this.editingEntryId === null || this.editingEntryId === undefined
-            ? null
-            : String(this.editingEntryId);
-        const editing = editingId === null
-            ? undefined
-            : this.timeEntries.find(entry => String(entry.id) === editingId);
         if ([SYNC_STATUS.CONFIRMED, SYNC_STATUS.SYNCING].includes(editing?.syncStatus)) {
             this.showToast(this.t('confirmedEntryLocked'));
             return;

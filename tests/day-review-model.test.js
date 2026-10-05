@@ -2325,3 +2325,61 @@ test('newly created entries still detect real overlaps', async () => {
     assert.equal(document.getElementById('entryConflictWarning').style.display, 'block');
     assert.equal(app.timeEntries.length, 2);
 });
+
+test('editing an entry without changing its time preserves raw seconds and avoids a false overlap', async () => {
+    const { app, document, storageData } = createTestApp();
+    const t = (h, m, s = 0) => new Date(2026, 8, 28, h, m, s).getTime();
+    await app.addEntry({ id: 'entry-a', activityId: 'act-1', activityNameSnapshot: 'A', startTimestamp: t(12, 0, 45), endTimestamp: t(12, 30, 0) });
+    await app.addEntry({ id: 'entry-b', activityId: 'act-2', activityNameSnapshot: 'B', startTimestamp: t(11, 59, 0), endTimestamp: t(12, 0, 30) });
+    app.activities = [{ id: 'act-1', name: 'A' }, { id: 'act-2', name: 'B' }];
+    app.reviewDate = '2026-09-28';
+    app.renderLog = () => {};
+    app.renderReview = () => {};
+    app.showToast = () => {};
+
+    app.showEntryEditModal('entry-a');
+    await app.saveTimeEntry();
+
+    assert.equal(document.getElementById('entryConflictWarning').style.display, 'none');
+    assert.equal(storageData.timeEntries.find(entry => entry.id === 'entry-a').startTimestamp, t(12, 0, 45));
+    assert.equal(storageData.timeEntries.find(entry => entry.id === 'entry-a').endTimestamp, t(12, 30, 0));
+});
+
+test('editing only the end time keeps the original start seconds and does not report overlap', async () => {
+    const { app, document, storageData } = createTestApp();
+    const t = (h, m, s = 0) => new Date(2026, 8, 28, h, m, s).getTime();
+    await app.addEntry({ id: 'entry-a', activityId: 'act-1', activityNameSnapshot: 'A', startTimestamp: t(12, 0, 45), endTimestamp: t(12, 30, 0) });
+    await app.addEntry({ id: 'entry-b', activityId: 'act-2', activityNameSnapshot: 'B', startTimestamp: t(11, 59, 0), endTimestamp: t(12, 0, 30) });
+    app.activities = [{ id: 'act-1', name: 'A' }, { id: 'act-2', name: 'B' }];
+    app.reviewDate = '2026-09-28';
+    app.renderLog = () => {};
+    app.renderReview = () => {};
+    app.showToast = () => {};
+
+    app.showEntryEditModal('entry-a');
+    document.getElementById('entryEditEnd').value = '12:45';
+    await app.saveTimeEntry();
+
+    assert.equal(document.getElementById('entryConflictWarning').style.display, 'none');
+    assert.equal(storageData.timeEntries.find(entry => entry.id === 'entry-a').startTimestamp, t(12, 0, 45));
+    assert.equal(storageData.timeEntries.find(entry => entry.id === 'entry-a').endTimestamp, t(12, 45, 0));
+});
+
+test('overlap validation does not apply five-minute rounding', async () => {
+    const { app, document, storageData } = createTestApp();
+    const t = (h, m, s = 0) => new Date(2026, 8, 28, h, m, s).getTime();
+    await app.addEntry({ id: 'entry-a', activityId: 'act-1', activityNameSnapshot: 'A', startTimestamp: t(12, 30, 0), endTimestamp: t(12, 32, 0) });
+    await app.addEntry({ id: 'entry-b', activityId: 'act-2', activityNameSnapshot: 'B', startTimestamp: t(12, 33, 0), endTimestamp: t(13, 0, 0) });
+    app.activities = [{ id: 'act-1', name: 'A' }, { id: 'act-2', name: 'B' }];
+    app.reviewDate = '2026-09-28';
+    app.renderLog = () => {};
+    app.renderReview = () => {};
+    app.showToast = () => {};
+
+    app.showEntryEditModal('entry-a');
+    await app.saveTimeEntry();
+
+    assert.equal(document.getElementById('entryConflictWarning').style.display, 'none');
+    assert.equal(storageData.timeEntries.find(entry => entry.id === 'entry-a').endTimestamp, t(12, 32, 0));
+    assert.equal(storageData.timeEntries.find(entry => entry.id === 'entry-b').startTimestamp, t(12, 33, 0));
+});
