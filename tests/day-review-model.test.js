@@ -100,10 +100,10 @@ function createTestApp(initialData = {}) {
         'entryEditProject', 'entryEditService', 'entryEditNotes', 'entryEditModalTitle',
         'entryEditDeleteBtn', 'entryEditSaveBtn', 'entryEditLockedNotice', 'entryConflictWarning', 'entryEditModal',
         'entryEditCustomerSelect', 'entryEditServiceSelect', 'entryEditClockodoHint', 'entryEditClockodoRetryBtn',
-        'entryEditCustomerInput', 'entryEditCustomerOptions', 'entryEditServiceInput', 'entryEditServiceOptions',
+        'entryEditCustomerInput', 'entryEditCustomerList', 'entryEditServiceInput', 'entryEditServiceList',
         'activityModal', 'modalTitle', 'activityName', 'modalSaveBtn', 'modalCancelBtn', 'modalCloseBtn',
         'activityCustomerSelect', 'activityServiceSelect', 'activityClockodoHint', 'activityClockodoRetryBtn',
-        'activityCustomerInput', 'activityCustomerOptions', 'activityServiceInput', 'activityServiceOptions',
+        'activityCustomerInput', 'activityCustomerList', 'activityServiceInput', 'activityServiceList',
         'syncConfirmEntriesList', 'syncConfirmDesc', 'syncConfirmSummary',
         'syncConfirmAlreadySyncedNotice', 'syncConfirmSubmitBtn', 'syncConfirmModal',
         'clockodoEmailInput', 'clockodoApiKeyInput', 'clockodoCustomerIdInput', 'clockodoProjectIdInput', 'clockodoServiceIdInput', 'clockodoSaveBtn',
@@ -122,6 +122,7 @@ function createTestApp(initialData = {}) {
             children: [],
             classList: { add() {}, remove() {}, contains() { return false; } },
             setAttribute() {},
+            removeAttribute() {},
             focus() {},
             appendChild(child) { this.children.push(child); },
             querySelectorAll: () => [],
@@ -140,10 +141,24 @@ function createTestApp(initialData = {}) {
         getElementById: id => elements.get(id) || null,
         querySelector: () => null,
         querySelectorAll: () => [],
-        createElement: () => ({
-            value: '', textContent: '', style: {}, appendChild() {},
-            click() { backupCapture.clicks += 1; backupCapture.filename = this.download; }
-        })
+        createElement: () => {
+            const element = {
+                value: '', textContent: '', style: {}, dataset: {}, className: '', id: '', hidden: false,
+                children: [],
+                classList: {
+                    add: (...names) => { element.className = `${element.className} ${names.join(' ')}`.trim(); },
+                    remove: (...names) => {
+                        for (const name of names) element.className = element.className.split(/\s+/).filter(part => part && part !== name).join(' ');
+                    },
+                    contains: name => element.className.split(/\s+/).includes(name)
+                },
+                setAttribute(name, value) { this[name] = String(value); },
+                removeAttribute(name) { delete this[name]; },
+                appendChild(child) { element.children.push(child); return child; },
+                click() { backupCapture.clicks += 1; backupCapture.filename = this.download; }
+            };
+            return element;
+        }
     };
 
     const context = vm.createContext({
@@ -1444,7 +1459,12 @@ test('Clockodo reference data failures are surfaced without throwing', async () 
     assert.match(app.clockodoAssignmentHint(), /Clockodo rejected these credentials/);
 });
 
-test('Clockodo assignment fields render cached options, saved IDs, and legacy records', () => {
+function clockodoComboboxLabels(app, document, context, fieldName) {
+    const ids = app.clockodoComboboxIds(context, fieldName);
+    return document.getElementById(ids.list).children.map(item => item.textContent);
+}
+
+test('Clockodo assignment fields render saved IDs, fallbacks, and unconfigured states', () => {
     const { app, document } = createTestApp();
     app.clockodoReferenceStatus = 'ready';
     app.clockodoCustomers = [{ id: 3, name: 'Alpha', active: false }, { id: 5, name: 'Beta', active: true }];
@@ -1453,16 +1473,22 @@ test('Clockodo assignment fields render cached options, saved IDs, and legacy re
     app.populateClockodoAssignmentSelects('activity', '5', '9', 'Beta', 'Repair');
     const customerHidden = document.getElementById('activityCustomerSelect');
     const customerInput = document.getElementById('activityCustomerInput');
-    const customerList = document.getElementById('activityCustomerOptions');
     const serviceHidden = document.getElementById('activityServiceSelect');
     const serviceInput = document.getElementById('activityServiceInput');
     assert.equal(customerHidden.value, '5');
     assert.equal(serviceHidden.value, '9');
     assert.equal(customerInput.value, 'Beta');
     assert.equal(serviceInput.value, 'Repair');
-    assert.deepEqual(customerList.children.map(option => option.value), ['Alpha', 'Beta']);
     assert.equal(customerInput.disabled, false);
     assert.equal(customerInput.placeholder, 'No Clockodo assignment');
+
+    app.openClockodoCombobox('activity', 'customer');
+    assert.deepEqual(
+        clockodoComboboxLabels(app, document, 'activity', 'customer'),
+        ['No Clockodo assignment', 'Beta', 'Alpha'],
+        'the current selection is shown first'
+    );
+    app.closeClockodoCombobox();
 
     app.populateClockodoAssignmentSelects('entry');
     const entryCustomerHidden = document.getElementById('entryEditCustomerSelect');
@@ -1477,58 +1503,119 @@ test('Clockodo assignment fields render cached options, saved IDs, and legacy re
     assert.equal(entryCustomerInput.value, 'Removed customer');
     assert.equal(entryCustomerHidden.value, '7');
     assert.match(entryCustomerInput.placeholder, /not configured/);
+    assert.equal(app.clockodoCombobox, null);
 });
 
-test('Clockodo assignment typing searches names and resolves the selected ID', () => {
+test('Clockodo combobox filters by partial name, is case-insensitive, and selects IDs', () => {
     const { app, document } = createTestApp();
     app.clockodoReferenceStatus = 'ready';
     app.clockodoCustomers = [
-        { id: 3, name: 'Alpha', active: true },
-        { id: 5, name: 'Beta', active: true },
-        { id: 8, name: 'Beta', active: false }
+        { id: 11, name: 'Bauunternehmen Müller', active: true },
+        { id: 12, name: 'Elektro Schmidt', active: true },
+        { id: 13, name: 'Bauunternehmen Müller', active: false }
     ];
-    app.clockodoServices = [{ id: 9, name: 'Repair', active: true }];
+    app.clockodoServices = [
+        { id: 21, name: 'Rohbauarbeiten', active: true },
+        { id: 22, name: 'Elektroinstallation', active: true }
+    ];
     app.populateClockodoAssignmentSelects('entry');
 
-    const input = document.getElementById('entryEditCustomerInput');
-    const hidden = document.getElementById('entryEditCustomerSelect');
-    const list = document.getElementById('entryEditCustomerOptions');
-    assert.deepEqual(list.children.map(option => option.value), ['Alpha', 'Beta (#5)', 'Beta (#8)']);
+    const customerInput = document.getElementById('entryEditCustomerInput');
+    const customerHidden = document.getElementById('entryEditCustomerSelect');
+    const customerList = document.getElementById('entryEditCustomerList');
 
-    input.value = 'bet';
+    app.openClockodoCombobox('entry', 'customer');
+    assert.deepEqual(clockodoComboboxLabels(app, document, 'entry', 'customer'), [
+        'No Clockodo assignment',
+        'Bauunternehmen Müller (#11)',
+        'Elektro Schmidt',
+        'Bauunternehmen Müller (#13)'
+    ]);
+
+    customerInput.value = 'BAU';
     app.applyClockodoAssignmentInput('entry', 'customer');
-    assert.equal(hidden.value, '', 'partial names do not resolve');
+    assert.deepEqual(clockodoComboboxLabels(app, document, 'entry', 'customer'), [
+        'No Clockodo assignment',
+        'Bauunternehmen Müller (#11)',
+        'Bauunternehmen Müller (#13)'
+    ]);
+    assert.equal(customerHidden.value, '', 'partial text does not set the ID');
 
-    input.value = 'beta';
+    customerInput.value = 'elektro';
     app.applyClockodoAssignmentInput('entry', 'customer');
-    assert.equal(hidden.value, '', 'duplicate plain names stay ambiguous');
+    assert.deepEqual(clockodoComboboxLabels(app, document, 'entry', 'customer'), [
+        'No Clockodo assignment',
+        'Elektro Schmidt'
+    ]);
 
-    input.value = 'beta (#8)';
+    app.selectClockodoComboboxOption('entry', 'customer', app.clockodoCombobox.options[1]);
+    assert.equal(customerHidden.value, '12');
+    assert.equal(customerInput.value, 'Elektro Schmidt');
+    assert.equal(app.clockodoCombobox, null);
+    assert.equal(customerList.hidden, true);
+
+    const serviceInput = document.getElementById('entryEditServiceInput');
+    const serviceHidden = document.getElementById('entryEditServiceSelect');
+    serviceInput.value = 'roh';
+    app.applyClockodoAssignmentInput('entry', 'service');
+    assert.deepEqual(clockodoComboboxLabels(app, document, 'entry', 'service'), [
+        'No Clockodo assignment',
+        'Rohbauarbeiten'
+    ]);
+    app.selectClockodoComboboxOption('entry', 'service', app.clockodoCombobox.options[1]);
+    assert.equal(serviceHidden.value, '21');
+    assert.equal(serviceInput.value, 'Rohbauarbeiten');
+
+    app.openClockodoCombobox('entry', 'customer');
+    const tappedOption = { dataset: { optionIndex: '2' } };
+    app.onClockodoComboboxListClick('entry', 'customer', { target: { closest: () => tappedOption } });
+    assert.equal(customerHidden.value, '11', 'tapping an option stores its ID');
+    assert.equal(customerInput.value, 'Bauunternehmen Müller (#11)');
+
+    customerInput.value = '';
     app.applyClockodoAssignmentInput('entry', 'customer');
-    assert.equal(hidden.value, '8');
-
-    input.value = 'ALPHA';
-    app.applyClockodoAssignmentInput('entry', 'customer');
-    assert.equal(hidden.value, '3', 'typing resolves the ID live');
-    assert.equal(input.value, 'ALPHA', 'typing text is preserved until commit');
-    app.applyClockodoAssignmentInput('entry', 'customer', { commit: true });
-    assert.equal(input.value, 'Alpha', 'committed text is canonicalized');
-
-    input.value = 'does not exist';
-    app.applyClockodoAssignmentInput('entry', 'customer', { commit: true });
-    assert.equal(hidden.value, '');
-    assert.equal(input.value, '', 'unmatched text is cleared on commit');
-
-    input.value = '';
-    app.applyClockodoAssignmentInput('entry', 'customer');
-    assert.equal(hidden.value, '');
-
-    input.value = 'Alpha';
-    app.applyClockodoAssignmentInput('entry', 'customer');
-    assert.equal(hidden.value, '3');
+    assert.equal(customerHidden.value, '', 'clearing the text clears the ID');
+    assert.equal(clockodoComboboxLabels(app, document, 'entry', 'customer')[0], 'No Clockodo assignment');
+    app.selectClockodoComboboxOption('entry', 'customer', app.clockodoCombobox.options[0]);
+    assert.equal(customerHidden.value, '');
+    assert.equal(customerInput.value, '');
 });
 
-test('Clockodo assignment typing preserves prefixes of longer names', () => {
+test('Clockodo combobox supports keyboard navigation and escape', () => {
+    const { app, document } = createTestApp();
+    app.clockodoReferenceStatus = 'ready';
+    app.clockodoCustomers = [{ id: 3, name: 'Alpha' }, { id: 5, name: 'Beta' }];
+    app.clockodoServices = [];
+    app.populateClockodoAssignmentSelects('entry');
+    const input = document.getElementById('entryEditCustomerInput');
+    const hidden = document.getElementById('entryEditCustomerSelect');
+    const list = document.getElementById('entryEditCustomerList');
+    const press = key => {
+        const event = { key, preventDefault() { event.defaultPrevented = true; } };
+        app.onClockodoComboboxKeydown('entry', 'customer', event);
+        return event;
+    };
+
+    press('ArrowDown');
+    assert.ok(app.clockodoCombobox, 'ArrowDown opens the dropdown');
+    assert.equal(app.clockodoCombobox.activeIndex, 0);
+    press('ArrowDown');
+    assert.equal(app.clockodoCombobox.activeIndex, 1);
+    const enter = press('Enter');
+    assert.equal(enter.defaultPrevented, true);
+    assert.equal(hidden.value, '3');
+    assert.equal(input.value, 'Alpha');
+    assert.equal(app.clockodoCombobox, null);
+
+    press('ArrowDown');
+    assert.equal(app.clockodoCombobox.activeIndex, 1, 'the selected option starts highlighted');
+    const escape = press('Escape');
+    assert.equal(escape.defaultPrevented, true);
+    assert.equal(app.clockodoCombobox, null);
+    assert.equal(list.hidden, true);
+});
+
+test('Clockodo combobox preserves prefixes while typing and normalizes on blur', () => {
     const { app, document } = createTestApp();
     app.clockodoReferenceStatus = 'ready';
     app.clockodoCustomers = [
@@ -1541,29 +1628,22 @@ test('Clockodo assignment typing preserves prefixes of longer names', () => {
 
     input.value = 'Alpha';
     app.applyClockodoAssignmentInput('entry', 'customer');
-    assert.equal(hidden.value, '3');
-    assert.equal(input.value, 'Alpha', 'a prefix of another name is not rewritten while typing');
+    assert.equal(hidden.value, '3', 'an exact name resolves live');
+    assert.equal(input.value, 'Alpha', 'a prefix of another name is not rewritten');
+    app.normalizeClockodoComboboxText('entry', 'customer');
+    assert.equal(input.value, 'Alpha');
 
-    input.value = 'Alpha 2';
+    input.value = 'ALPHA 2';
     app.applyClockodoAssignmentInput('entry', 'customer');
     assert.equal(hidden.value, '4');
+    app.normalizeClockodoComboboxText('entry', 'customer');
+    assert.equal(input.value, 'Alpha 2');
 
-    const serviceInput = document.getElementById('entryEditServiceInput');
-    const serviceHidden = document.getElementById('entryEditServiceSelect');
-    app.clockodoServices = [{ id: 9, name: 'Repair', active: true }];
-    app.populateClockodoAssignmentSelects('entry', null, null, '', '');
-    serviceInput.value = 'repair';
-    app.applyClockodoAssignmentInput('entry', 'service');
-    assert.equal(serviceHidden.value, '9');
-    const assignment = app.readClockodoAssignment('entry');
-    assert.equal(assignment.serviceName, 'Repair');
-
-    const activityInput = document.getElementById('activityCustomerInput');
-    activityInput.value = 'alpha';
-    app.applyClockodoAssignmentInput('activity', 'customer');
-    assert.equal(document.getElementById('activityCustomerSelect').value, '3');
-    app.applyClockodoAssignmentInput('activity', 'customer', { commit: true });
-    assert.equal(activityInput.value, 'Alpha');
+    input.value = 'zzz';
+    app.applyClockodoAssignmentInput('entry', 'customer');
+    assert.equal(hidden.value, '');
+    app.normalizeClockodoComboboxText('entry', 'customer');
+    assert.equal(input.value, '', 'unmatched text is cleared on blur');
 });
 
 test('activity Clockodo assignments persist across create and edit', async () => {

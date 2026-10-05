@@ -1068,6 +1068,10 @@ class TimerHubApp {
         this.clockodoReferenceStatus = 'idle';
         this.clockodoReferenceError = null;
         this.clockodoReferencePromise = null;
+        this.clockodoCombobox = null;
+        this.clockodoComboboxBlurTimer = null;
+        this.clockodoComboboxDocumentHandler = null;
+        this.clockodoComboboxViewportHandler = null;
 
         this.COLORS = [
             '#E74C3C', '#C0392B', '#E67E22', '#D35400', '#F39C12',
@@ -1554,14 +1558,18 @@ class TimerHubApp {
         });
         sel('activityClockodoRetryBtn')?.addEventListener('click', () => this.reloadClockodoReferenceData());
         sel('entryEditClockodoRetryBtn')?.addEventListener('click', () => this.reloadClockodoReferenceData());
-        for (const [inputId, context, fieldName] of [
-            ['activityCustomerInput', 'activity', 'customer'],
-            ['activityServiceInput', 'activity', 'service'],
-            ['entryEditCustomerInput', 'entry', 'customer'],
-            ['entryEditServiceInput', 'entry', 'service']
+        for (const [context, fieldName] of [
+            ['activity', 'customer'], ['activity', 'service'],
+            ['entry', 'customer'], ['entry', 'service']
         ]) {
-            sel(inputId)?.addEventListener('input', () => this.applyClockodoAssignmentInput(context, fieldName));
-            sel(inputId)?.addEventListener('change', () => this.applyClockodoAssignmentInput(context, fieldName, { commit: true }));
+            const combobox = this.clockodoComboboxIds(context, fieldName);
+            sel(combobox.input)?.addEventListener('focus', () => this.openClockodoCombobox(context, fieldName));
+            sel(combobox.input)?.addEventListener('input', () => this.applyClockodoAssignmentInput(context, fieldName));
+            sel(combobox.input)?.addEventListener('keydown', (event) => this.onClockodoComboboxKeydown(context, fieldName, event));
+            sel(combobox.input)?.addEventListener('blur', () => this.scheduleClockodoComboboxClose(context, fieldName));
+            sel(combobox.list)?.addEventListener('pointerdown', () => this.cancelClockodoComboboxClose());
+            sel(combobox.list)?.addEventListener('mousedown', (event) => event.preventDefault());
+            sel(combobox.list)?.addEventListener('click', (event) => this.onClockodoComboboxListClick(context, fieldName, event));
         }
 
         // Log screen
@@ -3559,6 +3567,7 @@ class TimerHubApp {
     }
 
     closeActivityModal() {
+        this.closeClockodoCombobox();
         document.getElementById('activityModal').classList.remove('active');
         this.editingActivityId = null;
     }
@@ -3816,6 +3825,7 @@ class TimerHubApp {
                 const field = document.getElementById(id);
                 if (field) field.disabled = locked || referenceDisabled;
             });
+        if (locked) this.closeClockodoCombobox();
         document.getElementById('entryEditSaveBtn').disabled = locked;
         document.getElementById('entryEditLockedNotice').style.display = locked ? '' : 'none';
     }
@@ -3899,6 +3909,7 @@ class TimerHubApp {
     }
 
     closeEntryEditModal() {
+        this.closeClockodoCombobox();
         document.getElementById('entryEditModal').classList.remove('active');
         this.editingEntryId = null;
     }
@@ -3940,15 +3951,26 @@ class TimerHubApp {
     clockodoAssignmentIds(context) {
         return context === 'activity'
             ? {
-                customer: 'activityCustomerSelect', customerInput: 'activityCustomerInput', customerList: 'activityCustomerOptions',
-                service: 'activityServiceSelect', serviceInput: 'activityServiceInput', serviceList: 'activityServiceOptions',
+                customer: 'activityCustomerSelect', customerInput: 'activityCustomerInput', customerList: 'activityCustomerList',
+                service: 'activityServiceSelect', serviceInput: 'activityServiceInput', serviceList: 'activityServiceList',
                 hint: 'activityClockodoHint', retry: 'activityClockodoRetryBtn'
             }
             : {
-                customer: 'entryEditCustomerSelect', customerInput: 'entryEditCustomerInput', customerList: 'entryEditCustomerOptions',
-                service: 'entryEditServiceSelect', serviceInput: 'entryEditServiceInput', serviceList: 'entryEditServiceOptions',
+                customer: 'entryEditCustomerSelect', customerInput: 'entryEditCustomerInput', customerList: 'entryEditCustomerList',
+                service: 'entryEditServiceSelect', serviceInput: 'entryEditServiceInput', serviceList: 'entryEditServiceList',
                 hint: 'entryEditClockodoHint', retry: 'entryEditClockodoRetryBtn'
             };
+    }
+
+    clockodoComboboxIds(context, fieldName) {
+        const ids = this.clockodoAssignmentIds(context);
+        return fieldName === 'customer'
+            ? { input: ids.customerInput, hidden: ids.customer, list: ids.customerList }
+            : { input: ids.serviceInput, hidden: ids.service, list: ids.serviceList };
+    }
+
+    clockodoComboboxItems(fieldName) {
+        return fieldName === 'customer' ? this.clockodoCustomers : this.clockodoServices;
     }
 
     clockodoAssignmentPlaceholder() {
@@ -3993,15 +4015,31 @@ class TimerHubApp {
         return list.find(item => this.clockodoOptionLabel(item, counts).toLowerCase() === lower) || null;
     }
 
-    buildClockodoDatalist(list, items) {
-        if (!list) return;
-        list.innerHTML = '';
+    clockodoAssignmentOptionModels(items) {
         const counts = this.clockodoNameCounts(items);
-        for (const item of items) {
-            const option = document.createElement('option');
-            option.value = this.clockodoOptionLabel(item, counts);
-            list.appendChild(option);
+        return items.map(item => ({
+            id: String(item.id),
+            label: this.clockodoOptionLabel(item, counts)
+        }));
+    }
+
+    buildClockodoComboboxOptions(fieldName, query, selectedId, fallbackName) {
+        const source = this.clockodoComboboxItems(fieldName);
+        const items = Array.isArray(source) ? source : [];
+        const models = this.clockodoAssignmentOptionModels(items);
+        const normalizedQuery = String(query ?? '').trim().toLowerCase();
+        const matches = models
+            .filter(model => !normalizedQuery || model.label.toLowerCase().includes(normalizedQuery))
+            .slice(0, 50);
+        const id = this.normalizeClockodoId(selectedId);
+        if (id && !normalizedQuery) {
+            const index = matches.findIndex(model => model.id === id);
+            if (index > 0) matches.unshift(matches.splice(index, 1)[0]);
+            else if (index < 0) {
+                matches.unshift(models.find(model => model.id === id) || { id, label: fallbackName || `#${id}` });
+            }
         }
+        return [{ id: '', label: this.t('clockodoAssignmentNone'), unassigned: true }].concat(matches);
     }
 
     populateClockodoAssignmentField(field, items, selectedId, fallbackName) {
@@ -4015,7 +4053,6 @@ class TimerHubApp {
                 ? this.clockodoOptionLabel(match, this.clockodoNameCounts(items))
                 : (id ? fallbackName || `#${id}` : '');
         }
-        this.buildClockodoDatalist(document.getElementById(field.list), items);
     }
 
     populateClockodoAssignmentSelects(context, selectedCustomerId = null, selectedServiceId = null, customerName = '', serviceName = '') {
@@ -4042,24 +4079,239 @@ class TimerHubApp {
                 input.placeholder = placeholder;
             }
         }
+        const open = this.clockodoCombobox;
+        if (open && open.context === context) {
+            if (ready) this.openClockodoCombobox(context, open.field);
+            else this.closeClockodoCombobox();
+        }
         const hint = document.getElementById(ids.hint);
         if (hint) hint.textContent = this.clockodoAssignmentHint();
         const retry = document.getElementById(ids.retry);
         if (retry) retry.style.display = status === 'error' ? '' : 'none';
     }
 
-    applyClockodoAssignmentInput(context, fieldName, { commit = false } = {}) {
-        const ids = this.clockodoAssignmentIds(context);
-        const inputId = fieldName === 'customer' ? ids.customerInput : ids.serviceInput;
-        const hiddenId = fieldName === 'customer' ? ids.customer : ids.service;
-        const items = fieldName === 'customer' ? this.clockodoCustomers : this.clockodoServices;
-        const input = document.getElementById(inputId);
-        const hidden = document.getElementById(hiddenId);
-        const match = this.findClockodoItem(items, input?.value);
-        if (hidden) hidden.value = match ? String(match.id) : '';
-        if (commit && input) {
-            input.value = match ? this.clockodoOptionLabel(match, this.clockodoNameCounts(items)) : '';
+    applyClockodoAssignmentInput(context, fieldName) {
+        const { input, hidden } = this.clockodoComboboxIds(context, fieldName);
+        const inputEl = document.getElementById(input);
+        const hiddenEl = document.getElementById(hidden);
+        const match = this.findClockodoItem(this.clockodoComboboxItems(fieldName), inputEl?.value);
+        if (hiddenEl) hiddenEl.value = match ? String(match.id) : '';
+        if (this.clockodoReferenceStatus === 'ready') this.openClockodoCombobox(context, fieldName, inputEl?.value || '');
+        else this.closeClockodoCombobox();
+    }
+
+    openClockodoCombobox(context, fieldName, query = '') {
+        if (this.clockodoReferenceStatus !== 'ready') return;
+        const { input, hidden, list } = this.clockodoComboboxIds(context, fieldName);
+        const inputEl = document.getElementById(input);
+        const listEl = document.getElementById(list);
+        if (!inputEl || !listEl) return;
+        const selectedId = document.getElementById(hidden)?.value || '';
+        const options = this.buildClockodoComboboxOptions(fieldName, query, selectedId, inputEl.value);
+        const selectedIndex = selectedId ? options.findIndex(option => option.id === selectedId) : 0;
+        this.closeClockodoCombobox();
+        this.clockodoCombobox = {
+            context,
+            field: fieldName,
+            inputId: input,
+            listId: list,
+            options,
+            activeIndex: selectedIndex >= 0 ? selectedIndex : 0
+        };
+        listEl.hidden = false;
+        listEl.innerHTML = '';
+        inputEl.setAttribute('aria-expanded', 'true');
+        this.renderClockodoComboboxList();
+        this.positionClockodoComboboxList();
+        this.bindClockodoComboboxViewportEvents();
+    }
+
+    closeClockodoCombobox() {
+        const state = this.clockodoCombobox;
+        if (!state) return;
+        const inputEl = document.getElementById(state.inputId);
+        const listEl = document.getElementById(state.listId);
+        if (listEl) {
+            listEl.hidden = true;
+            listEl.innerHTML = '';
         }
+        if (inputEl) {
+            inputEl.setAttribute('aria-expanded', 'false');
+            inputEl.removeAttribute('aria-activedescendant');
+        }
+        this.clockodoCombobox = null;
+        this.unbindClockodoComboboxViewportEvents();
+    }
+
+    renderClockodoComboboxList() {
+        const state = this.clockodoCombobox;
+        if (!state) return;
+        const listEl = document.getElementById(state.listId);
+        const inputEl = document.getElementById(state.inputId);
+        if (!listEl) return;
+        listEl.innerHTML = '';
+        state.options.forEach((option, index) => {
+            const item = document.createElement('li');
+            item.className = 'clockodo-combobox-option';
+            item.id = `${state.listId}-option-${index}`;
+            item.dataset.optionIndex = String(index);
+            item.dataset.optionId = option.id;
+            item.setAttribute('role', 'option');
+            item.setAttribute('aria-selected', String(index === state.activeIndex));
+            if (option.unassigned) item.className += ' is-unassigned';
+            if (index === state.activeIndex) item.className += ' is-active';
+            item.textContent = option.label;
+            listEl.appendChild(item);
+        });
+        if (inputEl && state.options[state.activeIndex]) {
+            inputEl.setAttribute('aria-activedescendant', `${state.listId}-option-${state.activeIndex}`);
+        }
+    }
+
+    scrollClockodoComboboxActiveIntoView() {
+        const state = this.clockodoCombobox;
+        if (!state) return;
+        const listEl = document.getElementById(state.listId);
+        const active = listEl?.children?.[state.activeIndex];
+        active?.scrollIntoView?.({ block: 'nearest' });
+    }
+
+    onClockodoComboboxKeydown(context, fieldName, event) {
+        const state = this.clockodoCombobox;
+        const isOpen = Boolean(state && state.context === context && state.field === fieldName);
+        if (!event?.key) return;
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault();
+            if (!isOpen) {
+                this.openClockodoCombobox(context, fieldName);
+                return;
+            }
+            const count = state.options.length;
+            if (!count) return;
+            const delta = event.key === 'ArrowDown' ? 1 : -1;
+            state.activeIndex = (state.activeIndex + delta + count) % count;
+            this.renderClockodoComboboxList();
+            this.scrollClockodoComboboxActiveIntoView();
+        } else if (event.key === 'Enter') {
+            if (!isOpen || !state.options[state.activeIndex]) return;
+            event.preventDefault();
+            this.selectClockodoComboboxOption(context, fieldName, state.options[state.activeIndex]);
+        } else if (event.key === 'Escape') {
+            if (!isOpen) return;
+            event.preventDefault();
+            this.closeClockodoCombobox();
+        }
+    }
+
+    onClockodoComboboxListClick(context, fieldName, event) {
+        const state = this.clockodoCombobox;
+        const optionEl = event?.target?.closest?.('.clockodo-combobox-option');
+        const index = Number(optionEl?.dataset?.optionIndex);
+        if (!optionEl || !state || state.context !== context || state.field !== fieldName || !Number.isInteger(index)) return;
+        this.selectClockodoComboboxOption(context, fieldName, state.options[index]);
+    }
+
+    selectClockodoComboboxOption(context, fieldName, option) {
+        if (!option) return;
+        const { input, hidden } = this.clockodoComboboxIds(context, fieldName);
+        const inputEl = document.getElementById(input);
+        const hiddenEl = document.getElementById(hidden);
+        if (hiddenEl) hiddenEl.value = option.unassigned ? '' : option.id;
+        if (inputEl) inputEl.value = option.unassigned ? '' : option.label;
+        this.closeClockodoCombobox();
+    }
+
+    scheduleClockodoComboboxClose(context, fieldName) {
+        this.cancelClockodoComboboxClose();
+        this.clockodoComboboxBlurTimer = setTimeout(() => {
+            this.clockodoComboboxBlurTimer = null;
+            const state = this.clockodoCombobox;
+            if (state && state.context === context && state.field === fieldName) {
+                this.normalizeClockodoComboboxText(context, fieldName);
+                this.closeClockodoCombobox();
+            }
+        }, 150);
+    }
+
+    cancelClockodoComboboxClose() {
+        if (this.clockodoComboboxBlurTimer) {
+            clearTimeout(this.clockodoComboboxBlurTimer);
+            this.clockodoComboboxBlurTimer = null;
+        }
+    }
+
+    normalizeClockodoComboboxText(context, fieldName) {
+        const { input } = this.clockodoComboboxIds(context, fieldName);
+        const inputEl = document.getElementById(input);
+        if (!inputEl) return;
+        const items = this.clockodoComboboxItems(fieldName);
+        const match = this.findClockodoItem(items, inputEl.value);
+        if (match) {
+            inputEl.value = this.clockodoOptionLabel(match, this.clockodoNameCounts(items));
+        } else if (String(inputEl.value || '').trim()) {
+            inputEl.value = '';
+        }
+    }
+
+    positionClockodoComboboxList() {
+        const state = this.clockodoCombobox;
+        if (!state) return;
+        const inputEl = document.getElementById(state.inputId);
+        const listEl = document.getElementById(state.listId);
+        if (!inputEl || !listEl || typeof inputEl.getBoundingClientRect !== 'function') return;
+        const rect = inputEl.getBoundingClientRect();
+        if (!rect) return;
+        const viewportHeight = Number(window?.innerHeight) || 800;
+        listEl.style.position = 'fixed';
+        listEl.style.left = `${Math.round(rect.left)}px`;
+        listEl.style.width = `${Math.round(rect.width)}px`;
+        const spaceBelow = viewportHeight - rect.bottom;
+        const openUp = spaceBelow < 180 && rect.top > spaceBelow;
+        const available = Math.max(120, Math.min(280, (openUp ? rect.top : spaceBelow) - 12));
+        listEl.style.maxHeight = `${Math.round(available)}px`;
+        if (openUp) {
+            listEl.style.top = 'auto';
+            listEl.style.bottom = `${Math.round(viewportHeight - rect.top + 4)}px`;
+        } else {
+            listEl.style.top = `${Math.round(rect.bottom + 4)}px`;
+            listEl.style.bottom = 'auto';
+        }
+    }
+
+    bindClockodoComboboxViewportEvents() {
+        this.unbindClockodoComboboxViewportEvents();
+        if (typeof document?.addEventListener === 'function') {
+            this.clockodoComboboxDocumentHandler = event => {
+                const state = this.clockodoCombobox;
+                if (!state) return;
+                const target = event?.target;
+                const inputEl = document.getElementById(state.inputId);
+                const listEl = document.getElementById(state.listId);
+                const insideInput = inputEl && (target === inputEl || inputEl.contains?.(target));
+                const insideList = listEl && (target === listEl || listEl.contains?.(target));
+                if (!insideInput && !insideList) this.closeClockodoCombobox();
+            };
+            document.addEventListener('pointerdown', this.clockodoComboboxDocumentHandler, true);
+        }
+        if (typeof window?.addEventListener === 'function') {
+            this.clockodoComboboxViewportHandler = () => {
+                if (this.clockodoCombobox) this.positionClockodoComboboxList();
+            };
+            window.addEventListener('scroll', this.clockodoComboboxViewportHandler, true);
+            window.addEventListener('resize', this.clockodoComboboxViewportHandler);
+        }
+    }
+
+    unbindClockodoComboboxViewportEvents() {
+        if (this.clockodoComboboxDocumentHandler && typeof document?.removeEventListener === 'function') {
+            document.removeEventListener('pointerdown', this.clockodoComboboxDocumentHandler, true);
+        }
+        if (this.clockodoComboboxViewportHandler) {
+            window?.removeEventListener?.('scroll', this.clockodoComboboxViewportHandler, true);
+            window?.removeEventListener?.('resize', this.clockodoComboboxViewportHandler);
+        }
+        this.clockodoComboboxDocumentHandler = null;
+        this.clockodoComboboxViewportHandler = null;
     }
 
     readClockodoAssignment(context) {
