@@ -693,6 +693,8 @@ const SYNC_STATUS = Object.freeze({
     LOCAL_ONLY: 'local_only'
 });
 
+const CANVAS_GRID_SIZE = 16;
+
 // ============================================================================
 // STORAGE REPOSITORY
 // ============================================================================
@@ -2703,6 +2705,13 @@ class TimerHubApp {
         return Number.isFinite(number) ? Math.max(min, Math.min(max, number)) : fallback;
     }
 
+    snapToCanvasGrid(value) {
+        const number = Number(value);
+        return Number.isFinite(number)
+            ? Math.round(number / CANVAS_GRID_SIZE) * CANVAS_GRID_SIZE
+            : 0;
+    }
+
     readCanvasPan() {
         try {
             const value = JSON.parse(localStorage.getItem('timerhubActivityCanvasView') || '{}');
@@ -2980,15 +2989,20 @@ class TimerHubApp {
                 const worldDx = dx / this.canvasZoom;
                 const worldDy = dy / this.canvasZoom;
 
-                gesture.activityButton.style.left =
-                    `${this.clampCanvasCoordinate(gesture.layout.x + worldDx, 0, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY)}px`;
-                gesture.activityButton.style.top =
-                    `${this.clampCanvasCoordinate(gesture.layout.y + worldDy, 0, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY)}px`;
+                const nextX = this.snapToCanvasGrid(
+                    this.clampCanvasCoordinate(gesture.layout.x + worldDx, 0, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY)
+                );
+                const nextY = this.snapToCanvasGrid(
+                    this.clampCanvasCoordinate(gesture.layout.y + worldDy, 0, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY)
+                );
+
+                gesture.activityButton.style.left = `${nextX}px`;
+                gesture.activityButton.style.top = `${nextY}px`;
 
                 this.positionActivityResizeHandle(gesture.activityId, {
                     ...gesture.layout,
-                    x: Number.parseFloat(gesture.activityButton.style.left),
-                    y: Number.parseFloat(gesture.activityButton.style.top)
+                    x: nextX,
+                    y: nextY
                 });
             } else if (gesture.mode === 'resize') {
                 const worldDx = dx / this.canvasZoom;
@@ -3066,13 +3080,21 @@ class TimerHubApp {
                 );
 
                 if (button) {
+                    const rawX = Number.parseFloat(button.style.left) || 0;
+                    const rawY = Number.parseFloat(button.style.top) || 0;
                     const finalLayout = {
                         activityId: gesture.activityId,
-                        x: Number.parseFloat(button.style.left) || 0,
-                        y: Number.parseFloat(button.style.top) || 0,
+                        x: gesture.mode === 'move' ? this.snapToCanvasGrid(rawX) : rawX,
+                        y: gesture.mode === 'move' ? this.snapToCanvasGrid(rawY) : rawY,
                         width: Number.parseFloat(button.style.width) || gesture.layout.width,
                         height: Number.parseFloat(button.style.height) || gesture.layout.height
                     };
+
+                    if (gesture.mode === 'move') {
+                        button.style.left = `${finalLayout.x}px`;
+                        button.style.top = `${finalLayout.y}px`;
+                        this.positionActivityResizeHandle(gesture.activityId, finalLayout);
+                    }
 
                     this.saveActivityCanvasLayout(finalLayout);
                 }
@@ -3141,14 +3163,18 @@ class TimerHubApp {
                 );
             } else if (event.shiftKey) {
                 layout.x = this.clampCanvasCoordinate(
-                    layout.x +
-                    (event.key === 'ArrowRight' ? delta : event.key === 'ArrowLeft' ? -delta : 0),
+                    this.snapToCanvasGrid(
+                        layout.x +
+                        (event.key === 'ArrowRight' ? delta : event.key === 'ArrowLeft' ? -delta : 0)
+                    ),
                     layout.x, 0, 2800
                 );
 
                 layout.y = this.clampCanvasCoordinate(
-                    layout.y +
-                    (event.key === 'ArrowDown' ? delta : event.key === 'ArrowUp' ? -delta : 0),
+                    this.snapToCanvasGrid(
+                        layout.y +
+                        (event.key === 'ArrowDown' ? delta : event.key === 'ArrowUp' ? -delta : 0)
+                    ),
                     layout.y, 0, 1600
                 );
             } else return;

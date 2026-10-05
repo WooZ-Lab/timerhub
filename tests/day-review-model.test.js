@@ -1238,6 +1238,21 @@ test('activity canvas positions and dimensions persist independently and may ove
     assert.equal(layouts[0].y, layouts[1].y);
 });
 
+test('canvas snapping rounds activity positions to the grid, including negative coordinates', () => {
+    const { app } = createTestApp();
+    assert.equal(app.snapToCanvasGrid(0), 0);
+    assert.equal(app.snapToCanvasGrid(7), 0);
+    assert.equal(app.snapToCanvasGrid(15), 16);
+    assert.equal(app.snapToCanvasGrid(16), 16);
+    assert.equal(app.snapToCanvasGrid(24), 32);
+    assert.equal(app.snapToCanvasGrid(131), 128);
+    assert.equal(app.snapToCanvasGrid(174), 176);
+    assert.equal(app.snapToCanvasGrid(-16), -16);
+    assert.equal(app.snapToCanvasGrid(-23), -16);
+    assert.equal(app.snapToCanvasGrid(-39), -32);
+    assert.equal(app.snapToCanvasGrid(Number.NaN), 0);
+});
+
 test('canvas taps start the timer; movement and resize gestures only save their final layout', async () => {
     const { app, context, localStorageData } = createTestApp();
     context.CSS = { escape: value => value };
@@ -1303,6 +1318,10 @@ test('canvas taps start the timer; movement and resize gestures only save their 
     app.renderMain();
     assert.equal(status.hidden, true, 'the idle prompt stays hidden when an activity exists');
 
+    const initialButton = children.find(child => child.classList.contains('activity-btn'));
+    assert.equal(initialButton.style.left, '140px', 'existing off-grid positions render unchanged');
+    assert.equal(initialButton.style.top, '90px', 'existing off-grid positions render unchanged');
+
     const pointer = (type, target, x, y) => viewport.handlers.get(type)?.({
         isPrimary: true, pointerType: 'mouse', button: 0, pointerId: 1, clientX: x, clientY: y, target,
         preventDefault() {}
@@ -1326,7 +1345,9 @@ test('canvas taps start the timer; movement and resize gestures only save their 
     assert.equal(savedLayouts.length, 0, 'pointer movement does not write layout or snapshots');
     pointer('pointerup', button, 44, 51);
     assert.equal(savedLayouts.length, 1, 'the final node position is persisted once');
-    assert.deepEqual(savedLayouts[0], { activityId: activity.id, x: 174, y: 131, width: 260, height: 150 });
+    assert.deepEqual(savedLayouts[0], { activityId: activity.id, x: 176, y: 128, width: 260, height: 150 });
+    assert.equal(savedLayouts[0].x % 16, 0, 'moved positions snap to the 16px grid');
+    assert.equal(savedLayouts[0].y % 16, 0, 'moved positions snap to the 16px grid');
     await button.handlers.get('click')();
     assert.equal(timerStarts, 1, 'a drag cannot accidentally start the timer');
 
@@ -1336,13 +1357,19 @@ test('canvas taps start the timer; movement and resize gestures only save their 
     pointer('pointermove', resize, 50, 30);
     pointer('pointerup', resize, 50, 30);
     assert.equal(savedLayouts.length, 2);
-    assert.deepEqual(savedLayouts[1], { activityId: activity.id, x: 174, y: 131, width: 310, height: 180 });
+    assert.deepEqual(savedLayouts[1], { activityId: activity.id, x: 176, y: 128, width: 310, height: 180 });
     assert.equal(timerStarts, 1, 'resizing cannot start the timer');
+
+    stage.handlers.get('keydown')?.({
+        key: 'ArrowRight', shiftKey: true, target: button, preventDefault() {}
+    });
+    assert.equal(savedLayouts.length, 3, 'keyboard moves persist a snapped position');
+    assert.deepEqual(savedLayouts[2], { activityId: activity.id, x: 192, y: 128, width: 310, height: 180 });
 
     pointer('pointerdown', viewport, 0, 0);
     pointer('pointermove', viewport, 35, 25);
     pointer('pointerup', viewport, 35, 25);
-    assert.equal(savedLayouts.length, 2, 'panning does not create activity layout mutations');
+    assert.equal(savedLayouts.length, 3, 'panning does not create activity layout mutations');
     assert.ok(localStorageData.has('timerhubActivityCanvasView'), 'the viewport returns to its panned position after reload');
     assert.deepEqual([app.readCanvasPan().x, app.readCanvasPan().y], [35, 25]);
 });
