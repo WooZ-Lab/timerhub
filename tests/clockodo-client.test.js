@@ -107,6 +107,65 @@ test('Clockodo client prefers per-entry customer and service over configured def
     assert.equal(payload.services_id, 88);
 });
 
+test('Clockodo client surfaces safe upstream rejection details', async () => {
+    const { client } = makeClient(async () => Response.json({
+        error: 'clockodo_rejected',
+        clockodo: {
+            status: 422,
+            code: 'Validation',
+            message: 'Service is not available for this customer.',
+            path: '/services_id',
+            fields: ['services_id'],
+            apiKey: 'never-leak-this'
+        }
+    }, { status: 422 }));
+    await assert.rejects(
+        () => client.createEntry(...Object.values(clientOptions), { customers_id: 1 }, 'rejection:client:1'),
+        error => {
+            assert.equal(error.code, 'clockodo_rejected');
+            assert.equal(error.status, 422);
+            assert.deepEqual(JSON.parse(JSON.stringify(error.details)), {
+                status: 422,
+                code: 'Validation',
+                message: 'Service is not available for this customer.',
+                path: '/services_id',
+                fields: ['services_id']
+            });
+            assert.equal(JSON.stringify(error.details).includes('never-leak-this'), false);
+            return true;
+        }
+    );
+});
+
+test('Clockodo client sanitizes malformed rejection details and keeps generic fallback', async () => {
+    const { client } = makeClient(async () => Response.json({
+        error: 'clockodo_rejected',
+        clockodo: {
+            status: 'not-a-number',
+            message: `  ${'x'.repeat(400)}\u0000  `,
+            fields: 'not-a-list',
+            apiKey: 'never-leak-this'
+        }
+    }, { status: 400 }));
+    await assert.rejects(
+        () => client.createEntry(...Object.values(clientOptions), { customers_id: 1 }, 'rejection:client:2'),
+        error => {
+            assert.equal(error.code, 'clockodo_rejected');
+            assert.equal(error.details.status, undefined);
+            assert.equal(error.details.message.length, 300);
+            assert.equal(error.details.message.includes('\u0000'), false);
+            assert.equal(error.details.fields, undefined);
+            assert.equal(JSON.stringify(error.details).includes('never-leak-this'), false);
+            return true;
+        }
+    );
+    const { client: withoutDetails } = makeClient(async () => Response.json({ error: 'clockodo_rejected' }, { status: 400 }));
+    await assert.rejects(
+        () => withoutDetails.createEntry(...Object.values(clientOptions), { customers_id: 1 }, 'rejection:client:3'),
+        error => error.code === 'clockodo_rejected' && error.details === null
+    );
+});
+
 test('Clockodo client classifies invalid credentials and malformed responses without exposing response bodies', async () => {
     const unauthorized = makeClient(async () => Response.json({ error: 'secret must not leak' }, { status: 401 }));
     await assert.rejects(() => unauthorized.client.testConnection(...Object.values(clientOptions)), error => error.code === 'invalid_credentials' && error.status === 401);

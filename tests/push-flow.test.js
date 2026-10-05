@@ -1057,3 +1057,93 @@ test('Clockodo customer and service loads classify upstream failures without lea
     const paths = requests.filter(item => item.url.includes('my.clockodo.com')).map(item => new URL(item.url).pathname);
     assert.ok(paths.every(path => path === '/api/v3/customers' || path === '/api/v4/services'));
 });
+
+test('Clockodo entry rejections expose safe upstream diagnostics without leaking secrets', async t => {
+    const backend = makeBackend();
+    const originalFetch = globalThis.fetch;
+    let upstreamResponse = Response.json({}, { status: 400 });
+    globalThis.fetch = async () => upstreamResponse;
+    t.after(() => { globalThis.fetch = originalFetch; });
+
+    const clientId = 'clockodo_rejection_client_1';
+    const token = 'clockodo-rejection-token'.padEnd(48, 'r');
+    const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+    await backend.request(`/api/clockodo/config?clientId=${clientId}`, {
+        method: 'PUT', headers: auth,
+        body: JSON.stringify({ apiUser: 'person@example.test', apiKey: 'private-rejection-key' })
+    });
+    const payload = {
+        time_since: '2026-09-28T08:00:00.000Z', time_until: '2026-09-28T08:00:01.000Z',
+        customers_id: 3, services_id: 9, billable: 1, text: 'Diagnostic'
+    };
+    let attempt = 0;
+    const send = () => {
+        attempt += 1;
+        return backend.request(`/api/clockodo/entries?clientId=${clientId}`, {
+            method: 'POST',
+            headers: { ...auth, 'Idempotency-Key': `rejection:entry:${attempt}` },
+            body: JSON.stringify(payload)
+        });
+    };
+
+    upstreamResponse = Response.json(
+        { error: { code: 400, message: 'Validation failed', fields: ['services_id'] } },
+        { status: 400 }
+    );
+    const badRequest = await send();
+    assert.equal(badRequest.status, 400);
+    const badRequestBody = await badRequest.text();
+    assert.deepEqual(JSON.parse(badRequestBody), {
+        error: 'clockodo_rejected',
+        clockodo: { status: 400, code: '400', message: 'Validation failed', fields: ['services_id'] }
+    });
+    assert.equal(badRequestBody.includes('private-rejection-key'), false);
+
+    upstreamResponse = Response.json(
+        { errors: [{ type: 'Validation', message: 'Service is not available for this customer.', details: 'services_id 9 has no assignment', path: '/services_id' }] },
+        { status: 422 }
+    );
+    const unprocessable = await send();
+    assert.equal(unprocessable.status, 422);
+    assert.deepEqual(await unprocessable.json(), {
+        error: 'clockodo_rejected',
+        clockodo: {
+            status: 422, code: 'Validation',
+            message: 'Service is not available for this customer.', path: '/services_id'
+        }
+    });
+
+    upstreamResponse = Response.json(
+        { errors: [{ type: 'General', message: 'Authentication failed' }] },
+        { status: 401 }
+    );
+    const unauthorized = await send();
+    assert.equal(unauthorized.status, 401);
+    assert.deepEqual(await unauthorized.json(), {
+        error: 'invalid_credentials',
+        clockodo: { status: 401, code: 'General', message: 'Authentication failed' }
+    });
+
+    upstreamResponse = new Response('<html>gateway error with private details</html>', { status: 400 });
+    const malformed = await send();
+    assert.equal(malformed.status, 400);
+    const malformedText = await malformed.text();
+    assert.deepEqual(JSON.parse(malformedText), { error: 'clockodo_rejected' });
+    assert.equal(malformedText.includes('private details'), false);
+
+    upstreamResponse = Response.json({
+        errors: [{ type: 'General', message: 'Nope', apiKey: 'never-leak-this' }],
+        apiKey: 'never-leak-this'
+    }, { status: 403 });
+    const redacted = await send();
+    const redactedText = await redacted.text();
+    assert.deepEqual(JSON.parse(redactedText), {
+        error: 'clockodo_rejected',
+        clockodo: { status: 403, code: 'General', message: 'Nope' }
+    });
+    assert.equal(redactedText.includes('never-leak-this'), false);
+
+    upstreamResponse = Response.json({ entry: { id: 4242 } });
+    const created = await send();
+    assert.deepEqual(await created.json(), { created: true, entryId: 4242 });
+});

@@ -1766,3 +1766,123 @@ test('synchronization sends the per-entry Clockodo assignment instead of the con
     assert.equal(sent[0].body.services_id, 88);
     assert.equal(sent[0].body.projects_id, 34);
 });
+
+test('Clockodo error messages surface safe rejection details with localized fallback', () => {
+    const { app } = createTestApp();
+    assert.equal(
+        app.clockodoErrorMessage({ code: 'clockodo_rejected', details: { status: 422, message: 'Service is not available for this customer.' } }),
+        'Clockodo rejected the entry (422): Service is not available for this customer.'
+    );
+    assert.equal(
+        app.clockodoErrorMessage({ code: 'clockodo_rejected', details: { message: 'Missing required field' } }),
+        'Clockodo rejected the entry: Missing required field'
+    );
+    assert.equal(
+        app.clockodoErrorMessage({ code: 'clockodo_rejected', details: { status: 400 } }),
+        'Clockodo rejected the entry (400).'
+    );
+    assert.equal(
+        app.clockodoErrorMessage({ code: 'clockodo_rejected', details: { status: 400, fields: ['services_id', 'customers_id'] } }),
+        'Clockodo rejected the entry (400): services_id, customers_id'
+    );
+    assert.equal(
+        app.clockodoErrorMessage({ code: 'clockodo_rejected' }),
+        app.t('clockodoRequestRejected')
+    );
+    assert.equal(
+        app.clockodoErrorMessage({ code: 'invalid_credentials' }),
+        app.t('clockodoInvalidCredentials')
+    );
+    assert.equal(
+        app.clockodoErrorMessage({ code: 'clockodo_outcome_unknown', details: { status: 503, message: 'upstream down' } }),
+        app.t('syncOutcomeUnknown'),
+        'uncertain outcomes keep their warning instead of Clockodo details'
+    );
+
+    app.currentLanguage = 'de';
+    assert.match(
+        app.clockodoErrorMessage({ code: 'clockodo_rejected', details: { status: 422, message: 'Fehler' } }),
+        /^Clockodo hat den Eintrag abgelehnt \(422\): Fehler$/
+    );
+    app.currentLanguage = 'ru';
+    assert.match(
+        app.clockodoErrorMessage({ code: 'clockodo_rejected', details: { status: 422, message: 'Ошибка' } }),
+        /^Clockodo отклонил запись \(422\): Ошибка$/
+    );
+});
+
+test('sync failures persist safe rejection details and show them in the toast', async () => {
+    const { app, storageData } = createTestApp();
+    const start = new Date(2026, 8, 28, 8, 0).getTime();
+    await app.addEntry({
+        id: 'rejected-entry', activityId: 'act-1', activityNameSnapshot: 'Painting',
+        startTimestamp: start, endTimestamp: start + 1000
+    });
+    app.reviewDate = '2026-09-28';
+    app.clockodoConfigured = true;
+    app.clockodoCustomerId = '12';
+    app.clockodoServiceId = '56';
+    let toast = null;
+    app.showToast = message => { toast = message; };
+    app.renderReview = () => {};
+    app.clockodoClient = {
+        buildEntryPayload: () => ({ customers_id: 12, services_id: 56, time_since: 'a', time_until: 'b', billable: 1 }),
+        async createEntry() {
+            const error = Object.assign(new Error('rejected'), { code: 'clockodo_rejected' });
+            error.details = { status: 422, message: 'Service is not available for this customer.' };
+            throw error;
+        }
+    };
+
+    app.showSyncConfirmationModal();
+    const batch = await app.confirmAndSyncClockodo();
+    assert.equal(batch.state, 'failed');
+    const entry = batch.entries.find(item => item.id === 'rejected-entry');
+    assert.equal(entry.clockodoError, 'clockodo_rejected');
+    assert.deepEqual(JSON.parse(JSON.stringify(entry.clockodoErrorDetails)), {
+        status: 422,
+        message: 'Service is not available for this customer.'
+    });
+    assert.equal(
+        toast,
+        'Clockodo synchronization failed: Clockodo rejected the entry (422): Service is not available for this customer.'
+    );
+    const stored = storageData.timeEntries.find(item => item.id === 'rejected-entry');
+    assert.deepEqual(JSON.parse(JSON.stringify(stored.clockodoErrorDetails)), {
+        status: 422,
+        message: 'Service is not available for this customer.'
+    });
+});
+
+test('legacy entries without rejection details normalize cleanly and secrets never persist', async () => {
+    const legacyEntry = {
+        id: 'legacy-error-entry', activityId: 'act-1', activityNameSnapshot: 'Painting',
+        startTimestamp: new Date(2026, 8, 28, 8, 0).getTime(),
+        endTimestamp: new Date(2026, 8, 28, 9, 0).getTime(),
+        syncStatus: 'failed', clockodoError: 'clockodo_rejected'
+    };
+    const { app, storageData } = createTestApp({ timeEntries: [legacyEntry] });
+    await app.loadTimeEntries();
+    assert.equal(app.timeEntries[0].clockodoErrorDetails, null);
+    assert.equal(
+        app.clockodoErrorMessage({ code: app.timeEntries[0].clockodoError, details: app.timeEntries[0].clockodoErrorDetails }),
+        app.t('clockodoRequestRejected')
+    );
+
+    const withSecret = app.createTimeEntry({
+        activityId: 'act-1', startTimestamp: 1, endTimestamp: 2,
+        clockodoError: 'clockodo_rejected',
+        clockodoErrorDetails: {
+            status: 422,
+            message: 'Validation failed',
+            apiKey: 'never-store-this',
+            authorization: 'Bearer never-store-this'
+        }
+    });
+    const normalized = app.normalizeTimeEntry(withSecret);
+    assert.equal(JSON.stringify(normalized).includes('never-store-this'), false);
+    assert.equal(JSON.stringify(normalized).includes('authorization'), false);
+    await app.storage.saveTimeEntry(normalized);
+    const persisted = JSON.stringify(storageData.timeEntries);
+    assert.equal(persisted.includes('never-store-this'), false);
+});

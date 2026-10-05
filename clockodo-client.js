@@ -1,10 +1,11 @@
 (function attachClockodoClient(root) {
     class ClockodoClientError extends Error {
-        constructor(code, status = 0) {
+        constructor(code, status = 0, details = null) {
             super(code);
             this.name = 'ClockodoClientError';
             this.code = code;
             this.status = status;
+            this.details = details;
         }
     }
 
@@ -13,6 +14,27 @@
             this.fetchImpl = fetchImpl;
             this.timeoutMs = timeoutMs;
             this.inFlight = new Map();
+        }
+
+        static sanitizeRejectionDetails(raw) {
+            if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+            const clean = value => typeof value === 'string'
+                ? value.replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim()
+                : '';
+            const details = {};
+            const status = Number(raw.status);
+            if (Number.isSafeInteger(status) && status > 0) details.status = status;
+            const code = clean(raw.code).slice(0, 100);
+            const message = clean(raw.message).slice(0, 300);
+            const path = clean(raw.path).slice(0, 200);
+            const fields = Array.isArray(raw.fields)
+                ? raw.fields.map(field => clean(field).slice(0, 100)).filter(Boolean).slice(0, 5)
+                : [];
+            if (code) details.code = code;
+            if (message) details.message = message;
+            if (path) details.path = path;
+            if (fields.length) details.fields = fields;
+            return Object.keys(details).length ? details : null;
         }
 
         async request(path, { clientId, accessToken, method = 'GET', body, idempotencyKey } = {}) {
@@ -67,7 +89,7 @@
                         : status === 429 ? 'rate_limited'
                         : status >= 500 ? 'service_error'
                         : 'request_rejected');
-                    throw new ClockodoClientError(code, status);
+                    throw new ClockodoClientError(code, status, ClockodoClient.sanitizeRejectionDetails(data?.clockodo));
                 }
                 if (!data || typeof data !== 'object' || Array.isArray(data)) {
                     throw new ClockodoClientError('malformed_response', response.status);

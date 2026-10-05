@@ -319,6 +319,9 @@ const extendedTranslations = {
         clockodoServiceError: 'Clockodo is temporarily unavailable. Retry later.',
         clockodoRequestRejected: 'Clockodo rejected the request. Check your account permissions and try again.',
         clockodoResponseInvalid: 'Clockodo returned an unexpected response. Try again later.',
+        clockodoRejectionDetail: 'Clockodo rejected the entry ({status}): {message}',
+        clockodoRejectionMessage: 'Clockodo rejected the entry: {message}',
+        clockodoRejectionStatus: 'Clockodo rejected the entry ({status}).',
         projectPlaceholder: 'Project name or ID', servicePlaceholder: 'Service name or ID', notesPlaceholder: 'Description of work done',
         customerIdPlaceholder: 'Clockodo customer ID', projectIdPlaceholder: 'Clockodo project ID', serviceIdPlaceholder: 'Clockodo service ID',
         clockodoAssignment: 'Clockodo assignment',
@@ -471,6 +474,9 @@ const extendedTranslations = {
         clockodoServiceError: 'Clockodo ist vorübergehend nicht verfügbar. Versuche es später erneut.',
         clockodoRequestRejected: 'Clockodo hat die Anfrage abgelehnt. Prüfe die Kontoberechtigungen und versuche es erneut.',
         clockodoResponseInvalid: 'Clockodo hat eine unerwartete Antwort gesendet. Versuche es später erneut.',
+        clockodoRejectionDetail: 'Clockodo hat den Eintrag abgelehnt ({status}): {message}',
+        clockodoRejectionMessage: 'Clockodo hat den Eintrag abgelehnt: {message}',
+        clockodoRejectionStatus: 'Clockodo hat den Eintrag abgelehnt ({status}).',
         projectPlaceholder: 'Projektname oder ID', servicePlaceholder: 'Leistungsname oder ID', notesPlaceholder: 'Beschreibung der ausgeführten Arbeit',
         customerIdPlaceholder: 'Clockodo-Kunden-ID', projectIdPlaceholder: 'Clockodo-Projekt-ID', serviceIdPlaceholder: 'Clockodo-Leistungs-ID',
         clockodoAssignment: 'Clockodo-Zuordnung',
@@ -623,6 +629,9 @@ const extendedTranslations = {
         clockodoServiceError: 'Clockodo временно недоступен. Повторите позже.',
         clockodoRequestRejected: 'Clockodo отклонил запрос. Проверьте права доступа к аккаунту и повторите попытку.',
         clockodoResponseInvalid: 'Clockodo вернул неожиданный ответ. Повторите попытку позже.',
+        clockodoRejectionDetail: 'Clockodo отклонил запись ({status}): {message}',
+        clockodoRejectionMessage: 'Clockodo отклонил запись: {message}',
+        clockodoRejectionStatus: 'Clockodo отклонил запись ({status}).',
         projectPlaceholder: 'Название или ID проекта', servicePlaceholder: 'Название или ID услуги', notesPlaceholder: 'Описание выполненной работы',
         customerIdPlaceholder: 'ID клиента Clockodo', projectIdPlaceholder: 'ID проекта Clockodo', serviceIdPlaceholder: 'ID услуги Clockodo',
         clockodoAssignment: 'Привязка Clockodo',
@@ -1232,6 +1241,26 @@ class TimerHubApp {
         return /^\d+$/.test(text) ? text : null;
     }
 
+    normalizeClockodoErrorDetails(raw) {
+        if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+        const details = {};
+        const status = Number(raw.status);
+        if (Number.isSafeInteger(status) && status > 0) details.status = status;
+        for (const key of ['code', 'message', 'path']) {
+            if (typeof raw[key] === 'string' && raw[key].trim()) {
+                details[key] = raw[key].trim().slice(0, 300);
+            }
+        }
+        if (Array.isArray(raw.fields)) {
+            const fields = raw.fields
+                .filter(field => typeof field === 'string' && field.trim())
+                .map(field => field.trim().slice(0, 100))
+                .slice(0, 5);
+            if (fields.length) details.fields = fields;
+        }
+        return Object.keys(details).length ? details : null;
+    }
+
     normalizeTimeEntry(raw = {}) {
         if (!raw || typeof raw !== 'object') {
             raw = {};
@@ -1276,7 +1305,8 @@ class TimerHubApp {
             syncBatchId: raw.syncBatchId ? String(raw.syncBatchId) : null,
             clockodoEntryId,
             clockodoSyncedAt: raw.clockodoSyncedAt && Number.isFinite(Number(raw.clockodoSyncedAt)) ? Number(raw.clockodoSyncedAt) : null,
-            clockodoError: raw.clockodoError ? String(raw.clockodoError) : null
+            clockodoError: raw.clockodoError ? String(raw.clockodoError) : null,
+            clockodoErrorDetails: this.normalizeClockodoErrorDetails(raw.clockodoErrorDetails)
         };
     }
 
@@ -1304,7 +1334,8 @@ class TimerHubApp {
             syncBatchId: data.syncBatchId || null,
             clockodoEntryId: data.clockodoEntryId || null,
             clockodoSyncedAt: data.clockodoSyncedAt || null,
-            clockodoError: data.clockodoError || null
+            clockodoError: data.clockodoError || null,
+            clockodoErrorDetails: this.normalizeClockodoErrorDetails(data.clockodoErrorDetails)
         };
         return this.normalizeTimeEntry(base);
     }
@@ -1453,6 +1484,7 @@ class TimerHubApp {
             if (existing.syncStatus === SYNC_STATUS.SYNCED || existing.syncStatus === SYNC_STATUS.LOCAL_ONLY || existing.syncStatus === SYNC_STATUS.CONFIRMED) {
                 merged.syncStatus = SYNC_STATUS.UNSYNCED;
                 merged.clockodoError = null;
+                merged.clockodoErrorDetails = null;
             }
         }
 
@@ -2074,7 +2106,7 @@ class TimerHubApp {
             const unknownNotice = entry.syncStatus === SYNC_STATUS.UNKNOWN ? `<small>${this.t('syncOutcomeUnknown')}</small>` : '';
             const localOnlyNotice = entry.syncStatus === SYNC_STATUS.LOCAL_ONLY ? `<small>${this.t('syncLocalOnlyNotice')}</small>` : '';
             const errorNotice = entry.clockodoError && entry.syncStatus === SYNC_STATUS.FAILED
-                ? `<small>${this.escapeHtml(this.clockodoErrorMessage({ code: entry.clockodoError }))}</small>`
+                ? `<small>${this.escapeHtml(this.clockodoErrorMessage({ code: entry.clockodoError, details: entry.clockodoErrorDetails }))}</small>`
                 : '';
             return `${gap}<article class="review-entry-card${issues.length ? ' suspicious-entry' : ''}" data-entry-id="${this.escapeHtml(entry.id)}">
                 <div class="review-entry-header">
@@ -2234,11 +2266,13 @@ class TimerHubApp {
             if (entry.clockodoEntryId) {
                 entry.syncStatus = SYNC_STATUS.LOCAL_ONLY;
                 entry.clockodoError = null;
+                entry.clockodoErrorDetails = null;
                 await this.persistSyncProgress(batch);
                 continue;
             }
             entry.syncStatus = SYNC_STATUS.SYNCING;
             entry.clockodoError = null;
+            entry.clockodoErrorDetails = null;
             if (!entry.clockodoPayload) {
                 try {
                     entry.clockodoPayload = this.clockodoClient.buildEntryPayload(entry, {
@@ -2250,6 +2284,7 @@ class TimerHubApp {
                 } catch (error) {
                     entry.syncStatus = SYNC_STATUS.FAILED;
                     entry.clockodoError = error?.code || 'invalid_assignment';
+                    entry.clockodoErrorDetails = null;
                     await this.persistSyncProgress(batch);
                     continue;
                 }
@@ -2263,16 +2298,19 @@ class TimerHubApp {
                 if (result.created !== true || !Number.isSafeInteger(Number(result.entryId)) || Number(result.entryId) <= 0) {
                     entry.syncStatus = SYNC_STATUS.UNKNOWN;
                     entry.clockodoError = 'malformed_response';
+                    entry.clockodoErrorDetails = null;
                 } else {
                     entry.syncStatus = SYNC_STATUS.SYNCED;
                     entry.clockodoEntryId = Number(result.entryId);
                     entry.clockodoSyncedAt = Date.now();
                     entry.clockodoError = null;
+                    entry.clockodoErrorDetails = null;
                 }
             } catch (error) {
                 const uncertain = ['network_error', 'timeout', 'malformed_response', 'network_outcome_unknown', 'timeout_outcome_unknown', 'operation_outcome_unknown', 'clockodo_outcome_unknown'].includes(error?.code);
                 entry.syncStatus = uncertain ? SYNC_STATUS.UNKNOWN : SYNC_STATUS.FAILED;
                 entry.clockodoError = error?.code || 'request_rejected';
+                entry.clockodoErrorDetails = uncertain ? null : this.normalizeClockodoErrorDetails(error?.details);
             }
             await this.persistSyncProgress(batch);
         }
@@ -2295,8 +2333,13 @@ class TimerHubApp {
         else if (localOnly > 0 && failed === 0 && unknown === 0) this.showToast(this.t('syncLocalOnlyToast', { count: localOnly }));
         else if (batch.state === SYNC_STATUS.UNKNOWN) this.showToast(this.t('syncOutcomeUnknown'));
         else if (batch.state === SYNC_STATUS.FAILED) {
-            const firstFailure = batch.entries.find(entry => entry.syncStatus === SYNC_STATUS.FAILED)?.clockodoError;
-            this.showToast(this.t('syncFailedToast', { error: this.clockodoErrorMessage({ code: firstFailure }) }));
+            const firstFailure = batch.entries.find(entry => entry.syncStatus === SYNC_STATUS.FAILED);
+            this.showToast(this.t('syncFailedToast', {
+                error: this.clockodoErrorMessage({
+                    code: firstFailure?.clockodoError,
+                    details: firstFailure?.clockodoErrorDetails
+                })
+            }));
         } else this.showToast(this.t('syncPartialFailureToast', { success: succeeded, failed: failed + unknown }));
         return batch;
     }
@@ -4410,6 +4453,22 @@ class TimerHubApp {
     }
 
     clockodoErrorMessage(error) {
+        const uncertainCodes = new Set([
+            'clockodo_outcome_unknown', 'operation_outcome_unknown', 'network_outcome_unknown',
+            'timeout_outcome_unknown', 'network_error', 'timeout'
+        ]);
+        const details = this.normalizeClockodoErrorDetails(error?.details);
+        if (details && !uncertainCodes.has(error?.code)) {
+            const status = details.status;
+            const message = details.message
+                || (Array.isArray(details.fields) && details.fields.length ? details.fields.join(', ') : '')
+                || details.path
+                || details.code
+                || '';
+            if (message && status) return this.t('clockodoRejectionDetail', { status, message });
+            if (message) return this.t('clockodoRejectionMessage', { message });
+            if (status) return this.t('clockodoRejectionStatus', { status });
+        }
         const messagesByCode = {
             network_error: this.t('clockodoNetworkError'), timeout: this.t('clockodoTimeout'),
             timeout_outcome_unknown: this.t('clockodoTimeout'), invalid_credentials: this.t('clockodoInvalidCredentials'),

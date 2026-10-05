@@ -205,6 +205,39 @@ export class TimerHubDurableObject {
             : "clockodo_rejected";
     }
 
+    clockodoRejectionDetails(status, data) {
+        const clean = value => typeof value === "string"
+            ? value.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 300)
+            : "";
+        const details = { status };
+        const errors = data && Array.isArray(data.errors) ? data.errors : [];
+        const apiError = errors.find(item => item && typeof item === "object" && !Array.isArray(item)) || null;
+        if (apiError) {
+            const code = clean(apiError.type);
+            const message = clean(apiError.message);
+            const alternative = clean(apiError.details);
+            const path = clean(apiError.path);
+            if (code) details.code = code;
+            if (message) details.message = message;
+            if (alternative && !message) details.message = alternative;
+            if (path) details.path = path;
+        }
+        const simple = data && data.error && typeof data.error === "object" && !Array.isArray(data.error)
+            ? data.error
+            : null;
+        if (simple) {
+            const code = Number(simple.code);
+            const message = clean(simple.message);
+            const fields = Array.isArray(simple.fields)
+                ? simple.fields.map(clean).filter(Boolean).slice(0, 5)
+                : [];
+            if (!details.code && Number.isSafeInteger(code) && code > 0) details.code = String(code);
+            if (!details.message && message) details.message = message;
+            if (fields.length) details.fields = fields;
+        }
+        return details.code || details.message || details.path || details.fields ? details : null;
+    }
+
     async clockodoListResponse(token, credentials, resource, responseKey) {
         const items = [];
         try {
@@ -361,15 +394,22 @@ export class TimerHubDurableObject {
             await this.state.storage.put(storageKey, { state: "sending", at: Date.now() });
             try {
                 const response = await this.clockodoFetch(request, token, credentials, "v2/entries", body, "POST");
-                const data = await response.json().catch(() => null);
+                const rawBody = await response.text().catch(() => "");
+                let data = null;
+                try {
+                    data = rawBody ? JSON.parse(rawBody) : null;
+                } catch {
+                    data = null;
+                }
                 if (!response.ok) {
                     const uncertain = response.status >= 500;
+                    const rejection = this.clockodoRejectionDetails(response.status, data);
                     await this.state.storage.put(storageKey, { state: uncertain ? "unknown" : "failed", status: response.status, at: Date.now() });
                     const error = response.status === 401 ? "invalid_credentials"
                         : response.status === 429 ? "rate_limited"
                         : uncertain ? "clockodo_outcome_unknown"
                         : "clockodo_rejected";
-                    return jsonError(error, response.status);
+                    return Response.json({ error, ...(rejection ? { clockodo: rejection } : {}) }, { status: response.status });
                 }
                 if (!data?.entry || !Number.isInteger(Number(data.entry.id)) || Number(data.entry.id) <= 0) {
                     await this.state.storage.put(storageKey, { state: "unknown", at: Date.now() });
