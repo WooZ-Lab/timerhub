@@ -2598,7 +2598,10 @@ class TimerHubApp {
             btn.setAttribute('aria-label', this.activeActivityId === activity.id
                 ? this.t('activityStopAria', { activity: activity.name })
                 : this.t('activityStartAria', { activity: activity.name }));
-            btn.style.setProperty('--activity-accent', activity.color || '#18794e');
+            const activityColor = activity.color || '#18794e';
+            btn.style.setProperty('--activity-accent', activityColor);
+            // Activity text color MUST derive from the background: white -> black, black -> white.
+            btn.style.setProperty('--activity-text-color', this.contrastingTextColor(activityColor));
 
             const name = document.createElement('div');
             name.className = 'btn-name';

@@ -2448,18 +2448,20 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 /* Activity shape itself carries the activity color. */
 #activitiesGrid .activity-btn.activity-node {
     background: var(--activity-accent, var(--brand)) !important;
-    color: #fff;
+    color: var(--activity-text-color, #000000);
     border: 0 !important;
     box-shadow: none;
 }
 
-/* Preserve readable text on every colored shape. */
+/* Preserve readable text on every colored shape. The foreground is generated
+   from the background color (white -> black, black -> white) and must not be
+   replaced by a fixed global text color. */
 #activitiesGrid .activity-btn.activity-node .btn-name,
 #activitiesGrid .activity-btn.activity-node .btn-time,
 #activitiesGrid .activity-btn.activity-node .btn-duration,
 #activitiesGrid .activity-btn.activity-node .btn-state,
 #activitiesGrid .activity-btn.activity-node .btn-hint {
-    color: #fff;
+    color: var(--activity-text-color, #000000) !important;
 }
 
 /* Remove all visual remnants of the former internal color/shape markers. */

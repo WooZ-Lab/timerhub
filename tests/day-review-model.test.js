@@ -96,6 +96,7 @@ function createTestApp(initialData = {}) {
     const elements = new Map();
     for (const id of [
         'reviewDateInput', 'reviewSummaryBar', 'reviewEntriesList', 'reviewSuspiciousBanner',
+        'activitiesGrid', 'timerRunningStatus',
         'entryEditDate', 'entryEditEndDate', 'entryEditStart', 'entryEditEnd', 'entryEditActivity',
         'entryEditProject', 'entryEditService', 'entryEditNotes', 'entryEditModalTitle',
         'entryEditDeleteBtn', 'entryEditSaveBtn', 'entryEditLockedNotice', 'entryConflictWarning', 'entryEditModal',
@@ -118,13 +119,14 @@ function createTestApp(initialData = {}) {
             disabled: false,
             textContent: '',
             dataset: {},
-            style: {},
+            style: { setProperty(name, value) { this[name] = value; } },
             children: [],
-            classList: { add() {}, remove() {}, contains() { return false; } },
+            classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
             setAttribute() {},
             removeAttribute() {},
             focus() {},
             appendChild(child) { this.children.push(child); },
+            replaceChildren() { this.children.length = 0; },
             querySelectorAll: () => [],
             addEventListener() {}
         });
@@ -143,17 +145,19 @@ function createTestApp(initialData = {}) {
         querySelectorAll: () => [],
         createElement: () => {
             const element = {
-                value: '', textContent: '', style: {}, dataset: {}, className: '', id: '', hidden: false,
+                value: '', textContent: '', style: { setProperty(name, value) { this[name] = value; } }, dataset: {}, className: '', id: '', hidden: false,
                 children: [],
                 classList: {
                     add: (...names) => { element.className = `${element.className} ${names.join(' ')}`.trim(); },
                     remove: (...names) => {
                         for (const name of names) element.className = element.className.split(/\s+/).filter(part => part && part !== name).join(' ');
                     },
+                    toggle() {},
                     contains: name => element.className.split(/\s+/).includes(name)
                 },
                 setAttribute(name, value) { this[name] = String(value); },
                 removeAttribute(name) { delete this[name]; },
+                addEventListener() {},
                 appendChild(child) { element.children.push(child); return child; },
                 click() { backupCapture.clicks += 1; backupCapture.filename = this.download; }
             };
@@ -2784,4 +2788,31 @@ test('Clockodo customer and service fields show descriptive placeholders when em
     app.clockodoReferenceStatus = 'unconfigured';
     app.populateClockodoAssignmentSelects('entry');
     assert.match(document.getElementById(ids.customerInput).placeholder, /not configured/);
+});
+
+test('activity buttons derive their text color from the centralized contrast rule', () => {
+    const { app, document } = createTestApp();
+    app.activities = [
+        { id: 'white-activity', name: 'White', color: '#ffffff', shape: 'circle', size: 'medium', archived: false },
+        { id: 'black-activity', name: 'Black', color: '#000000', shape: 'square', size: 'medium', archived: false },
+        { id: 'yellow-activity', name: 'Yellow', color: '#F1C40F', shape: 'circle', size: 'medium', archived: false },
+        { id: 'navy-activity', name: 'Navy', color: '#2C3E50', shape: 'circle', size: 'medium', archived: false }
+    ];
+    app.applyCanvasTransform = () => {};
+    app.populateActivityFilter = () => {};
+    app.renderMain();
+
+    const grid = document.getElementById('activitiesGrid');
+    const buttons = grid.children.filter(element => typeof element.className === 'string' && element.className.includes('activity-btn'));
+    assert.equal(buttons.length, 4);
+    for (const button of buttons) {
+        const activity = app.activities.find(item => item.id === button.dataset.activityId);
+        assert.equal(button.style['--activity-accent'], activity.color);
+        assert.equal(button.style['--activity-text-color'], app.contrastingTextColor(activity.color));
+        assert.notEqual(button.style['--activity-text-color'], activity.color);
+    }
+    assert.equal(buttons.find(button => button.dataset.activityId === 'white-activity').style['--activity-text-color'], '#000000');
+    assert.equal(buttons.find(button => button.dataset.activityId === 'black-activity').style['--activity-text-color'], '#ffffff');
+    assert.equal(buttons.find(button => button.dataset.activityId === 'yellow-activity').style['--activity-text-color'], '#000000');
+    assert.equal(buttons.find(button => button.dataset.activityId === 'navy-activity').style['--activity-text-color'], '#ffffff');
 });

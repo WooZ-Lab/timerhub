@@ -1233,3 +1233,41 @@ test('Clockodo customer and service fields use input placeholders instead of sep
     assert.match(htmlSource, /id="entryEditCustomerInput"[^>]*data-i18n-aria-label="clockodoCustomerSelectLabel"/);
     assert.match(htmlSource, /id="entryEditServiceInput"[^>]*data-i18n-aria-label="clockodoServiceSelectLabel"/);
 });
+
+test('activity contrast rule maximizes WCAG contrast for every palette color', () => {
+    const browser = makeBrowserHarness(makeBackend());
+    const luminance = hexColor => {
+        const hex = hexColor.replace('#', '');
+        const channels = [0, 2, 4].map(index => parseInt(hex.slice(index, index + 2), 16) / 255);
+        const linear = channels.map(value => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+        return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+    };
+    const contrast = (a, b) => {
+        const [light, dark] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+        return (light + 0.05) / (dark + 0.05);
+    };
+
+    assert.equal(browser.app.contrastingTextColor('#ffffff'), '#000000');
+    assert.equal(browser.app.contrastingTextColor('#000000'), '#ffffff');
+    assert.equal(browser.app.contrastingTextColor('#F1C40F'), '#000000');
+    assert.equal(browser.app.contrastingTextColor('#2C3E50'), '#ffffff');
+
+    const palette = source.match(/this\.COLORS = \[([\s\S]*?)\];/)[1]
+        .split(',')
+        .map(value => value.trim().replace(/^'|'$/g, ''))
+        .filter(Boolean);
+    assert.ok(palette.length > 0);
+    for (const color of palette) {
+        const foreground = browser.app.contrastingTextColor(color);
+        assert.ok(['#000000', '#ffffff'].includes(foreground), `${color} produced ${foreground}`);
+        assert.notEqual(foreground, color);
+        assert.ok(contrast(color, foreground) >= 4.5, `${color} with ${foreground} has insufficient contrast`);
+    }
+});
+
+test('activity rendering derives text color from the centralized contrast helper', () => {
+    assert.match(source, /btn\.style\.setProperty\('--activity-text-color', this\.contrastingTextColor\(/);
+    assert.match(styleSource, /#activitiesGrid \.activity-btn\.activity-node \{[^}]*background:\s*var\(--activity-accent[^}]*color:\s*var\(--activity-text-color/);
+    assert.equal(/#activitiesGrid \.activity-btn\.activity-node \{[^}]*color:\s*#fff/i.test(styleSource), false);
+    assert.match(styleSource, /\.activity-node \.btn-name,[\s\S]*?\.btn-hint \{\s*color:\s*var\(--activity-text-color/);
+});
