@@ -1886,3 +1886,130 @@ test('legacy entries without rejection details normalize cleanly and secrets nev
     const persisted = JSON.stringify(storageData.timeEntries);
     assert.equal(persisted.includes('never-store-this'), false);
 });
+
+function makeAssignmentClient(sent, failEntryId = null) {
+    return {
+        buildEntryPayload(entry, config) {
+            const idFor = (value, fallback) => {
+                const source = /^\d+$/.test(String(value ?? '')) ? value : fallback;
+                if (source === null || source === undefined || String(source).trim() === '') return null;
+                const parsed = Number(source);
+                return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : null;
+            };
+            const customerId = idFor(entry.customerId, idFor(config.customerId, null));
+            const serviceId = idFor(entry.serviceId, idFor(config.serviceId, null));
+            if (!Number.isInteger(customerId) || !Number.isInteger(serviceId)) {
+                throw Object.assign(new Error('missing assignment'), { code: 'missing_clockodo_assignment' });
+            }
+            return { id: entry.id, customers_id: customerId, services_id: serviceId };
+        },
+        async createEntry(clientId, token, payload, idempotencyKey) {
+            sent.push({ payload, idempotencyKey });
+            if (failEntryId && payload.id === failEntryId) {
+                throw Object.assign(new Error('rejected'), { code: 'clockodo_rejected' });
+            }
+            return { created: true, entryId: 900 };
+        }
+    };
+}
+
+test('retrying a corrected failed entry uses the refreshed batch IDs', async () => {
+    const { app, storageData } = createTestApp();
+    const start = new Date(2026, 8, 28, 8, 0).getTime();
+    await app.addEntry({
+        id: 'retry-fixed', activityId: 'act-1', activityNameSnapshot: 'Painting',
+        startTimestamp: start, endTimestamp: start + 60 * 60 * 1000
+    });
+    app.reviewDate = '2026-09-28';
+    app.clockodoConfigured = true;
+    app.clockodoCustomerId = '';
+    app.clockodoServiceId = '';
+    app.showToast = () => {};
+    app.renderReview = () => {};
+    const sent = [];
+    app.clockodoClient = makeAssignmentClient(sent);
+
+    app.showSyncConfirmationModal();
+    const failed = await app.confirmAndSyncClockodo();
+    assert.equal(failed.state, 'failed');
+    assert.equal(sent.length, 0);
+    assert.equal(failed.entries[0].customerId, null);
+    assert.equal(failed.entries[0].serviceId, null);
+
+    await app.updateEntry('retry-fixed', {
+        customerId: '11', serviceId: '21',
+        customerName: 'Bauunternehmen Müller', serviceName: 'Rohbau'
+    });
+    const snapshot = storageData.syncBatches.find(batch => batch.id === failed.id).entries.find(item => item.id === 'retry-fixed');
+    assert.equal(snapshot.customerId, '11');
+    assert.equal(snapshot.serviceId, '21');
+    assert.equal(snapshot.syncStatus, 'failed');
+
+    const retried = await app.retrySyncBatch(failed.id);
+    assert.equal(retried.state, 'synced');
+    assert.equal(sent.length, 1);
+    assert.deepEqual(JSON.parse(JSON.stringify(sent[0].payload)), { id: 'retry-fixed', customers_id: 11, services_id: 21 });
+    assert.equal(sent[0].idempotencyKey, 'timerhub-entry:retry-fixed');
+    assert.equal(sent[0].idempotencyKey.startsWith('timerhub-entry:'), true);
+    assert.equal(app.timeEntries.find(entry => entry.id === 'retry-fixed').syncStatus, 'synced');
+});
+
+test('Confirm & Send after correcting a failed entry uses the refreshed batch IDs', async () => {
+    const { app } = createTestApp();
+    const start = new Date(2026, 8, 28, 8, 0).getTime();
+    await app.addEntry({
+        id: 'confirm-fixed', activityId: 'act-1', activityNameSnapshot: 'Painting',
+        startTimestamp: start, endTimestamp: start + 60 * 60 * 1000
+    });
+    app.reviewDate = '2026-09-28';
+    app.clockodoConfigured = true;
+    app.clockodoCustomerId = '';
+    app.clockodoServiceId = '';
+    app.showToast = () => {};
+    app.renderReview = () => {};
+    const sent = [];
+    app.clockodoClient = makeAssignmentClient(sent);
+
+    app.showSyncConfirmationModal();
+    const failed = await app.confirmAndSyncClockodo();
+    assert.equal(failed.state, 'failed');
+    assert.equal(sent.length, 0);
+
+    await app.updateEntry('confirm-fixed', { customerId: '11', serviceId: '21' });
+
+    app.showSyncConfirmationModal();
+    const synced = await app.confirmAndSyncClockodo();
+    assert.equal(synced.state, 'synced');
+    assert.equal(synced.id, failed.id, 'the existing failed batch is retried with refreshed data');
+    assert.equal(sent.length, 1);
+    assert.deepEqual(JSON.parse(JSON.stringify(sent[0].payload)), { id: 'confirm-fixed', customers_id: 11, services_id: 21 });
+});
+
+test('refreshing a failed entry leaves synced entries in a partial batch untouched', async () => {
+    const { app } = createTestApp();
+    const start = new Date(2026, 8, 28, 8, 0).getTime();
+    await app.addEntry({ id: 'keep-synced', activityId: 'act-1', activityNameSnapshot: 'Keep', startTimestamp: start, endTimestamp: start + 60 * 60 * 1000 });
+    await app.addEntry({ id: 'fix-failed', activityId: 'act-2', activityNameSnapshot: 'Fix', startTimestamp: start + 60 * 60 * 1000, endTimestamp: start + 2 * 60 * 60 * 1000 });
+    app.reviewDate = '2026-09-28';
+    app.clockodoConfigured = true;
+    app.clockodoCustomerId = '12';
+    app.clockodoServiceId = '56';
+    app.showToast = () => {};
+    app.renderReview = () => {};
+    const sent = [];
+    app.clockodoClient = makeAssignmentClient(sent, 'fix-failed');
+
+    app.showSyncConfirmationModal();
+    const partial = await app.confirmAndSyncClockodo();
+    assert.equal(partial.state, 'partial');
+    const syncedSnapshotBefore = JSON.stringify(app.syncBatches.find(batch => batch.id === partial.id).entries.find(item => item.id === 'keep-synced'));
+
+    await app.updateEntry('fix-failed', { customerId: '11', serviceId: '21' });
+    const batch = app.syncBatches.find(item => item.id === partial.id);
+    assert.equal(JSON.stringify(batch.entries.find(item => item.id === 'keep-synced')), syncedSnapshotBefore);
+    assert.equal(batch.entries.find(item => item.id === 'keep-synced').syncStatus, 'synced');
+    const fixed = batch.entries.find(item => item.id === 'fix-failed');
+    assert.equal(fixed.customerId, '11');
+    assert.equal(fixed.serviceId, '21');
+    assert.equal(fixed.syncStatus, 'failed');
+});

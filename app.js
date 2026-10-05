@@ -1496,7 +1496,38 @@ class TimerHubApp {
 
         this.timeEntries[index] = normalized;
         await this.storage.saveTimeEntry(normalized);
+        if (workFieldsChanged) await this.refreshFailedBatchEntry(normalized);
         return normalized;
+    }
+
+    async refreshFailedBatchEntry(entry) {
+        if (!entry?.syncBatchId) return false;
+        const batch = this.syncBatches.find(item => item.id === entry.syncBatchId);
+        if (!batch || ![SYNC_STATUS.FAILED, 'partial'].includes(batch.state)) return false;
+        const index = batch.entries.findIndex(item => item.id === entry.id);
+        if (index < 0 || batch.entries[index].syncStatus !== SYNC_STATUS.FAILED) return false;
+        batch.entries[index] = {
+            ...batch.entries[index],
+            activityId: entry.activityId,
+            activityNameSnapshot: entry.activityNameSnapshot,
+            startTimestamp: entry.startTimestamp,
+            endTimestamp: entry.endTimestamp,
+            durationMs: entry.endTimestamp - entry.startTimestamp,
+            notes: entry.notes,
+            project: entry.project,
+            service: entry.service,
+            customerId: entry.customerId,
+            serviceId: entry.serviceId,
+            customerName: entry.customerName,
+            serviceName: entry.serviceName,
+            isEdited: entry.isEdited,
+            editedAt: entry.editedAt,
+            clockodoPayload: null
+        };
+        await this.storage.saveSyncProgress(batch, [batch.entries[index]]);
+        const batchIndex = this.syncBatches.findIndex(item => item.id === batch.id);
+        if (batchIndex >= 0) this.syncBatches[batchIndex] = batch;
+        return true;
     }
 
     async deleteEntry(id) {
