@@ -2306,10 +2306,11 @@ class TimerHubApp {
             entry.clockodoErrorDetails = null;
             if (!entry.clockodoPayload) {
                 try {
+                    const activity = this.activities.find(item => item.id === entry.activityId);
                     entry.clockodoPayload = this.clockodoClient.buildEntryPayload(entry, {
-                        customerId: this.clockodoCustomerId,
+                        customerId: activity?.customerId || this.clockodoCustomerId,
                         projectId: this.clockodoProjectId,
-                        serviceId: this.clockodoServiceId,
+                        serviceId: activity?.serviceId || this.clockodoServiceId,
                         billable: this.clockodoBillable
                     });
                 } catch (error) {

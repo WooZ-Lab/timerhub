@@ -2013,3 +2013,85 @@ test('refreshing a failed entry leaves synced entries in a partial batch untouch
     assert.equal(fixed.serviceId, '21');
     assert.equal(fixed.syncStatus, 'failed');
 });
+
+test('sync falls back to the activity assignment when an entry has no per-entry IDs', async () => {
+    const { app, context } = createTestApp();
+    vm.runInContext(clockodoClientSource, context);
+    app.activities = [{ id: 'act-1', name: 'Painting', customerId: '', serviceId: '', archived: false }];
+    const start = new Date(2026, 8, 28, 8, 0).getTime();
+    await app.addEntry({
+        id: 'late-assignment', activityId: 'act-1', activityNameSnapshot: 'Painting',
+        startTimestamp: start, endTimestamp: start + 60 * 1000
+    });
+    assert.equal(app.timeEntries[0].customerId, null);
+    assert.equal(app.timeEntries[0].serviceId, null);
+
+    app.activities[0].customerId = '11';
+    app.activities[0].serviceId = '21';
+    app.activities[0].customerName = 'Bauunternehmen Müller';
+    app.activities[0].serviceName = 'Rohbau';
+
+    app.reviewDate = '2026-09-28';
+    app.clockodoConfigured = true;
+    app.clockodoCustomerId = '';
+    app.clockodoServiceId = '';
+    app.showToast = () => {};
+    app.renderReview = () => {};
+    app.getPushClientId = () => 'client_1234567890abcdef';
+    app.getClockodoAccessToken = () => 'a'.repeat(48);
+    const sent = [];
+    app.clockodoClient = new context.ClockodoClient({
+        fetchImpl: async (url, init) => {
+            sent.push(JSON.parse(init.body));
+            return { status: 200, ok: true, json: async () => ({ created: true, entryId: 901 }) };
+        }
+    });
+
+    app.showSyncConfirmationModal();
+    const batch = await app.confirmAndSyncClockodo();
+    assert.equal(batch.state, 'synced');
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].customers_id, 11);
+    assert.equal(sent[0].services_id, 21);
+});
+
+test('retrying after assigning the activity uses the activity IDs', async () => {
+    const { app, context } = createTestApp();
+    vm.runInContext(clockodoClientSource, context);
+    app.activities = [{ id: 'act-1', name: 'Painting', customerId: '', serviceId: '', archived: false }];
+    const start = new Date(2026, 8, 28, 9, 0).getTime();
+    await app.addEntry({
+        id: 'late-retry', activityId: 'act-1', activityNameSnapshot: 'Painting',
+        startTimestamp: start, endTimestamp: start + 60 * 1000
+    });
+    app.reviewDate = '2026-09-28';
+    app.clockodoConfigured = true;
+    app.clockodoCustomerId = '';
+    app.clockodoServiceId = '';
+    app.showToast = () => {};
+    app.renderReview = () => {};
+    app.getPushClientId = () => 'client_1234567890abcdef';
+    app.getClockodoAccessToken = () => 'a'.repeat(48);
+    const sent = [];
+    app.clockodoClient = new context.ClockodoClient({
+        fetchImpl: async (url, init) => {
+            sent.push(JSON.parse(init.body));
+            return { status: 200, ok: true, json: async () => ({ created: true, entryId: 902 }) };
+        }
+    });
+
+    app.showSyncConfirmationModal();
+    const failed = await app.confirmAndSyncClockodo();
+    assert.equal(failed.state, 'failed');
+    assert.equal(sent.length, 0);
+
+    app.activities[0].customerId = '11';
+    app.activities[0].serviceId = '21';
+
+    const retried = await app.retrySyncBatch(failed.id);
+    assert.equal(retried.state, 'synced');
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].customers_id, 11);
+    assert.equal(sent[0].services_id, 21);
+    assert.equal(app.timeEntries.find(entry => entry.id === 'late-retry').syncStatus, 'synced');
+});
