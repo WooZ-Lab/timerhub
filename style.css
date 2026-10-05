@@ -1050,42 +1050,54 @@ input:-webkit-autofill:active {
 
 .review-summary-bar {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-    gap: 8px;
-    padding: 12px 16px;
-    background: linear-gradient(135deg, rgba(39, 174, 96, 0.08), rgba(39, 174, 96, 0.02));
-    border-bottom: 1px solid var(--border-color);
-}
-
-.review-summary-card {
-    background-color: var(--bg-primary);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0;
+    margin: 12px 16px 0;
+    overflow: hidden;
     border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 8px 12px;
-    text-align: center;
+    border-radius: var(--radius-md);
+    background-color: var(--bg-secondary);
 }
 
-.review-summary-card.highlight {
-    border-color: #27AE60;
-    box-shadow: 0 1px 3px rgba(39, 174, 96, 0.15);
+.review-summary-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-width: 0;
+    padding: 9px 8px;
+    text-align: center;
+    font-size: 18px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    color: var(--text-primary);
+}
+
+.review-summary-stat:nth-child(even) {
+    border-left: 1px solid var(--border-color);
+}
+
+.review-summary-stat:nth-child(n + 3) {
+    border-top: 1px solid var(--border-color);
+}
+
+.review-summary-stat:nth-child(5) {
+    grid-column: 1 / -1;
+}
+
+.review-summary-stat.highlight {
+    color: var(--brand-strong);
 }
 
 .review-summary-label {
     font-size: 11px;
-    color: var(--text-secondary);
-    text-transform: uppercase;
+    font-weight: 600;
     letter-spacing: 0.5px;
-}
-
-.review-summary-value {
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin-top: 2px;
-}
-
-.review-summary-card.highlight .review-summary-value {
-    color: #27AE60;
+    text-transform: uppercase;
+    white-space: normal;
+    color: var(--text-secondary);
 }
 
 .review-suspicious-banner {
@@ -1584,10 +1596,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .screen-header { padding:24px; border-bottom:1px solid var(--border-color); }
 .screen-header h2 { font-size:25px; letter-spacing:-.5px; }
 .review-date-bar, .log-filters { background:var(--bg-secondary); border-color:var(--border-color); }
-.review-summary-bar { padding:12px 24px; gap:10px; }
-.review-summary-card { flex:1 1 130px; min-height:82px; padding:14px; border:1px solid var(--border-color); border-radius:var(--radius-md); background:var(--bg-secondary); box-shadow:var(--shadow-card); }
-.review-summary-card.highlight { background:var(--brand-soft); border-color:color-mix(in srgb, var(--brand) 25%, var(--border-color)); }
-.review-summary-card.highlight .review-summary-value, .review-entry-duration { color:var(--brand-strong); }
+.review-summary-bar { margin:12px 24px 0; }
+.review-entry-duration { color:var(--brand-strong); }
 .review-toolbar { padding:12px 24px; }
 .review-entries-list { padding:12px 24px 24px; gap:12px; }
 .review-entry-card { padding:16px; border:1px solid var(--border-color); border-left:4px solid var(--entry-color, var(--border-color)); border-radius:var(--radius-md); background:var(--bg-secondary); box-shadow:var(--shadow-card); }
@@ -1663,7 +1673,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     .timer-running-status { max-width:100%; text-align:left; }
     .activities-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; padding:12px 16px 92px; }
     .activity-btn, .activity-btn.small, .activity-btn.medium, .activity-btn.large { min-height:104px; padding:14px; }
-    .review-summary-bar { padding:10px 16px; }
+    .review-summary-bar { margin:10px 16px 0; }
     .review-toolbar, .review-entries-list { padding-left:16px; padding-right:16px; }
     .screen-header, .log-actions { padding-left:16px; padding-right:16px; }
     .log-content, .settings-content { padding:16px 16px 28px; }
@@ -1803,21 +1813,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     white-space: nowrap;
 }
 
-.review-summary-bar {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 8px;
-    padding: 10px 16px;
-}
-
-.review-summary-card {
-    min-width: 0;
+.review-summary-stat {
     min-height: 68px;
-    padding: 9px 8px;
-}
-
-.review-summary-value {
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
 }
 
 .review-suspicious-banner {
@@ -1913,10 +1910,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
         width: 100%;
     }
 
-    .review-summary-bar {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
     .review-toolbar {
         grid-template-columns: 1fr;
     }
@@ -1945,23 +1938,15 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
         padding-bottom: 6px;
     }
 
-    .review-summary-bar {
-        padding-top: 6px;
-        padding-bottom: 6px;
-    }
-
-    .review-summary-card {
+    .review-summary-stat {
         min-height: 58px;
         padding-top: 6px;
         padding-bottom: 6px;
+        font-size: 16px;
     }
 
     .review-summary-label {
         font-size: 10px;
-    }
-
-    .review-summary-value {
-        font-size: 16px;
     }
 
     .review-suspicious-banner {
@@ -1985,7 +1970,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
         padding-inline: 24px;
     }
 
-    .review-summary-bar,
     .review-toolbar,
     .review-entries-list {
         padding-left: 24px;
@@ -1993,7 +1977,29 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     }
 
     .review-summary-bar {
-        grid-template-columns: repeat(4, minmax(120px, 1fr));
+        display: flex;
+        margin-left: 24px;
+        margin-right: 24px;
+    }
+
+    .review-summary-stat {
+        flex: 1 1 0;
+    }
+
+    .review-summary-stat:nth-child(n + 2) {
+        border-left: 1px solid var(--border-color);
+    }
+
+    .review-summary-stat:nth-child(n + 3) {
+        border-top: 0;
+    }
+
+    .review-summary-stat:nth-child(5) {
+        grid-column: auto;
+    }
+
+    .review-summary-stat:first-child {
+        border-left: 0;
     }
 
     .review-toolbar {

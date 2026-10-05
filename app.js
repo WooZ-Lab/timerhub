@@ -2115,12 +2115,12 @@ class TimerHubApp {
         const total = this.calculateDayTotal(this.reviewDate);
         const syncedCount = entries.filter(entry => entry.syncStatus === SYNC_STATUS.SYNCED).length;
         const unsyncedCount = entries.length - syncedCount;
-        summary.innerHTML = `<div class="review-summary-card highlight"><div class="review-summary-label">${this.t('totalTrackedTime')}</div><div class="review-summary-value">${this.formatDuration(total)}</div></div><div class="review-summary-card"><div class="review-summary-label">${this.t('entriesCount', { count: entries.length })}</div></div><div class="review-summary-card"><div class="review-summary-label">${this.t('syncedCount', { count: syncedCount })}</div></div><div class="review-summary-card"><div class="review-summary-label">${this.t('unsyncedCount', { count: unsyncedCount })}</div></div>`;
+        summary.innerHTML = `<div class="review-summary-stat highlight"><span class="review-summary-label">${this.t('totalTrackedTime')}</span>${this.formatDuration(total)}</div><div class="review-summary-stat"><span class="review-summary-label">${this.t('entriesCount', { count: entries.length })}</span></div><div class="review-summary-stat"><span class="review-summary-label">${this.t('syncedCount', { count: syncedCount })}</span></div><div class="review-summary-stat"><span class="review-summary-label">${this.t('unsyncedCount', { count: unsyncedCount })}</span></div>`;
         const latestBatch = this.syncBatches.filter(batch => batch.date === this.reviewDate).sort((a, b) => b.version - a.version)[0];
         if (latestBatch) {
             const done = latestBatch.entries.filter(entry => [SYNC_STATUS.SYNCED, SYNC_STATUS.LOCAL_ONLY, SYNC_STATUS.FAILED, SYNC_STATUS.UNKNOWN].includes(entry.syncStatus)).length;
             const batchStatusKey = { partial: 'statusPartial', unknown: 'statusUnknown', confirmed: 'statusConfirmed', syncing: 'statusSyncing', failed: 'statusFailed', synced: 'statusSynced', local_only: 'statusLocalOnly' }[latestBatch.state] || 'statusPending';
-            summary.innerHTML += `<div class="review-summary-card"><div class="review-summary-label">${this.t('syncProgress', { done, total: latestBatch.entries.length })}</div><div class="review-summary-value">${this.t(batchStatusKey)}</div></div>`;
+            summary.innerHTML += `<div class="review-summary-stat"><span class="review-summary-label">${this.t('syncProgress', { done, total: latestBatch.entries.length })}</span>${this.t(batchStatusKey)}</div>`;
         }
 
         const suspicious = this.getSuspiciousEntries(this.reviewDate);
