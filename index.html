@@ -42,6 +42,11 @@
         <div id="mainScreen" class="screen active">
             <div class="safe-area-top"></div>
             <div id="timerRunningStatus" class="timer-running-status" role="status" aria-live="polite"></div>
+            <div id="canvasToolbar" class="canvas-toolbar" role="toolbar" aria-label="Canvas actions" data-i18n-aria-label="canvasToolbar">
+                <button id="addActivityBtn" class="canvas-tool-btn" aria-label="Add new activity" data-i18n-aria-label="addActivity">+</button>
+                <button id="groupToggleAllBtn" class="canvas-tool-btn" aria-label="Collapse all groups" data-i18n-aria-label="collapseAllGroups" hidden>↕</button>
+                <button id="createGroupBtn" class="canvas-tool-btn" aria-label="Create group from selection" data-i18n-aria-label="createGroupFromSelection" hidden>▣</button>
+            </div>
             <div class="canvas-viewport" id="activityCanvasViewport" role="region" aria-label="Activity canvas" data-i18n-aria-label="activityCanvas">
                 <div class="activities-grid" id="activitiesGrid">
                     <!-- Activity nodes are rendered on this persistent free-position stage. -->
@@ -50,10 +55,6 @@
             
             <div class="safe-area-bottom"></div>
         </div>
-
-        <button id="addActivityBtn" class="add-button" aria-label="Add new activity" data-i18n-aria-label="addActivity">+</button>
-        <button id="createGroupBtn" class="add-button group-add-button" aria-label="Create group from selection" data-i18n-aria-label="createGroupFromSelection" hidden>Group</button>
-        <button id="groupToggleAllBtn" class="add-button group-toggle-all-button" aria-label="Collapse all groups" data-i18n-aria-label="collapseAllGroups" hidden>Collapse all</button>
 
         <!-- Day Review screen -->
         <div id="reviewScreen" class="screen">
@@ -125,10 +126,6 @@
 
         <!-- Settings screen -->
         <div id="settingsScreen" class="screen">
-            <div class="screen-header">
-                <h2 data-i18n="settings">Settings</h2>
-            </div>
-            
             <div class="settings-content">
                 <h3 class="settings-section-title" data-i18n="appearanceSettings">Appearance and regional settings</h3>
                 <div class="settings-group">
@@ -507,7 +504,7 @@
         </div>
 
         <!-- Modal: Create Group from selection -->
-        <div id="groupModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="groupModalTitle">
+        <div id="groupModal" class="modal modal-centered" role="dialog" aria-modal="true" aria-labelledby="groupModalTitle">
             <div class="modal-content modal-small">
                 <div class="modal-header">
                     <h3 id="groupModalTitle" data-i18n="createGroup">Create Group</h3>

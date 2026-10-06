@@ -1679,7 +1679,7 @@ test('creating a group from a selection stores a snapped position and relative m
 
     assert.deepEqual({ ...app.getActivityCanvasLayout(first, 0) }, { x: 140, y: 90, width: 260, height: 150 });
     assert.deepEqual({ ...app.getActivityCanvasLayout(second, 1) }, { x: 420, y: 250, width: 220, height: 120 });
-    assert.deepEqual([...app.selectedActivityIds].sort(), ['group-layout-a', 'group-layout-b'], 'members stay selected after creation');
+    assert.equal(app.selectedActivityIds.size, 0, 'selection clears after successful group creation');
 });
 
 test('group creation requires a non-empty selection', async () => {
@@ -1986,6 +1986,266 @@ test('group dragging coexists with activity dragging and canvas panning', async 
     assert.deepEqual({ ...app.canvasPan }, { x: 40, y: 30 }, 'canvas panning still works');
     pointer('pointerup', viewport, 540, 530);
     assert.equal(group.x, groupPosition.x, 'panning never moves groups');
+});
+
+test('activity magnetism aligns edges, centers, and corners within one grid cell', () => {
+    const { app } = createTestApp();
+    const moving = { x: 100, y: 100, width: 100, height: 80 };
+
+    assert.deepEqual(
+        { ...app.magneticActivityAdjustment(moving, [{ x: 108, y: 500, width: 50, height: 50 }]) },
+        { x: 8, y: 0 },
+        'left-to-left attraction'
+    );
+    assert.deepEqual(
+        { ...app.magneticActivityAdjustment(moving, [{ x: 210, y: 500, width: 50, height: 50 }]) },
+        { x: 10, y: 0 },
+        'right-edge to left-edge attraction'
+    );
+    assert.deepEqual(
+        { ...app.magneticActivityAdjustment(moving, [{ x: 500, y: 92, width: 50, height: 120 }]) },
+        { x: 0, y: -8 },
+        'top-to-top vertical attraction'
+    );
+    assert.deepEqual(
+        { ...app.magneticActivityAdjustment(moving, [{ x: 500, y: 190, width: 50, height: 120 }]) },
+        { x: 0, y: 10 },
+        'bottom-edge to top-edge attraction'
+    );
+    assert.deepEqual(
+        { ...app.magneticActivityAdjustment(moving, [{ x: 108, y: 92, width: 50, height: 120 }]) },
+        { x: 8, y: -8 },
+        'corner alignment snaps both axes'
+    );
+    assert.deepEqual(
+        { ...app.magneticActivityAdjustment(moving, [{ x: 147, y: 500, width: 10, height: 50 }]) },
+        { x: 2, y: 0 },
+        'center alignment is a valid candidate'
+    );
+    assert.deepEqual(
+        { ...app.magneticActivityAdjustment(moving, [{ x: 116, y: 500, width: 10, height: 50 }]) },
+        { x: 16, y: 0 },
+        'a full grid cell is still within the threshold'
+    );
+    assert.deepEqual(
+        { ...app.magneticActivityAdjustment(moving, [{ x: 118, y: 500, width: 10, height: 50 }]) },
+        { x: 0, y: 0 },
+        'no attraction outside the threshold'
+    );
+    assert.deepEqual(
+        {
+            ...app.magneticActivityAdjustment(moving, [
+                { x: 112, y: 500, width: 50, height: 50 },
+                { x: 103, y: 700, width: 50, height: 50 }
+            ])
+        },
+        { x: 3, y: 0 },
+        'the nearest candidate wins over competing alignments'
+    );
+    assert.deepEqual(
+        { ...app.magneticActivityAdjustment({ x: -100, y: -100, width: 100, height: 80 }, [{ x: -108, y: -500, width: 50, height: 50 }]) },
+        { x: -8, y: 0 },
+        'negative canvas coordinates are supported'
+    );
+});
+
+test('activity magnetism applies while moving, cooperates with grid snapping, and respects zoom', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, buttons, pointer } = harness;
+    app.activities = [
+        { id: 'magnet-target', name: 'Target', position: 0, size: 'medium' },
+        { id: 'magnet-mover', name: 'Mover', position: 1, size: 'medium' },
+        { id: 'magnet-far', name: 'Far', position: 2, size: 'medium' }
+    ];
+    app.activityLayouts = new Map([
+        ['magnet-target', { activityId: 'magnet-target', x: 200, y: 100, width: 200, height: 120 }],
+        ['magnet-mover', { activityId: 'magnet-mover', x: 0, y: 0, width: 200, height: 120 }],
+        ['magnet-far', { activityId: 'magnet-far', x: 2000, y: 1200, width: 200, height: 120 }]
+    ]);
+    app.renderMain();
+
+    let mover = buttons.find(button => button.dataset.activityId === 'magnet-mover');
+    pointer('pointerdown', mover, 0, 0);
+    pointer('pointermove', mover, 204, 0);
+    assert.equal(mover.style.left, '200px', 'magnetism aligns the edge instead of the raw grid cell');
+    pointer('pointerup', mover, 204, 0);
+    assert.equal(app.activityLayouts.get('magnet-mover').x, 200, 'the magnetic position is persisted');
+    assert.deepEqual(
+        { ...app.activityLayouts.get('magnet-target') },
+        { activityId: 'magnet-target', x: 200, y: 100, width: 200, height: 120 },
+        'the target activity never moves'
+    );
+
+    app.activityLayouts.set('magnet-mover', { activityId: 'magnet-mover', x: 0, y: 0, width: 200, height: 120 });
+    app.canvasZoom = 2;
+    app.canvasPan = { x: 40, y: 25 };
+    app.renderMain();
+    mover = buttons.find(button => button.dataset.activityId === 'magnet-mover');
+    pointer('pointerdown', mover, 10, 10);
+    pointer('pointermove', mover, 418, 10);
+    assert.equal(mover.style.left, '200px', 'zoom and pan keep the same magnetic world position');
+    pointer('pointerup', mover, 418, 10);
+
+    app.canvasZoom = 1;
+    app.canvasPan = { x: 0, y: 0 };
+    app.activityLayouts.set('magnet-mover', { activityId: 'magnet-mover', x: 0, y: 0, width: 200, height: 120 });
+    app.renderMain();
+    mover = buttons.find(button => button.dataset.activityId === 'magnet-mover');
+    pointer('pointerdown', mover, 0, 0);
+    pointer('pointermove', mover, 50, 0);
+    pointer('pointerup', mover, 50, 0);
+    assert.equal(app.activityLayouts.get('magnet-mover').x % 16, 0, 'grid snapping still applies without a magnetic candidate');
+    assert.equal(app.activityLayouts.get('magnet-mover').x, 48);
+
+    app.activityLayouts.set('magnet-mover', { activityId: 'magnet-mover', x: 0, y: 0, width: 200, height: 120 });
+    app.renderMain();
+    mover = buttons.find(button => button.dataset.activityId === 'magnet-mover');
+    pointer('pointerdown', mover, 0, 0);
+    pointer('pointermove', mover, -300, 0);
+    pointer('pointerup', mover, -300, 0);
+    assert.ok(app.activityLayouts.get('magnet-mover').x < 0, 'negative coordinates are supported while moving');
+    assert.ok(app.activityLayouts.get('magnet-mover').x % 16 === 0, 'negative positions stay on the grid');
+});
+
+test('expanding overlapping groups applies temporary offsets without persisting them', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, containers, storageData } = harness;
+    app.activities = [
+        { id: 'col-a1', name: 'A1', position: 0, groupId: 'col-a', size: 'medium' },
+        { id: 'col-b1', name: 'B1', position: 1, groupId: 'col-b', size: 'medium' },
+        { id: 'col-c1', name: 'C1', position: 2, groupId: 'col-c', size: 'medium' }
+    ];
+    app.activityLayouts = new Map([
+        ['col-a1', { activityId: 'col-a1', x: 0, y: 0, width: 200, height: 120 }],
+        ['col-b1', { activityId: 'col-b1', x: 0, y: 0, width: 200, height: 120 }],
+        ['col-c1', { activityId: 'col-c1', x: 0, y: 0, width: 200, height: 120 }]
+    ]);
+    app.groups = [
+        { id: 'col-a', name: 'A', x: 100, y: 100, collapsed: false },
+        { id: 'col-b', name: 'B', x: 180, y: 100, collapsed: false },
+        { id: 'col-c', name: 'C', x: 260, y: 100, collapsed: false }
+    ];
+    app.renderMain();
+
+    assert.deepEqual({ ...app.groupDisplayOffset('col-a') }, { x: 0, y: 0 });
+    assert.deepEqual({ ...app.groupDisplayOffset('col-b') }, { x: 180, y: 0 });
+    assert.deepEqual({ ...app.groupDisplayOffset('col-c') }, { x: 100, y: 196 });
+    assert.deepEqual(app.groups.map(group => group.x), [100, 180, 260], 'saved positions are untouched');
+
+    const rects = containers.map(container => ({
+        left: Number.parseFloat(container.style.left),
+        top: Number.parseFloat(container.style.top),
+        width: Number.parseFloat(container.style.width),
+        height: Number.parseFloat(container.style.height)
+    }));
+    for (let i = 0; i < rects.length; i += 1) {
+        for (let j = i + 1; j < rects.length; j += 1) {
+            const a = rects[i];
+            const b = rects[j];
+            const overlaps = a.left < b.left + b.width && b.left < a.left + a.width &&
+                a.top < b.top + b.height && b.top < a.top + a.height;
+            assert.equal(overlaps, false, `expanded groups ${i} and ${j} must not overlap`);
+        }
+    }
+    assert.equal(rects[0].left, 80);
+    assert.equal(rects[1].left, 340);
+    assert.equal(rects[2].left, 340);
+    assert.equal(rects[2].top, 260);
+
+    await app.collapseAllGroups();
+    assert.deepEqual(app.groups.map(group => group.x), [100, 180, 260], 'collapse keeps saved positions');
+    assert.deepEqual({ ...app.groupDisplayOffset('col-b') }, { x: 0, y: 0 });
+    const collapsedB = containers.find(container => container.dataset.groupId === 'col-b');
+    assert.equal(collapsedB.style.left, '160px', 'collapsed groups render at their saved position');
+
+    await app.expandAllGroups();
+    assert.deepEqual({ ...app.groupDisplayOffset('col-b') }, { x: 180, y: 0 }, 'every new expansion recalculates');
+    assert.deepEqual(app.groups.map(group => group.x), [100, 180, 260]);
+
+    const offsetBefore = { ...app.groupDisplayOffset('col-b') };
+    app.activityLayouts.set('col-a1', { activityId: 'col-a1', x: 0, y: 0, width: 400, height: 120 });
+    app.renderMain();
+    const offsetAfter = app.groupDisplayOffset('col-b');
+    assert.ok(
+        offsetAfter.x !== offsetBefore.x || offsetAfter.y !== offsetBefore.y,
+        'changed member sizes affect the next calculation'
+    );
+    assert.deepEqual(app.groups.map(group => group.x), [100, 180, 260], 'saved positions stay untouched after recalculation');
+    assert.ok(
+        storageData.groups.every(group => group.x === { 'col-a': 100, 'col-b': 180, 'col-c': 260 }[group.id]),
+        'only saved coordinates are persisted'
+    );
+});
+
+test('group dragging keeps using saved coordinates while temporary offsets are active', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, containers, buttons, pointer, storageData } = harness;
+    app.activities = [
+        { id: 'dragc-a1', name: 'A1', position: 0, groupId: 'dragc-a', size: 'medium' },
+        { id: 'dragc-b1', name: 'B1', position: 1, groupId: 'dragc-b', size: 'medium' }
+    ];
+    app.activityLayouts = new Map([
+        ['dragc-a1', { activityId: 'dragc-a1', x: 0, y: 0, width: 200, height: 120 }],
+        ['dragc-b1', { activityId: 'dragc-b1', x: 0, y: 0, width: 200, height: 120 }]
+    ]);
+    app.groups = [
+        { id: 'dragc-a', name: 'A', x: 100, y: 100, collapsed: false },
+        { id: 'dragc-b', name: 'B', x: 180, y: 100, collapsed: false }
+    ];
+    app.renderMain();
+    assert.equal(app.groupDisplayOffset('dragc-b').x, 180);
+
+    const title = containers.find(container => container.dataset.groupId === 'dragc-b').children[0];
+    pointer('pointerdown', title, 0, 0);
+    pointer('pointermove', title, 32, 0);
+    assert.equal(app.groups[1].x, 208, 'the saved group position follows the pointer without the temporary offset');
+    assert.equal(app.groupDisplayOffset('dragc-b').x, 180, 'the temporary offset is unchanged during the drag');
+    const member = buttons.find(button => button.dataset.activityId === 'dragc-b1');
+    assert.equal(member.style.left, '388px', 'the rendered position combines saved coordinates and the temporary offset');
+    pointer('pointerup', title, 32, 0);
+    assert.equal(app.groups[1].x, 208);
+    assert.ok(storageData.groups.some(group => group.id === 'dragc-b' && group.x === 208), 'the saved coordinate is persisted');
+});
+
+test('group selection action tracks a valid selection only', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, createGroupBtn, viewport, pointer } = harness;
+    app.activities = [
+        { id: 'sel-a', name: 'A', position: 0, groupId: 'sel-group', size: 'medium' },
+        { id: 'sel-b', name: 'B', position: 1, size: 'medium' }
+    ];
+    app.activityLayouts = new Map([
+        ['sel-a', { activityId: 'sel-a', x: 0, y: 0, width: 200, height: 120 }],
+        ['sel-b', { activityId: 'sel-b', x: 400, y: 0, width: 200, height: 120 }]
+    ]);
+    app.groups = [{ id: 'sel-group', name: 'G', x: 0, y: 0, collapsed: false }];
+    app.renderMain();
+
+    app.setCanvasSelection(['sel-a']);
+    assert.equal(createGroupBtn.hidden, false, 'a valid selection enables the action');
+    app.setCanvasSelection([]);
+    assert.equal(createGroupBtn.hidden, true, 'clearing the selection hides the action');
+
+    app.setCanvasSelection(['sel-a']);
+    pointer('pointerdown', viewport, 500, 500);
+    assert.equal(app.selectedActivityIds.size, 0, 'a new canvas interaction clears the selection');
+    assert.equal(createGroupBtn.hidden, true);
+    pointer('pointerup', viewport, 500, 500);
+
+    app.setCanvasSelection(['sel-a']);
+    await app.toggleGroupCollapsed('sel-group');
+    assert.equal(app.selectedActivityIds.size, 0, 'collapsing prunes now-hidden selected members');
+    assert.equal(createGroupBtn.hidden, true);
+
+    app.setCanvasSelection(['sel-b']);
+    const group = await app.createGroupFromSelection('Extra');
+    assert.ok(group);
+    assert.equal(app.selectedActivityIds.size, 0, 'successful creation clears the selection');
+    assert.equal(createGroupBtn.hidden, true, 'the action disappears after successful creation');
+
+    app.setCanvasSelection(['sel-b']);
+    app.switchScreen('review');
+    assert.equal(app.selectedActivityIds.size, 0, 'leaving the canvas clears the selection');
 });
 
 test('automatic snapshot failures are observable but do not fail saved user data', async () => {

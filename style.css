@@ -194,32 +194,6 @@ html, body {
     }
 }
 
-.add-button {
-    position: fixed;
-    bottom: calc(16px + var(--safe-bottom));
-    right: calc(16px + var(--safe-right));
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    background-color: var(--color-blue);
-    color: var(--action-text);
-    border: none;
-    font-size: 32px;
-    font-weight: bold;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
-    transition: transform 0.2s, box-shadow 0.2s;
-    z-index: 50;
-}
-
-.add-button:active {
-    transform: scale(0.95);
-    box-shadow: 0 2px 8px rgba(52, 152, 219, 0.2);
-}
-
 /* Activity Button */
 .activity-btn {
     position: relative;
@@ -843,10 +817,6 @@ button:focus-visible,
     font-weight: 600;
     cursor: pointer;
     transition: background-color 0.2s;
-}
-
-.add-button {
-    color: var(--action-text);
 }
 
 .menu-item {
@@ -1591,11 +1561,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .activity-btn.small { min-height:96px; }
 .activity-btn.medium { grid-column:span 2; min-height:110px; }
 .activity-btn.large { grid-column:span 2; grid-row:span 2; min-height:232px; }
-.add-button { width:58px; height:58px; right:calc(24px + var(--safe-right)); bottom:calc(24px + var(--safe-bottom)); color:#fff; background:var(--brand); box-shadow:0 5px 16px rgba(17,100,63,.24); }
-.group-add-button { right:calc(24px + var(--safe-right)); bottom:calc(150px + var(--safe-bottom)); width:auto; min-width:58px; height:46px; padding:0 16px; border-radius:999px; font-size:13px; font-weight:700; letter-spacing:.02em; }
-.group-add-button[hidden] { display:none; }
-.group-toggle-all-button { right:calc(24px + var(--safe-right)); bottom:calc(94px + var(--safe-bottom)); width:auto; min-width:58px; height:46px; padding:0 16px; border-radius:999px; font-size:13px; font-weight:700; letter-spacing:.02em; }
-.group-toggle-all-button[hidden] { display:none; }
 .screen-header { padding:24px; border-bottom:1px solid var(--border-color); }
 .screen-header h2 { font-size:25px; letter-spacing:-.5px; }
 .review-date-bar, .log-filters { background:var(--bg-secondary); border-color:var(--border-color); }
@@ -1646,7 +1611,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .clockodo-combobox-option.is-active { background-color:var(--bg-secondary); }
 .clockodo-combobox-option.is-unassigned { color:var(--text-secondary); }
 @media (hover: hover) { .clockodo-combobox-option:hover { background-color:var(--bg-secondary); } }
-.modal { background:rgba(8, 18, 12, .58); backdrop-filter:blur(2px); }
+.modal {
+    background:rgba(8, 18, 12, .58); backdrop-filter:blur(2px); }
+.modal.modal-centered { align-items:center; padding:16px; }
+.modal.modal-centered .modal-content {
+    width:calc(100% - 8px); max-height:calc(100dvh - 32px);
+    border-radius:var(--radius-lg); padding-bottom:0;
+}
 .modal-content { max-width:540px; border:1px solid var(--border-color); border-radius:var(--radius-lg); box-shadow:0 22px 60px rgba(0,0,0,.22); }
 .modal-header, .modal-footer { padding:18px 20px; }
 .modal-header h3 { font-size:19px; }
@@ -1740,6 +1711,30 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     border:1px solid var(--border-color); border-radius:var(--radius-md); background:var(--bg-primary);
     box-shadow:inset 0 1px 3px rgba(18,42,28,.04); touch-action:none; overscroll-behavior:contain;
 }
+.canvas-toolbar {
+    position:absolute; z-index:60;
+    top:max(8px, env(safe-area-inset-top));
+    left:max(10px, env(safe-area-inset-left));
+    right:max(10px, env(safe-area-inset-right));
+    display:flex; align-items:center; gap:4px;
+    min-height:48px; max-height:48px; padding:3px 4px;
+    border:1px solid var(--border-color); border-radius:var(--radius-md);
+    background:color-mix(in srgb, var(--bg-secondary) 92%, transparent);
+    box-shadow:var(--shadow-card); backdrop-filter:blur(12px);
+    overflow-x:auto; overflow-y:hidden; white-space:nowrap;
+    -webkit-overflow-scrolling:touch; touch-action:pan-x; scrollbar-width:thin;
+}
+.canvas-tool-btn {
+    flex:0 0 auto; min-width:40px; height:40px; padding:0 12px;
+    display:inline-flex; align-items:center; justify-content:center;
+    border:1px solid transparent; border-radius:var(--radius-sm);
+    background:transparent; color:var(--text-primary);
+    font-size:16px; font-weight:700; line-height:1;
+    cursor:pointer; touch-action:manipulation;
+}
+.canvas-tool-btn[hidden] { display:none; }
+.canvas-tool-btn:hover { background:var(--bg-tertiary); }
+.canvas-tool-btn:active { background:var(--brand-soft); }
 .activities-grid {
     position:absolute; inset:0 auto auto 0; display:block; width:3600px; height:2200px; padding:0;
     transform-origin:0 0; background-image:radial-gradient(color-mix(in srgb, var(--text-tertiary) 25%, transparent) .8px, transparent .8px);
@@ -2235,21 +2230,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     will-change: transform;
 }
 
-/* Floating add button belongs to Timer, not to the canvas layout. */
-#mainScreen #addActivityBtn {
-    position: absolute;
-    z-index: 60;
-    right: max(18px, env(safe-area-inset-right));
-    bottom: max(18px, env(safe-area-inset-bottom));
-    width: 56px;
-    height: 56px;
-    min-width: 56px;
-    min-height: 56px;
-    margin: 0;
-    border-radius: 50%;
-    box-shadow: var(--shadow-card);
-}
-
 /* The old instructional block is intentionally gone. */
 
 /* Old canvas zoom controls are no longer part of the UI. */
@@ -2268,21 +2248,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     #mainScreen .timer-heading h2 {
         font-size: 16px;
     }
-
-    #mainScreen #addActivityBtn {
-        right: max(14px, env(safe-area-inset-right));
-        bottom: max(14px, env(safe-area-inset-bottom));
-        width: 54px;
-        height: 54px;
-        min-width: 54px;
-        min-height: 54px;
-    }
 }
 
 #mainScreen > #timerRunningStatus {
     position: absolute;
     z-index: 70;
-    top: max(10px, env(safe-area-inset-top));
+    top: calc(max(8px, env(safe-area-inset-top)) + 52px);
     left: 50%;
     transform: translateX(-50%);
     pointer-events: none;
@@ -2514,82 +2485,4 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 #activitiesGrid .activity-color-mark,
 #activitiesGrid .activity-shape-mark {
     display: none !important;
-}
-
-/* Timer UI: Add Activity stays above the infinite canvas. */
-#mainScreen > #addActivityBtn {
-    position: fixed !important;
-    z-index: 1000 !important;
-    display: flex !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    pointer-events: auto !important;
-    right: max(18px, env(safe-area-inset-right)) !important;
-    bottom: max(18px, env(safe-area-inset-bottom)) !important;
-    width: 58px !important;
-    height: 58px !important;
-    min-width: 58px !important;
-    min-height: 58px !important;
-    margin: 0 !important;
-    border-radius: 50% !important;
-    background: var(--brand, var(--color-blue)) !important;
-    color: #fff !important;
-    border: 0 !important;
-    font-size: 32px !important;
-    font-weight: 700 !important;
-    line-height: 1 !important;
-    align-items: center !important;
-    justify-content: center !important;
-    box-shadow: 0 5px 16px rgba(0, 0, 0, .24) !important;
-}
-
-#mainScreen > #addActivityBtn:active {
-    transform: scale(.95);
-}
-
-@media (max-width: 600px) {
-    #mainScreen > #addActivityBtn {
-        right: max(14px, env(safe-area-inset-right)) !important;
-        bottom: max(14px, env(safe-area-inset-bottom)) !important;
-        width: 54px !important;
-        height: 54px !important;
-        min-width: 54px !important;
-        min-height: 54px !important;
-    }
-}
-
-/* Add Activity button: always stay above the bottom navbar */
-#addActivityBtn {
-    position: fixed !important;
-    z-index: 1000 !important;
-    right: max(18px, env(safe-area-inset-right)) !important;
-    bottom: calc(var(--navbar-height, 64px) + 18px + var(--safe-bottom, 0px)) !important;
-    width: 58px;
-    height: 58px;
-    border-radius: 50%;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    background: var(--brand, var(--color-blue)) !important;
-    color: #fff !important;
-    border: 0 !important;
-    box-shadow: var(--shadow-card);
-    pointer-events: auto !important;
-}
-
-#mainScreen.active ~ #addActivityBtn {
-    display: flex !important;
-}
-
-#addActivityBtn:active {
-    transform: scale(0.95);
-}
-
-@media (max-width: 600px) {
-    #addActivityBtn {
-        right: max(14px, env(safe-area-inset-right)) !important;
-        bottom: calc(var(--navbar-height, 64px) + 14px + var(--safe-bottom, 0px)) !important;
-        width: 54px;
-        height: 54px;
-    }
 }

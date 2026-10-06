@@ -355,6 +355,7 @@ const extendedTranslations = {
         collapseAllGroups: 'Collapse all', expandAllGroups: 'Expand all',
         duplicateGroup: 'Duplicate group', groupCopyName: '{name} (copy)',
         groupDuplicated: 'Group "{name}" duplicated',
+        canvasToolbar: 'Canvas actions',
     },
     de: {
         activityFilter: 'Aktivitätsfilter',
@@ -527,6 +528,7 @@ const extendedTranslations = {
         collapseAllGroups: 'Alle einklappen', expandAllGroups: 'Alle ausklappen',
         duplicateGroup: 'Gruppe duplizieren', groupCopyName: '{name} (Kopie)',
         groupDuplicated: 'Gruppe "{name}" dupliziert',
+        canvasToolbar: 'Canvas-Aktionen',
     },
     ru: {
         activityFilter: 'Фильтр занятий',
@@ -699,6 +701,7 @@ const extendedTranslations = {
         collapseAllGroups: 'Свернуть все', expandAllGroups: 'Развернуть все',
         duplicateGroup: 'Дублировать группу', groupCopyName: '{name} (копия)',
         groupDuplicated: 'Группа «{name}» дублирована',
+        canvasToolbar: 'Действия на холсте',
     }
 };
 for (const language of Object.keys(translations)) {
@@ -1137,6 +1140,7 @@ class TimerHubApp {
         this.canvasGesture = null;
         this.canvasSelectionElement = null;
         this.selectedActivityIds = new Set();
+        this.groupDisplayOffsets = new Map();
         this.suppressActivityClick = null;
         this.editingActivityId = null;
         this.editingEntryId = null;
@@ -2155,7 +2159,8 @@ class TimerHubApp {
 
     switchScreen(screen) {
         this.currentScreen = screen;
-        
+        if (screen !== 'main' && this.selectedActivityIds?.size) this.setCanvasSelection([]);
+
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
         
         switch (screen) {
@@ -2657,6 +2662,7 @@ class TimerHubApp {
         grid.replaceChildren();
         this.canvasZIndex = 1;
         this.applyCanvasTransform(grid);
+        this.groupDisplayOffsets = this.computeGroupDisplayOffsets();
 
         if (!this.activities.length) {
             const empty = document.createElement('div');
@@ -2847,10 +2853,51 @@ class TimerHubApp {
         }
     }
 
-    groupMemberBoxes(group) {
+    groupMemberBoxes(group, includeDisplayOffset = true) {
         return this.activities
             .filter(activity => activity.groupId === group.id)
-            .map(activity => this.getActivityCanvasLayout(activity, this.activities.indexOf(activity)));
+            .map(activity => this.getActivityCanvasLayout(activity, this.activities.indexOf(activity), includeDisplayOffset));
+    }
+
+    groupDisplayOffset(groupId) {
+        return this.groupDisplayOffsets?.get(groupId) || { x: 0, y: 0 };
+    }
+
+    groupContainerBounds(boxes) {
+        const left = Math.min(...boxes.map(box => box.x)) - CANVAS_GROUP_PADDING;
+        const top = Math.min(...boxes.map(box => box.y)) - CANVAS_GROUP_HEADER;
+        const right = Math.max(...boxes.map(box => box.x + box.width)) + CANVAS_GROUP_PADDING;
+        const bottom = Math.max(...boxes.map(box => box.y + box.height)) + CANVAS_GROUP_PADDING;
+        return { left, top, right, bottom, width: right - left, height: bottom - top };
+    }
+
+    computeGroupDisplayOffsets() {
+        const offsets = new Map();
+        const placed = [];
+        for (const group of this.groups) {
+            if (group.collapsed) continue;
+            const boxes = this.groupMemberBoxes(group, false);
+            if (!boxes.length) continue;
+            const bounds = this.groupContainerBounds(boxes);
+            let left = bounds.left;
+            let top = bounds.top;
+            let shifted = true;
+            while (shifted) {
+                shifted = false;
+                for (const other of placed) {
+                    const candidate = { left, top, right: left + bounds.width, bottom: top + bounds.height };
+                    if (!this.rectanglesIntersect(candidate, other)) continue;
+                    const shiftRight = other.right + CANVAS_GROUP_PADDING - candidate.left;
+                    const shiftDown = other.bottom + CANVAS_GROUP_PADDING - candidate.top;
+                    if (shiftRight <= shiftDown) left += shiftRight;
+                    else top += shiftDown;
+                    shifted = true;
+                }
+            }
+            placed.push({ left, top, right: left + bounds.width, bottom: top + bounds.height });
+            offsets.set(group.id, { x: left - bounds.left, y: top - bounds.top });
+        }
+        return offsets;
     }
 
     applyGroupGeometry(container, boxes) {
@@ -2904,6 +2951,7 @@ class TimerHubApp {
             this.showToast(this.t('groupCreateFailed'));
         }
         this.renderMain();
+        this.pruneCanvasSelection();
         return group;
     }
 
@@ -2918,6 +2966,7 @@ class TimerHubApp {
             }
         }
         this.renderMain();
+        this.pruneCanvasSelection();
         return true;
     }
 
@@ -2981,7 +3030,7 @@ class TimerHubApp {
         return duplicate;
     }
 
-    getActivityCanvasLayout(activity, index) {
+    getActivityCanvasLayout(activity, index, includeDisplayOffset = true) {
         const saved = this.activityLayouts.get(activity.id);
         const group = this.activityGroup(activity);
         const sizeDefaults = { small: [220, 120], medium: [260, 150], large: [320, 190] };
@@ -3008,6 +3057,11 @@ class TimerHubApp {
         if (group) {
             layout.x += group.x;
             layout.y += group.y;
+            if (includeDisplayOffset) {
+                const offset = this.groupDisplayOffset(group.id);
+                layout.x += offset.x;
+                layout.y += offset.y;
+            }
         }
         return layout;
     }
@@ -3027,6 +3081,36 @@ class TimerHubApp {
         return Number.isFinite(number)
             ? Math.round(number / CANVAS_GRID_SIZE) * CANVAS_GRID_SIZE
             : 0;
+    }
+
+    magneticActivityOthers(excludeId) {
+        return this.activities
+            .filter(activity => activity.id !== excludeId && !this.activityGroup(activity)?.collapsed)
+            .map(activity => this.getActivityCanvasLayout(activity, this.activities.indexOf(activity)));
+    }
+
+    magneticActivityAdjustment(layout, others, threshold = CANVAS_GRID_SIZE) {
+        const collect = (candidates, start, size, otherStart, otherSize) => {
+            const targets = [otherStart, otherStart + otherSize, otherStart + otherSize / 2];
+            const origins = [start, start + size, start + size / 2];
+            for (const target of targets) {
+                for (const origin of origins) {
+                    const delta = target - origin;
+                    if (Math.abs(delta) <= threshold) candidates.push(delta);
+                }
+            }
+        };
+        const x = [];
+        const y = [];
+        for (const other of others) {
+            if (!other) continue;
+            collect(x, layout.x, layout.width, other.x, other.width);
+            collect(y, layout.y, layout.height, other.y, other.height);
+        }
+        const nearest = deltas => deltas.length
+            ? deltas.reduce((best, delta) => (Math.abs(delta) < Math.abs(best) ? delta : best))
+            : 0;
+        return { x: nearest(x), y: nearest(y) };
     }
 
     selectionRectFromPoints(start, current) {
@@ -3098,9 +3182,10 @@ class TimerHubApp {
         const button = document.getElementById('createGroupBtn');
         if (button) {
             const count = this.selectedActivityIds?.size || 0;
+            const label = this.t('createGroupFromSelection', { count });
             button.hidden = count === 0;
-            button.textContent = this.t('createGroupFromSelection', { count });
-            button.setAttribute('aria-label', this.t('createGroupFromSelection', { count }));
+            button.setAttribute('aria-label', label);
+            button.title = label;
         }
         const toggleAll = document.getElementById('groupToggleAllBtn');
         if (toggleAll) {
@@ -3108,10 +3193,23 @@ class TimerHubApp {
             const anyExpanded = this.groups.some(group => !group.collapsed);
             const label = anyExpanded ? this.t('collapseAllGroups') : this.t('expandAllGroups');
             toggleAll.hidden = !hasGroups;
-            toggleAll.textContent = label;
             toggleAll.setAttribute('aria-label', label);
+            toggleAll.title = label;
             toggleAll.dataset.action = anyExpanded ? 'collapse' : 'expand';
         }
+    }
+
+    pruneCanvasSelection() {
+        if (!this.selectedActivityIds?.size) return;
+        const valid = new Set();
+        for (const id of this.selectedActivityIds) {
+            const activity = this.activities.find(item => item.id === id);
+            if (!activity) continue;
+            const group = this.activityGroup(activity);
+            if (group?.collapsed) continue;
+            valid.add(id);
+        }
+        if (valid.size !== this.selectedActivityIds.size) this.setCanvasSelection(valid);
     }
 
     openGroupModal() {
@@ -3173,7 +3271,7 @@ class TimerHubApp {
             return null;
         }
         this.renderMain();
-        this.setCanvasSelection(selected);
+        this.setCanvasSelection([]);
         this.showToast(this.t('groupCreated', { name: group.name }));
         return group;
     }
@@ -3402,6 +3500,8 @@ class TimerHubApp {
                 return;
             }
 
+            if (this.selectedActivityIds?.size) this.setCanvasSelection([]);
+
             const resizeHandle = event.target.closest?.('.activity-resize-handle');
             const activityButton = event.target.closest?.('.activity-btn') || (resizeHandle
                 ? stage.querySelector(`.activity-btn[data-activity-id="${CSS.escape(resizeHandle.dataset.activityId)}"]`)
@@ -3521,12 +3621,18 @@ class TimerHubApp {
                 const worldDx = dx / this.canvasZoom;
                 const worldDy = dy / this.canvasZoom;
 
-                const nextX = this.snapToCanvasGrid(
+                const gridX = this.snapToCanvasGrid(
                     this.clampCanvasCoordinate(gesture.layout.x + worldDx, 0, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY)
                 );
-                const nextY = this.snapToCanvasGrid(
+                const gridY = this.snapToCanvasGrid(
                     this.clampCanvasCoordinate(gesture.layout.y + worldDy, 0, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY)
                 );
+                const magnet = this.magneticActivityAdjustment(
+                    { x: gridX, y: gridY, width: gesture.layout.width, height: gesture.layout.height },
+                    this.magneticActivityOthers(gesture.activityId)
+                );
+                const nextX = gridX + magnet.x;
+                const nextY = gridY + magnet.y;
 
                 gesture.activityButton.style.left = `${nextX}px`;
                 gesture.activityButton.style.top = `${nextY}px`;
@@ -3635,8 +3741,8 @@ class TimerHubApp {
                     const rawY = Number.parseFloat(button.style.top) || 0;
                     const finalLayout = {
                         activityId: gesture.activityId,
-                        x: gesture.mode === 'move' ? this.snapToCanvasGrid(rawX) : rawX,
-                        y: gesture.mode === 'move' ? this.snapToCanvasGrid(rawY) : rawY,
+                        x: rawX,
+                        y: rawY,
                         width: Number.parseFloat(button.style.width) || gesture.layout.width,
                         height: Number.parseFloat(button.style.height) || gesture.layout.height
                     };
@@ -3801,7 +3907,12 @@ class TimerHubApp {
         const activity = this.activities.find(item => item.id === layout.activityId);
         const group = this.activityGroup(activity);
         if (!group) return layout;
-        return { ...layout, x: layout.x - group.x, y: layout.y - group.y };
+        const offset = this.groupDisplayOffset(group.id);
+        return {
+            ...layout,
+            x: layout.x - group.x - offset.x,
+            y: layout.y - group.y - offset.y
+        };
     }
 
     getPushClientId() {
@@ -4474,6 +4585,7 @@ class TimerHubApp {
         }
         this.closeActivityMenu();
         this.renderMain();
+        this.pruneCanvasSelection();
     }
 
     async deleteActivity() {
@@ -4488,6 +4600,7 @@ class TimerHubApp {
         }
         this.closeActivityMenu();
         this.renderMain();
+        this.pruneCanvasSelection();
     }
 
     renderLog() {

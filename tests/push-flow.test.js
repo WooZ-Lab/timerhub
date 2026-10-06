@@ -1215,6 +1215,33 @@ test('day review statistics keep a mobile-first grid that cannot collapse', () =
     assert.match(desktopBlock, /display:\s*flex/);
 });
 
+test('canvas toolbar, centered group modal, and single settings heading are wired', () => {
+    assert.match(htmlSource, /id="canvasToolbar" class="canvas-toolbar"/);
+    assert.match(htmlSource, /id="addActivityBtn" class="canvas-tool-btn"/);
+    assert.match(htmlSource, /id="groupToggleAllBtn" class="canvas-tool-btn"/);
+    assert.match(htmlSource, /id="createGroupBtn" class="canvas-tool-btn"/);
+    assert.equal(/add-button/.test(htmlSource), false, 'standalone canvas FAB buttons are gone');
+
+    const toolbarRule = styleSource.match(/\.canvas-toolbar\s*\{([^}]*)\}/s)?.[1] || '';
+    assert.match(toolbarRule, /position:\s*absolute/);
+    assert.match(toolbarRule, /display:\s*flex/);
+    assert.match(toolbarRule, /overflow-x:\s*auto/);
+    assert.match(toolbarRule, /max-height:\s*48px/);
+
+    const toolButtonRule = styleSource.match(/\.canvas-tool-btn\s*\{([^}]*)\}/s)?.[1] || '';
+    assert.match(toolButtonRule, /min-width:\s*40px/);
+    assert.match(toolButtonRule, /height:\s*40px/);
+    assert.match(styleSource, /\.canvas-tool-btn\[hidden\]\s*\{\s*display:none;\s*\}/);
+    assert.equal(styleSource.includes('#addActivityBtn'), false, 'legacy FAB positioning rules are removed');
+
+    assert.match(htmlSource, /id="groupModal" class="modal modal-centered"/);
+    const centeredRule = styleSource.match(/\.modal\.modal-centered\s*\{([^}]*)\}/s)?.[1] || '';
+    assert.match(centeredRule, /align-items:\s*center/);
+    assert.match(centeredRule, /padding:\s*16px/);
+
+    assert.equal((htmlSource.match(/data-i18n="settings"/g) || []).length, 1, 'settings heading is not duplicated');
+});
+
 test('activity name, color, and shape selections persist when saving', async () => {
     const browser = makeBrowserHarness(makeBackend());
     const saved = [];
