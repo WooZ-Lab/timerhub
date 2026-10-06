@@ -1509,13 +1509,27 @@ class TimerHubApp {
         return entries.reduce((sum, entry) => sum + this.getEntryDuration(entry), 0);
     }
 
+    roundToFiveMinutes(timestamp) {
+        const value = Number(timestamp);
+        if (!Number.isFinite(value)) return value;
+        const client = this.clockodoClient;
+        if (client && typeof client.roundToNearestFiveMinutes === 'function') {
+            return client.roundToNearestFiveMinutes(value);
+        }
+        const fiveMinutes = 5 * 60 * 1000;
+        return Math.round(value / fiveMinutes) * fiveMinutes;
+    }
+
     entryInterval(entry) {
         const start = Number(entry?.startTimestamp);
         if (!Number.isFinite(start)) return null;
         const rawEnd = entry?.endTimestamp;
         const end = rawEnd === null || rawEnd === undefined ? Infinity : Number(rawEnd);
         if (Number.isNaN(end)) return null;
-        return { start, end };
+        return {
+            start: this.roundToFiveMinutes(start),
+            end: end === Infinity ? Infinity : this.roundToFiveMinutes(end)
+        };
     }
 
     entriesOverlap(first, second) {
@@ -1563,12 +1577,9 @@ class TimerHubApp {
                 for (let j = 0; j < entries.length; j++) {
                     if (i === j) continue;
                     const other = entries[j];
-                    if (other.endTimestamp !== null) {
-                        const hasOverlap = !(entry.endTimestamp <= other.startTimestamp || entry.startTimestamp >= other.endTimestamp);
-                        if (hasOverlap) {
-                            issues.push('overlapping');
-                            break;
-                        }
+                    if (other.endTimestamp !== null && this.entriesOverlap(entry, other)) {
+                        issues.push('overlapping');
+                        break;
                     }
                 }
             }
