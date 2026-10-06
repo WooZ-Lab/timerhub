@@ -1264,6 +1264,23 @@ test('canvas toolbar, centered group modal, and single settings heading are wire
     assert.equal((htmlSource.match(/data-i18n="settings"/g) || []).length, 1, 'settings heading is not duplicated');
 });
 
+test('duplicated Day Review and Time Log screen headings are removed while navigation labels remain', () => {
+    assert.equal((htmlSource.match(/data-i18n="endOfDayReview"/g) || []).length, 0, 'the duplicated Day Review heading is gone');
+    assert.equal((htmlSource.match(/data-i18n="timeLog"/g) || []).length, 1, 'the Time Log label only remains in the bottom navigation');
+    assert.equal((htmlSource.match(/data-i18n="dayReview"/g) || []).length, 1, 'the Day Review navigation label remains');
+    assert.equal((htmlSource.match(/data-i18n-aria-label="dayReview"/g) || []).length, 1, 'the Day Review navigation aria-label remains');
+
+    const reviewScreen = htmlSource.slice(htmlSource.indexOf('id="reviewScreen"'), htmlSource.indexOf('id="logScreen"'));
+    const logScreen = htmlSource.slice(htmlSource.indexOf('id="logScreen"'), htmlSource.indexOf('id="settingsScreen"'));
+    assert.equal(reviewScreen.includes('<h2'), false, 'the review screen no longer repeats the navigation title');
+    assert.equal(logScreen.includes('<h2'), false, 'the log screen no longer repeats the navigation title');
+    assert.equal(reviewScreen.includes('screen-header'), false, 'no empty review heading wrapper is left behind');
+    assert.equal(logScreen.includes('screen-header'), false, 'no empty log heading wrapper is left behind');
+
+    assert.match(reviewScreen, /id="reviewDateInput"/, 'review screen content is unchanged');
+    assert.match(logScreen, /id="logDateFilter"/, 'log screen content is unchanged');
+});
+
 test('activity name, color, and shape selections persist when saving', async () => {
     const browser = makeBrowserHarness(makeBackend());
     const saved = [];
