@@ -54,25 +54,36 @@ test('Clockodo client formats entry timestamps without milliseconds', () => {
     assert.equal(Client.isNormalizedEntryPayload(null), false);
 });
 
-test('Clockodo client ceilings entry timestamps up to the next five minutes', () => {
-    const { Client } = makeClient(async () => new Response('{}'));
+test('Clockodo client rounds entry timestamps to the nearest five minutes', () => {
+    const { Client, client } = makeClient(async () => new Response('{}'));
     const iso = timestamp => new Date(timestamp).toISOString();
     const cases = [
-        ['2026-10-05T12:38:02.000Z', '2026-10-05T12:40:00.000Z'],
-        ['2026-10-05T17:23:01.000Z', '2026-10-05T17:25:00.000Z'],
-        ['2026-10-05T12:35:00.000Z', '2026-10-05T12:35:00.000Z'],
-        ['2026-10-05T17:25:00.000Z', '2026-10-05T17:25:00.000Z']
+        ['2026-10-05T12:35:00.000Z', '2026-10-05T12:35:00.000Z', 'exact boundary stays put'],
+        ['2026-10-05T12:37:29.000Z', '2026-10-05T12:35:00.000Z', 'one second below the midpoint rounds down'],
+        ['2026-10-05T12:37:30.000Z', '2026-10-05T12:40:00.000Z', 'exactly 30 seconds rounds up'],
+        ['2026-10-05T12:37:31.000Z', '2026-10-05T12:40:00.000Z', 'one second above the midpoint rounds up'],
+        ['2026-10-05T12:39:59.000Z', '2026-10-05T12:40:00.000Z', 'rounds up from just below the boundary'],
+        ['2026-10-05T12:40:00.000Z', '2026-10-05T12:40:00.000Z', 'landing on a boundary stays put'],
+        ['2026-10-05T12:42:29.000Z', '2026-10-05T12:40:00.000Z', 'rounds down from just below the boundary'],
+        ['2026-10-05T12:42:30.000Z', '2026-10-05T12:45:00.000Z', 'rounds up past the boundary midpoint'],
+        ['2026-10-05T12:58:30.000Z', '2026-10-05T13:00:00.000Z', 'rounds across an hour boundary'],
+        ['2026-10-05T23:57:30.000Z', '2026-10-06T00:00:00.000Z', 'rounds across midnight']
     ];
-    for (const [input, expected] of cases) {
-        assert.equal(iso(Client.roundUpToFiveMinutes(Date.parse(input))), expected);
+    for (const [input, expected, message] of cases) {
+        assert.equal(iso(Client.roundToNearestFiveMinutes(Date.parse(input))), expected, message);
+        assert.equal(iso(client.roundToNearestFiveMinutes(Date.parse(input))), expected, `${message} (instance method)`);
     }
-    const payload = Client.buildEntryPayload({
-        startTimestamp: Date.parse('2026-10-05T12:38:02.000Z'),
-        endTimestamp: Date.parse('2026-10-05T17:23:01.000Z'),
+
+    const entry = {
+        startTimestamp: Date.parse('2026-10-05T12:37:29.000Z'),
+        endTimestamp: Date.parse('2026-10-05T12:58:30.000Z'),
         activityNameSnapshot: 'Painting', customerId: '11', serviceId: '21'
-    }, { billable: true });
-    assert.equal(payload.time_since, '2026-10-05T12:40:00Z');
-    assert.equal(payload.time_until, '2026-10-05T17:25:00Z');
+    };
+    const payload = Client.buildEntryPayload(entry, { billable: true });
+    assert.equal(payload.time_since, '2026-10-05T12:35:00Z');
+    assert.equal(payload.time_until, '2026-10-05T13:00:00Z');
+    assert.equal(entry.startTimestamp, Date.parse('2026-10-05T12:37:29.000Z'), 'raw start timestamp is preserved');
+    assert.equal(entry.endTimestamp, Date.parse('2026-10-05T12:58:30.000Z'), 'raw end timestamp is preserved');
 });
 
 test('Clockodo client sends only proxy credentials and validates successful entry responses', async () => {

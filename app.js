@@ -5609,8 +5609,8 @@ class TimerHubApp {
 
     clockodoSendTimestamp(timestamp) {
         if (!this.clockodoConfigured || !this.clockodoClient ||
-            typeof this.clockodoClient.roundUpToFiveMinutes !== 'function') return timestamp;
-        return this.clockodoClient.roundUpToFiveMinutes(timestamp);
+            typeof this.clockodoClient.roundToNearestFiveMinutes !== 'function') return timestamp;
+        return this.clockodoClient.roundToNearestFiveMinutes(timestamp);
     }
 
     clockodoErrorMessage(error) {

@@ -684,6 +684,43 @@ test('Task 3: Day overview sorts entries, shows gaps, and renders the correct to
     assert.match(document.getElementById('reviewSummaryBar').innerHTML, /02:00:00/);
 });
 
+test('Day Review and the Clockodo payload share the same nearest-five-minute rounding', () => {
+    const { app, context, document } = createTestApp();
+    vm.runInContext(clockodoClientSource, context);
+    app.clockodoClient = vm.runInContext('new ClockodoClient()', context);
+    app.clockodoConfigured = true;
+    app.timeFormat = '24h';
+
+    const start = new Date('2026-10-05T12:37:29').getTime();
+    const end = new Date('2026-10-05T12:42:30').getTime();
+    const clientStart = app.clockodoClient.roundToNearestFiveMinutes(start);
+    const clientEnd = app.clockodoClient.roundToNearestFiveMinutes(end);
+    assert.equal(app.clockodoSendTimestamp(start), clientStart, 'the Day Review wrapper uses the shared client rounding');
+    assert.equal(app.clockodoSendTimestamp(end), clientEnd);
+    assert.equal(app.formatTime(clientStart), '12:35');
+    assert.equal(app.formatTime(clientEnd), '12:45');
+
+    app.reviewDate = '2026-10-05';
+    app.activities = [{ id: 'round-act', name: 'Paint', position: 0 }];
+    app.timeEntries = [{
+        id: 'round-entry', activityId: 'round-act', activityNameSnapshot: 'Paint',
+        startTimestamp: start, endTimestamp: end, syncStatus: 'unsynced'
+    }];
+    app.renderReview();
+    const html = document.getElementById('reviewEntriesList').innerHTML;
+    assert.match(html, /12:35/, 'Day Review displays the rounded start');
+    assert.match(html, /12:45/, 'Day Review displays the rounded end');
+    assert.equal(app.timeEntries[0].startTimestamp, start, 'the raw start timestamp is untouched');
+    assert.equal(app.timeEntries[0].endTimestamp, end, 'the raw end timestamp is untouched');
+
+    const payload = app.clockodoClient.buildEntryPayload({
+        startTimestamp: start, endTimestamp: end, customerId: '11', serviceId: '21'
+    }, { billable: true });
+    const iso = timestamp => new Date(timestamp).toISOString().replace(/\.\d{3}Z$/, 'Z');
+    assert.equal(payload.time_since, iso(app.clockodoSendTimestamp(start)), 'the payload matches the Day Review rounding');
+    assert.equal(payload.time_until, iso(app.clockodoSendTimestamp(end)));
+});
+
 test('Task 4: Add workflow accepts an explicit overnight interval and persists its metadata', async () => {
     const { app, storageData, document } = createTestApp();
     app.activities = [{ id: 'act-1', name: 'Night work', color: '#27AE60' }];
