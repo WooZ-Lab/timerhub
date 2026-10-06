@@ -1509,6 +1509,39 @@ class TimerHubApp {
         return entries.reduce((sum, entry) => sum + this.getEntryDuration(entry), 0);
     }
 
+    entryInterval(entry) {
+        const start = Number(entry?.startTimestamp);
+        if (!Number.isFinite(start)) return null;
+        const rawEnd = entry?.endTimestamp;
+        const end = rawEnd === null || rawEnd === undefined ? Infinity : Number(rawEnd);
+        if (Number.isNaN(end)) return null;
+        return { start, end };
+    }
+
+    entriesOverlap(first, second) {
+        const a = this.entryInterval(first);
+        const b = this.entryInterval(second);
+        if (!a || !b) return false;
+        return a.start < b.end && a.end > b.start;
+    }
+
+    getOverlappingEntryIds(entries = this.timeEntries) {
+        const overlapping = new Set();
+        const list = Array.isArray(entries) ? entries.filter(Boolean) : [];
+        for (let i = 0; i < list.length; i++) {
+            for (let j = i + 1; j < list.length; j++) {
+                const first = list[i];
+                const second = list[j];
+                if (String(first.id) === String(second.id)) continue;
+                if (this.entriesOverlap(first, second)) {
+                    overlapping.add(String(first.id));
+                    overlapping.add(String(second.id));
+                }
+            }
+        }
+        return overlapping;
+    }
+
     getSuspiciousEntries(dateString) {
         const entries = this.getDayEntries(dateString);
         const suspicious = [];
@@ -2243,6 +2276,7 @@ class TimerHubApp {
         }
 
         const issueKeys = { running: this.t('issueRunning'), zeroDuration: this.t('issueZeroDuration'), overlapping: this.t('issueOverlapping'), unusuallyLong: this.t('issueUnusuallyLong') };
+        const overlappingIds = this.getOverlappingEntryIds(entries);
         const statusKeys = {
             unsynced: this.t('statusLocal'), pending: this.t('statusPending'), confirmed: this.t('statusConfirmed'),
             syncing: this.t('statusSyncing'), synced: this.t('statusSynced'), failed: this.t('statusFailed'),
@@ -2262,6 +2296,10 @@ class TimerHubApp {
             const meta = [entry.project, entry.service].filter(Boolean).map(value => this.escapeHtml(value)).join(' · ');
             const notes = entry.notes ? `<div class="review-entry-notes">${this.escapeHtml(entry.notes)}</div>` : '';
             const issueText = issues.map(issue => issueKeys[issue]).filter(Boolean).join(' · ');
+            const isConflict = overlappingIds.has(String(entry.id));
+            const conflictNote = isConflict && !issues.includes('overlapping')
+                ? `<small class="review-conflict-note">${this.escapeHtml(this.t('overlappingEntry'))}</small>`
+                : '';
             const batch = entry.syncBatchId ? this.syncBatches.find(item => item.id === entry.syncBatchId) : null;
             const activityLabel = activity?.name || entry.activityNameSnapshot || this.t('activity');
             const retryButton = entry.syncStatus === SYNC_STATUS.FAILED && batch
@@ -2275,12 +2313,12 @@ class TimerHubApp {
             const retryDiagnostic = this.retryDiagnostic && !this.retryDiagnostic.pending && String(this.retryDiagnostic.entryId) === String(entry.id)
                 ? this.renderRetryDiagnostic(this.retryDiagnostic)
                 : '';
-            return `${gap}<article class="review-entry-card${issues.length ? ' suspicious-entry' : ''}" data-entry-id="${this.escapeHtml(entry.id)}">
+            return `${gap}<article class="review-entry-card${issues.length ? ' suspicious-entry' : ''}${isConflict ? ' conflict-entry' : ''}" data-entry-id="${this.escapeHtml(entry.id)}">
                 <div class="review-entry-header">
                 <div class="review-entry-times"><strong>${this.escapeHtml(start)}</strong><span>–</span><strong>${this.escapeHtml(end)}</strong></div>
                 <span class="review-entry-duration">${this.escapeHtml(duration)}</span></div>
                 <div class="review-entry-title"><span class="review-activity-dot" style="background-color:${this.escapeHtml(activity?.color || '#27AE60')}"></span>${this.escapeHtml(activityLabel)}</div>
-                ${meta ? `<div class="review-entry-tags">${entry.project ? `<span class="review-tag">${this.escapeHtml(entry.project)}</span>` : ''}${entry.service ? `<span class="review-tag">${this.escapeHtml(entry.service)}</span>` : ''}</div>` : ''}${notes}${issueText ? `<small>${this.escapeHtml(issueText)}</small>` : ''}${errorNotice}${unknownNotice}${localOnlyNotice}
+                ${meta ? `<div class="review-entry-tags">${entry.project ? `<span class="review-tag">${this.escapeHtml(entry.project)}</span>` : ''}${entry.service ? `<span class="review-tag">${this.escapeHtml(entry.service)}</span>` : ''}</div>` : ''}${notes}${issueText ? `<small>${this.escapeHtml(issueText)}</small>` : ''}${conflictNote}${errorNotice}${unknownNotice}${localOnlyNotice}
                 <div class="review-entry-footer"><span class="sync-badge ${this.escapeHtml(entry.syncStatus)}">${this.escapeHtml(status)}</span><div class="review-entry-actions"><button class="review-action-btn review-edit-entry" type="button" data-entry-id="${this.escapeHtml(entry.id)}" aria-label="${this.escapeHtml(`${this.t('edit')}: ${activityLabel}`)}" ${entry.syncStatus === SYNC_STATUS.CONFIRMED || entry.syncStatus === SYNC_STATUS.SYNCING ? `disabled title="${this.escapeHtml(this.t('confirmedEntryLocked'))}"` : ''}><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m4 16.5-.8 4.3 4.3-.8L19 8.5 15.5 5 4 16.5Z"/><path d="m13.5 7 3.5 3.5"/></svg>${this.t('edit')}</button>${retryButton}</div></div>${retryDiagnostic}
             </article>`;
         }).join('');
@@ -4814,6 +4852,7 @@ class TimerHubApp {
         }
 
         entries.sort((a, b) => a.startTimestamp - b.startTimestamp);
+        const overlappingIds = this.getOverlappingEntryIds(entries);
 
         if (entries.length === 0) {
             content.innerHTML = `<div class="log-empty">${this.t('noEntries')}</div>`;
@@ -4854,11 +4893,16 @@ class TimerHubApp {
                 const duration = entry.endTimestamp - entry.startTimestamp;
                 const start = this.formatDateTime(entry.startTimestamp);
                 const end = this.formatDateTime(entry.endTimestamp);
+                const isConflict = overlappingIds.has(String(entry.id));
+                const conflictNote = isConflict
+                    ? `<div class="log-entry-conflict-note">${this.escapeHtml(this.t('overlappingEntry'))}</div>`
+                    : '';
 
-                html += `<div class="log-entry" data-entry-id="${this.escapeHtml(entry.id)}">
+                html += `<div class="log-entry${isConflict ? ' log-entry-conflict' : ''}" data-entry-id="${this.escapeHtml(entry.id)}">
                     <div class="log-entry-time">${start} – ${end}</div>
                     <div class="log-entry-activity">${this.escapeHtml(snapshot)}</div>
                     <div class="log-entry-duration">${this.formatDuration(duration)}</div>
+                    ${conflictNote}
                 </div>`;
             });
 
@@ -4877,7 +4921,7 @@ class TimerHubApp {
 
     showEntryEditModal(entryId) {
         this.editingEntryId = entryId;
-        const entry = this.timeEntries.find(e => e.id === entryId);
+        const entry = this.timeEntries.find(e => String(e.id) === String(entryId));
         if (!entry) return;
 
         this.populateEntryActivitySelect(entry.activityId);
@@ -5010,14 +5054,13 @@ class TimerHubApp {
             this.showToast(this.t('confirmedEntryLocked'));
             return;
         }
+        const candidate = { startTimestamp: start, endTimestamp: end };
         const hasConflict = this.timeEntries.some(entry => {
             if (editingId !== null && String(entry.id) === editingId) return false;
-            const otherEnd = entry.endTimestamp === null ? Infinity : entry.endTimestamp;
-            return start < otherEnd && end > entry.startTimestamp;
+            return this.entriesOverlap(candidate, entry);
         });
         if (hasConflict) {
             warning.style.display = 'block';
-            return;
         }
 
         const activity = this.activities.find(item => item.id === activityId);
@@ -5044,6 +5087,7 @@ class TimerHubApp {
         this.closeEntryEditModal();
         this.renderLog();
         this.renderReview();
+        if (hasConflict) this.showToast(this.t('overlappingEntry'));
     }
 
     closeEntryEditModal() {

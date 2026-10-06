@@ -750,7 +750,7 @@ test('Task 4: Add workflow accepts an explicit overnight interval and persists i
     assert.equal(storageData.timeEntries.length, 1);
 });
 
-test('Task 4: Editing rejects equal, reversed, excessive, and overlapping intervals without changing stored data', async () => {
+test('Task 4: Editing rejects equal, reversed, and excessive intervals, and saves overlaps with a warning', async () => {
     const { app, storageData, document } = createTestApp();
     const date = '2026-09-28';
     const start = new Date(`${date}T08:00:00`).getTime();
@@ -786,7 +786,9 @@ test('Task 4: Editing rejects equal, reversed, excessive, and overlapping interv
     value('entryEditEndDate', date);
     await app.saveTimeEntry();
     assert.equal(document.getElementById('entryConflictWarning').style.display, 'block');
-    assert.equal(storageData.timeEntries.find(entry => entry.id === 'existing').startTimestamp, start);
+    assert.equal(app.lastToast, app.t('overlappingEntry'));
+    assert.equal(storageData.timeEntries.find(entry => entry.id === 'existing').startTimestamp, new Date(`${date}T09:30:00`).getTime());
+    assert.equal(storageData.timeEntries.find(entry => entry.id === 'existing').endTimestamp, new Date(`${date}T10:30:00`).getTime());
 });
 
 test('Task 5: Confirmation freezes the reviewed dataset, persists it, and prevents duplicate confirmation', async () => {
@@ -3667,34 +3669,37 @@ async function createOverlapApp() {
     app.reviewDate = '2026-09-28';
     app.renderLog = () => {};
     app.renderReview = () => {};
-    app.showToast = () => {};
+    const toasts = [];
+    app.showToast = message => toasts.push(message);
     const setTimes = (start, end, date = '2026-09-28') => {
         document.getElementById('entryEditDate').value = date;
         document.getElementById('entryEditStart').value = start;
         document.getElementById('entryEditEndDate').value = date;
         document.getElementById('entryEditEnd').value = end;
     };
-    return { app, document, storageData, t, setTimes };
+    return { app, document, storageData, t, setTimes, toasts };
 }
 
 test('editing an existing entry without changing its interval does not overlap with itself', async () => {
-    const { app, document, storageData, t, setTimes } = await createOverlapApp();
+    const { app, document, storageData, t, setTimes, toasts } = await createOverlapApp();
     app.showEntryEditModal('entry-a');
     setTimes('12:00', '12:30');
     await app.saveTimeEntry();
     assert.equal(document.getElementById('entryConflictWarning').style.display, 'none');
+    assert.deepEqual(toasts, []);
     assert.equal(storageData.timeEntries.find(entry => entry.id === 'entry-a').startTimestamp, t(12, 0));
     assert.equal(storageData.timeEntries.find(entry => entry.id === 'entry-a').endTimestamp, t(12, 30));
 });
 
-test('moving an existing entry into another entry reports an overlap and keeps stored data', async () => {
-    const { app, document, storageData, t, setTimes } = await createOverlapApp();
+test('moving an existing entry into another entry warns but still saves the change', async () => {
+    const { app, document, storageData, t, setTimes, toasts } = await createOverlapApp();
     app.showEntryEditModal('entry-a');
     setTimes('12:05', '12:35');
     await app.saveTimeEntry();
     assert.equal(document.getElementById('entryConflictWarning').style.display, 'block');
-    assert.equal(storageData.timeEntries.find(entry => entry.id === 'entry-a').startTimestamp, t(12, 0));
-    assert.equal(storageData.timeEntries.find(entry => entry.id === 'entry-a').endTimestamp, t(12, 30));
+    assert.deepEqual(toasts, [app.t('overlappingEntry')]);
+    assert.equal(storageData.timeEntries.find(entry => entry.id === 'entry-a').startTimestamp, t(12, 5));
+    assert.equal(storageData.timeEntries.find(entry => entry.id === 'entry-a').endTimestamp, t(12, 35));
 });
 
 test('moving an existing entry to a non-overlapping interval is accepted', async () => {
@@ -3716,7 +3721,8 @@ test('overlap validation respects exact seconds', async () => {
     app.reviewDate = '2026-09-28';
     app.renderLog = () => {};
     app.renderReview = () => {};
-    app.showToast = () => {};
+    const toasts = [];
+    app.showToast = message => toasts.push(message);
     app.showEntryEditModal('entry-a');
     document.getElementById('entryEditDate').value = '2026-09-28';
     document.getElementById('entryEditStart').value = '12:00';
@@ -3724,6 +3730,7 @@ test('overlap validation respects exact seconds', async () => {
     document.getElementById('entryEditEnd').value = '12:30';
     await app.saveTimeEntry();
     assert.equal(document.getElementById('entryConflictWarning').style.display, 'block');
+    assert.deepEqual(toasts, [app.t('overlappingEntry')]);
     assert.equal(storageData.timeEntries.find(entry => entry.id === 'entry-a').endTimestamp, t(12, 30));
 });
 
@@ -3749,8 +3756,8 @@ test('the edited entry is excluded by stable ID rather than object identity', as
     assert.equal(storageData.timeEntries[0].endTimestamp, t(12, 30));
 });
 
-test('newly created entries still detect real overlaps', async () => {
-    const { app, document } = await createOverlapApp();
+test('newly created entries still detect real overlaps and are saved with a warning', async () => {
+    const { app, document, toasts } = await createOverlapApp();
     app.showAddEntryModal();
     document.getElementById('entryEditDate').value = '2026-09-28';
     document.getElementById('entryEditStart').value = '12:45';
@@ -3758,7 +3765,8 @@ test('newly created entries still detect real overlaps', async () => {
     document.getElementById('entryEditEnd').value = '13:15';
     await app.saveTimeEntry();
     assert.equal(document.getElementById('entryConflictWarning').style.display, 'block');
-    assert.equal(app.timeEntries.length, 2);
+    assert.deepEqual(toasts, [app.t('overlappingEntry')]);
+    assert.equal(app.timeEntries.length, 3);
 });
 
 test('editing an entry without changing its time preserves raw seconds and avoids a false overlap', async () => {
@@ -3817,6 +3825,225 @@ test('overlap validation does not apply five-minute rounding', async () => {
     assert.equal(document.getElementById('entryConflictWarning').style.display, 'none');
     assert.equal(storageData.timeEntries.find(entry => entry.id === 'entry-a').endTimestamp, t(12, 32, 0));
     assert.equal(storageData.timeEntries.find(entry => entry.id === 'entry-b').startTimestamp, t(12, 33, 0));
+});
+
+async function createConflictApp(buildEntries) {
+    const harness = createTestApp();
+    const t = (h, m, s = 0, ms = 0) => new Date(2026, 8, 28, h, m, s, ms).getTime();
+    harness.app.activities = [
+        { id: 'act-1', name: 'A', color: '#27AE60' },
+        { id: 'act-2', name: 'B', color: '#3498DB' },
+        { id: 'act-3', name: 'C', color: '#9B59B6' }
+    ];
+    for (const entry of buildEntries(t)) await harness.app.addEntry(entry);
+    harness.app.reviewDate = '2026-09-28';
+    harness.app.renderLog = () => {};
+    return { ...harness, t };
+}
+
+test('editing an entry with unchanged millisecond timestamps preserves them exactly and does not self-overlap', async () => {
+    const { app, document, storageData, toasts, t } = await createConflictApp(t => [
+        { id: 'entry-a', activityId: 'act-1', activityNameSnapshot: 'A', startTimestamp: t(12, 0, 45, 123), endTimestamp: t(12, 30, 0, 456) },
+        { id: 'entry-b', activityId: 'act-2', activityNameSnapshot: 'B', startTimestamp: t(11, 59, 0), endTimestamp: t(12, 0, 30) }
+    ]);
+    app.renderReview = () => {};
+
+    app.showEntryEditModal('entry-a');
+    await app.saveTimeEntry();
+
+    assert.equal(document.getElementById('entryConflictWarning').style.display, 'none');
+    assert.deepEqual(toasts, []);
+    assert.equal(storageData.timeEntries.find(entry => entry.id === 'entry-a').startTimestamp, t(12, 0, 45, 123));
+    assert.equal(storageData.timeEntries.find(entry => entry.id === 'entry-a').endTimestamp, t(12, 30, 0, 456));
+});
+
+test('the edited entry stays excluded from conflict detection after the entry list is reloaded', async () => {
+    const { app, document, storageData, toasts, t } = await createConflictApp(t => [
+        { id: 'entry-a', activityId: 'act-1', activityNameSnapshot: 'A', startTimestamp: t(12, 0), endTimestamp: t(12, 30) }
+    ]);
+    app.renderReview = () => {};
+    await app.loadTimeEntries();
+
+    app.showEntryEditModal('entry-a');
+    await app.saveTimeEntry();
+
+    assert.equal(document.getElementById('entryConflictWarning').style.display, 'none');
+    assert.deepEqual(toasts, []);
+    assert.equal(storageData.timeEntries.find(entry => entry.id === 'entry-a').startTimestamp, t(12, 0));
+    assert.equal(storageData.timeEntries.find(entry => entry.id === 'entry-a').endTimestamp, t(12, 30));
+});
+
+test('an unchanged saved entry is not marked as conflicting with itself', async () => {
+    const { app, document, toasts, t } = await createConflictApp(t => [
+        { id: 'entry-a', activityId: 'act-1', activityNameSnapshot: 'A', startTimestamp: t(12, 0), endTimestamp: t(12, 30) }
+    ]);
+
+    app.showEntryEditModal('entry-a');
+    await app.saveTimeEntry();
+    app.renderReview();
+
+    const html = document.getElementById('reviewEntriesList').innerHTML;
+    assert.deepEqual(toasts, []);
+    assert.equal(html.includes('conflict-entry'), false);
+});
+
+test('real overlaps are detected, no longer block saving, and are marked as conflicts after the save', async () => {
+    const { app, document, storageData, toasts, t } = await createConflictApp(t => [
+        { id: 'entry-a', activityId: 'act-1', activityNameSnapshot: 'A', startTimestamp: t(12, 0), endTimestamp: t(12, 30) },
+        { id: 'entry-b', activityId: 'act-2', activityNameSnapshot: 'B', startTimestamp: t(12, 15), endTimestamp: t(12, 45) },
+        { id: 'entry-c', activityId: 'act-3', activityNameSnapshot: 'C', startTimestamp: t(13, 0), endTimestamp: t(13, 30) }
+    ]);
+
+    assert.deepEqual([...app.getOverlappingEntryIds()].sort(), ['entry-a', 'entry-b']);
+
+    app.showEntryEditModal('entry-a');
+    document.getElementById('entryEditStart').value = '12:20';
+    document.getElementById('entryEditEnd').value = '12:50';
+    await app.saveTimeEntry();
+
+    assert.equal(document.getElementById('entryConflictWarning').style.display, 'block');
+    assert.deepEqual(toasts, [app.t('overlappingEntry')]);
+    const stored = storageData.timeEntries.find(entry => entry.id === 'entry-a');
+    assert.equal(stored.startTimestamp, t(12, 20));
+    assert.equal(stored.endTimestamp, t(12, 50));
+
+    app.renderReview();
+    const html = document.getElementById('reviewEntriesList').innerHTML;
+    const cards = html.split('<article ');
+    const cardA = cards.find(card => card.includes('data-entry-id="entry-a"'));
+    const cardB = cards.find(card => card.includes('data-entry-id="entry-b"'));
+    const cardC = cards.find(card => card.includes('data-entry-id="entry-c"'));
+    assert.ok(cardA.includes('conflict-entry'), 'entry-a is marked as conflicting');
+    assert.ok(cardB.includes('conflict-entry'), 'entry-b is marked as conflicting');
+    assert.equal(cardC.includes('conflict-entry'), false, 'non-conflicting entry-c keeps its normal appearance');
+    assert.ok(
+        cardA.includes(app.t('overlappingEntry')) || cardA.includes(app.t('issueOverlapping')),
+        'the localized overlap warning is visible on the entry'
+    );
+});
+
+test('conflict state recalculates when an overlap is removed and after an entry is deleted', async () => {
+    const { app, document, t } = await createConflictApp(t => [
+        { id: 'entry-a', activityId: 'act-1', activityNameSnapshot: 'A', startTimestamp: t(12, 0), endTimestamp: t(12, 30) },
+        { id: 'entry-b', activityId: 'act-2', activityNameSnapshot: 'B', startTimestamp: t(12, 15), endTimestamp: t(12, 45) }
+    ]);
+    const countConflicts = () => {
+        app.renderReview();
+        const html = document.getElementById('reviewEntriesList').innerHTML;
+        return (html.match(/conflict-entry/g) || []).length;
+    };
+
+    assert.equal(countConflicts(), 2);
+
+    await app.updateEntry('entry-b', { startTimestamp: t(12, 30), endTimestamp: t(13, 0) });
+    assert.equal(countConflicts(), 0, 'the red state clears once the entries only touch');
+
+    await app.updateEntry('entry-b', { startTimestamp: t(12, 15), endTimestamp: t(12, 45) });
+    assert.equal(countConflicts(), 2, 'the red state returns when the overlap returns');
+
+    await app.deleteEntry('entry-a');
+    assert.equal(countConflicts(), 0, 'deleting a conflicting entry clears the red state from the other entry');
+});
+
+test('multiple overlapping entries are all flagged and still save with one warning', async () => {
+    const { app, document, storageData, toasts, t } = await createConflictApp(t => [
+        { id: 'entry-a', activityId: 'act-1', activityNameSnapshot: 'A', startTimestamp: t(12, 0), endTimestamp: t(12, 30) },
+        { id: 'entry-b', activityId: 'act-2', activityNameSnapshot: 'B', startTimestamp: t(12, 10), endTimestamp: t(12, 40) },
+        { id: 'entry-c', activityId: 'act-3', activityNameSnapshot: 'C', startTimestamp: t(12, 20), endTimestamp: t(12, 50) }
+    ]);
+
+    assert.deepEqual([...app.getOverlappingEntryIds()].sort(), ['entry-a', 'entry-b', 'entry-c']);
+    app.renderReview();
+    const html = document.getElementById('reviewEntriesList').innerHTML;
+    assert.equal((html.match(/conflict-entry/g) || []).length, 3);
+
+    app.showAddEntryModal();
+    document.getElementById('entryEditDate').value = '2026-09-28';
+    document.getElementById('entryEditStart').value = '12:45';
+    document.getElementById('entryEditEndDate').value = '2026-09-28';
+    document.getElementById('entryEditEnd').value = '13:15';
+    await app.saveTimeEntry();
+
+    assert.equal(document.getElementById('entryConflictWarning').style.display, 'block');
+    assert.deepEqual(toasts, [app.t('overlappingEntry')]);
+    assert.equal(storageData.timeEntries.length, 4);
+});
+
+test('touching boundaries such as 10:00-11:00 and 11:00-12:00 are not overlapping', async () => {
+    const { app, document, toasts, t } = await createConflictApp(t => [
+        { id: 'entry-a', activityId: 'act-1', activityNameSnapshot: 'A', startTimestamp: t(10, 0), endTimestamp: t(11, 0) },
+        { id: 'entry-b', activityId: 'act-2', activityNameSnapshot: 'B', startTimestamp: t(11, 0), endTimestamp: t(12, 0) }
+    ]);
+    assert.deepEqual([...app.getOverlappingEntryIds()], []);
+
+    app.showEntryEditModal('entry-a');
+    await app.saveTimeEntry();
+    app.renderReview();
+
+    assert.equal(document.getElementById('entryConflictWarning').style.display, 'none');
+    assert.deepEqual(toasts, []);
+    assert.equal(document.getElementById('reviewEntriesList').innerHTML.includes('conflict-entry'), false);
+});
+
+test('conflict detection uses exact timestamps instead of five-minute Clockodo rounding', async () => {
+    const { app, document, storageData, toasts, t } = await createConflictApp(t => [
+        { id: 'entry-a', activityId: 'act-1', activityNameSnapshot: 'A', startTimestamp: t(12, 36, 0), endTimestamp: t(12, 37, 0) },
+        { id: 'entry-b', activityId: 'act-2', activityNameSnapshot: 'B', startTimestamp: t(12, 36, 30), endTimestamp: t(12, 38, 0) }
+    ]);
+    app.clockodoConfigured = true;
+    app.clockodoClient = { roundToNearestFiveMinutes: timestamp => Math.round(Number(timestamp) / 300000) * 300000 };
+
+    assert.equal(app.clockodoSendTimestamp(t(12, 36, 0)), app.clockodoSendTimestamp(t(12, 37, 0)), 'rounding collapses entry-a');
+    assert.deepEqual([...app.getOverlappingEntryIds()].sort(), ['entry-a', 'entry-b'], 'exact timestamps still detect the overlap');
+
+    app.showEntryEditModal('entry-b');
+    await app.saveTimeEntry();
+
+    assert.equal(document.getElementById('entryConflictWarning').style.display, 'block');
+    assert.deepEqual(toasts, [app.t('overlappingEntry')]);
+    assert.equal(storageData.timeEntries.find(entry => entry.id === 'entry-b').startTimestamp, t(12, 36, 30));
+    assert.equal(storageData.timeEntries.find(entry => entry.id === 'entry-b').endTimestamp, t(12, 38, 0));
+});
+
+test('malformed and invalid time ranges are still rejected before overlap handling', async () => {
+    const { app, document, toasts } = await createConflictApp(() => []);
+    app.showAddEntryModal();
+    const value = (id, nextValue) => { document.getElementById(id).value = nextValue; };
+
+    value('entryEditDate', 'not-a-date');
+    value('entryEditStart', '25:99');
+    value('entryEditEndDate', '2026-09-28');
+    value('entryEditEnd', '10:00');
+    await app.saveTimeEntry();
+    assert.deepEqual(toasts, [app.t('pleaseFillAllFields')]);
+    assert.equal(app.timeEntries.length, 0);
+
+    value('entryEditDate', '2026-09-28');
+    value('entryEditStart', '10:00');
+    value('entryEditEnd', '09:00');
+    await app.saveTimeEntry();
+    assert.deepEqual(toasts, [app.t('pleaseFillAllFields'), app.t('startBeforeEnd')]);
+    assert.equal(app.timeEntries.length, 0);
+
+    value('entryEditStart', '10:00');
+    value('entryEditEndDate', '2026-09-29');
+    value('entryEditEnd', '11:30');
+    await app.saveTimeEntry();
+    assert.deepEqual(toasts, [app.t('pleaseFillAllFields'), app.t('startBeforeEnd'), app.t('entryTooLong')]);
+    assert.equal(app.timeEntries.length, 0);
+});
+
+test('the overlap warning is localized in English, German, and Russian', async () => {
+    const { app } = createTestApp();
+    const expected = {
+        en: 'This time overlaps with another entry',
+        de: 'Diese Zeit überlappt mit einem anderen Eintrag',
+        ru: 'Это время пересекается с другой записью'
+    };
+    for (const [language, text] of Object.entries(expected)) {
+        app.currentLanguage = language;
+        assert.equal(app.t('overlappingEntry'), text, `${language} overlap warning`);
+    }
 });
 
 test('retry failures render a visible diagnostic with the real error details', async () => {

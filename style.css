@@ -428,6 +428,19 @@ button:focus-visible,
     margin-top: 4px;
 }
 
+.log-entry.log-entry-conflict {
+    border-left-color: var(--danger-color);
+    background-color: color-mix(in srgb, var(--danger-color) 7%, var(--bg-secondary));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger-color) 35%, transparent);
+}
+
+.log-entry-conflict-note {
+    margin-top: 6px;
+    font-size: 12px;
+    font-weight: 650;
+    color: var(--danger-color);
+}
+
 .log-empty {
     text-align: center;
     color: var(--text-tertiary);
@@ -1150,6 +1163,18 @@ input:-webkit-autofill:active {
 .review-entry-card.suspicious-entry {
     border-left-color: #F39C12 !important;
     background-color: rgba(243, 156, 18, 0.02);
+}
+
+.review-entry-card.conflict-entry {
+    border-color: var(--danger-color);
+    border-left-color: var(--danger-color) !important;
+    background-color: color-mix(in srgb, var(--danger-color) 7%, var(--bg-secondary));
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--danger-color) 45%, transparent);
+}
+
+.review-entry-card.conflict-entry .review-conflict-note {
+    color: var(--danger-color);
+    font-weight: 700;
 }
 
 .review-entry-header {
