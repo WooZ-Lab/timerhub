@@ -3013,6 +3013,66 @@ class TimerHubApp {
         this.setCanvasDropTarget(targetId);
     }
 
+    groupMemberRelativeBoxes(group, excludeId) {
+        const boxes = [];
+        for (const member of this.activities) {
+            if (member.groupId !== group.id || member.id === excludeId) continue;
+            const saved = this.activityLayouts.get(member.id);
+            if (saved && Number.isFinite(Number(saved.x)) && Number.isFinite(Number(saved.y))) {
+                boxes.push({
+                    x: Number(saved.x),
+                    y: Number(saved.y),
+                    width: this.clampCanvasCoordinate(saved.width, 260, 160, 640),
+                    height: this.clampCanvasCoordinate(saved.height, 150, 110, 520)
+                });
+                continue;
+            }
+            const layout = this.getActivityCanvasLayout(member, this.activities.indexOf(member), false);
+            boxes.push({
+                x: layout.x - group.x,
+                y: layout.y - group.y,
+                width: layout.width,
+                height: layout.height
+            });
+        }
+        return boxes;
+    }
+
+    findNearestFreePosition(movingBox, obstacles, step = CANVAS_GRID_SIZE) {
+        const overlaps = box => obstacles.some(other =>
+            box.x < other.x + other.width && other.x < box.x + box.width &&
+            box.y < other.y + other.height && other.y < box.y + box.height
+        );
+        if (!overlaps(movingBox)) return { x: movingBox.x, y: movingBox.y };
+        const baseX = this.snapToCanvasGrid(movingBox.x);
+        const baseY = this.snapToCanvasGrid(movingBox.y);
+        const candidates = [];
+        const radius = 40;
+        for (let dx = -radius; dx <= radius; dx += 1) {
+            for (let dy = -radius; dy <= radius; dy += 1) {
+                if (!dx && !dy) continue;
+                candidates.push({ dx, dy, distance: dx * dx + dy * dy });
+            }
+        }
+        candidates.sort((a, b) =>
+            (a.distance - b.distance) ||
+            (Math.abs(a.dy) - Math.abs(b.dy)) ||
+            (Math.abs(a.dx) - Math.abs(b.dx)) ||
+            (b.dy - a.dy) ||
+            (b.dx - a.dx)
+        );
+        for (const candidate of candidates) {
+            const box = {
+                ...movingBox,
+                x: baseX + candidate.dx * step,
+                y: baseY + candidate.dy * step
+            };
+            if (!overlaps(box)) return { x: box.x, y: box.y };
+        }
+        const bottom = Math.max(...obstacles.map(box => box.y + box.height));
+        return { x: baseX, y: this.snapToCanvasGrid(bottom + step) };
+    }
+
     reassignActivityToGroup(activity, targetGroup, displayLayout) {
         const targetOffset = targetGroup ? this.groupDisplayOffset(targetGroup.id) : { x: 0, y: 0 };
         const originX = targetGroup ? targetGroup.x : 0;
@@ -3024,6 +3084,12 @@ class TimerHubApp {
             width: displayLayout.width,
             height: displayLayout.height
         };
+        if (targetGroup) {
+            const obstacles = this.groupMemberRelativeBoxes(targetGroup, activity.id);
+            const free = this.findNearestFreePosition(stored, obstacles);
+            stored.x = free.x;
+            stored.y = free.y;
+        }
         if (targetGroup) activity.groupId = targetGroup.id;
         else delete activity.groupId;
         this.activityLayouts.set(activity.id, stored);

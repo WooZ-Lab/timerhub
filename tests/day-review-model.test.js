@@ -2261,11 +2261,13 @@ test('dragging an activity into a group reassigns membership without moving it',
     const { app, buttons, containers, pointer, storageData } = harness;
     app.activities = [
         { id: 'drop-free', name: 'Free', position: 0, size: 'medium' },
-        { id: 'drop-member', name: 'Member', position: 1, groupId: 'drop-a', size: 'medium' }
+        { id: 'drop-member', name: 'Member', position: 1, groupId: 'drop-a', size: 'medium' },
+        { id: 'drop-anchor', name: 'Anchor', position: 2, groupId: 'drop-a', size: 'medium' }
     ];
     app.activityLayouts = new Map([
         ['drop-free', { activityId: 'drop-free', x: 800, y: 600, width: 200, height: 120 }],
-        ['drop-member', { activityId: 'drop-member', x: 0, y: 0, width: 200, height: 120 }]
+        ['drop-member', { activityId: 'drop-member', x: 0, y: 0, width: 200, height: 120 }],
+        ['drop-anchor', { activityId: 'drop-anchor', x: 400, y: 0, width: 200, height: 120 }]
     ]);
     app.groups = [{ id: 'drop-a', name: 'A', x: 100, y: 100, collapsed: false }];
     app.renderMain();
@@ -2273,18 +2275,18 @@ test('dragging an activity into a group reassigns membership without moving it',
 
     const free = buttons.find(button => button.dataset.activityId === 'drop-free');
     pointer('pointerdown', free, 0, 0);
-    pointer('pointermove', free, -704, -512);
-    assert.equal(free.style.left, '100px', 'magnetism aligns the activity with the group member');
+    pointer('pointermove', free, -500, -500);
+    assert.equal(free.style.left, '300px', 'magnetism aligns the activity between the group members');
     assert.equal(free.style.top, '100px');
     assert.equal(container.classList.contains('group-drop-target'), true, 'the hovered group is highlighted');
     const beforeDrop = { left: free.style.left, top: free.style.top };
-    pointer('pointerup', free, -704, -512);
+    pointer('pointerup', free, -500, -500);
 
     const activity = app.activities.find(item => item.id === 'drop-free');
     assert.equal(activity.groupId, 'drop-a', 'the dropped activity joins the group');
     assert.deepEqual(
         { ...app.activityLayouts.get('drop-free') },
-        { activityId: 'drop-free', x: 0, y: 0, width: 200, height: 120 },
+        { activityId: 'drop-free', x: 200, y: 0, width: 200, height: 120 },
         'the visual position converts into the group frame'
     );
     assert.equal(app.groups[0].x, 100, 'group x is unchanged');
@@ -2295,7 +2297,7 @@ test('dragging an activity into a group reassigns membership without moving it',
     assert.equal(dropped.style.left, beforeDrop.left, 'the activity does not jump after the membership change');
     assert.equal(dropped.style.top, beforeDrop.top);
     assert.ok(storageData.activities.some(item => item.id === 'drop-free' && item.groupId === 'drop-a'), 'membership is persisted');
-    assert.ok(storageData.layout.some(item => item.activityId === 'drop-free' && item.x === 0 && item.y === 0), 'the converted layout is persisted');
+    assert.ok(storageData.layout.some(item => item.activityId === 'drop-free' && item.x === 200 && item.y === 0), 'the converted layout is persisted');
 
     const exported = await app.storage.exportAll();
     assert.equal(exported.activities.find(item => item.id === 'drop-free').groupId, 'drop-a', 'export keeps the membership');
@@ -2311,12 +2313,14 @@ test('dragging an activity between groups and out of groups converts coordinates
     app.activities = [
         { id: 'swap-mover', name: 'Mover', position: 0, groupId: 'swap-a', size: 'medium' },
         { id: 'swap-anchor', name: 'Anchor', position: 1, groupId: 'swap-a', size: 'medium' },
-        { id: 'swap-b1', name: 'B1', position: 2, groupId: 'swap-b', size: 'medium' }
+        { id: 'swap-b1', name: 'B1', position: 2, groupId: 'swap-b', size: 'medium' },
+        { id: 'swap-b2', name: 'B2', position: 3, groupId: 'swap-b', size: 'medium' }
     ];
     app.activityLayouts = new Map([
         ['swap-mover', { activityId: 'swap-mover', x: 300, y: 0, width: 200, height: 120 }],
         ['swap-anchor', { activityId: 'swap-anchor', x: 0, y: 0, width: 200, height: 120 }],
-        ['swap-b1', { activityId: 'swap-b1', x: 0, y: 0, width: 200, height: 120 }]
+        ['swap-b1', { activityId: 'swap-b1', x: 0, y: 0, width: 200, height: 120 }],
+        ['swap-b2', { activityId: 'swap-b2', x: 400, y: 0, width: 200, height: 120 }]
     ]);
     app.groups = [
         { id: 'swap-a', name: 'A', x: 100, y: 100, collapsed: false },
@@ -2327,20 +2331,20 @@ test('dragging an activity between groups and out of groups converts coordinates
     let mover = buttons.find(button => button.dataset.activityId === 'swap-mover');
     assert.equal(mover.style.left, '400px');
     pointer('pointerdown', mover, 0, 0);
-    pointer('pointermove', mover, 400, 0);
-    assert.equal(mover.style.left, '800px', 'the activity aligns with the target group member');
+    pointer('pointermove', mover, 600, 0);
+    assert.equal(mover.style.left, '1000px', 'the activity aligns between the target group members');
     assert.equal(containers.find(item => item.dataset.groupId === 'swap-b').classList.contains('group-drop-target'), true);
-    pointer('pointerup', mover, 400, 0);
+    pointer('pointerup', mover, 600, 0);
 
     const activity = app.activities.find(item => item.id === 'swap-mover');
     assert.equal(activity.groupId, 'swap-b', 'membership changes to the target group');
     assert.deepEqual(
         { ...app.activityLayouts.get('swap-mover') },
-        { activityId: 'swap-mover', x: 0, y: 0, width: 200, height: 120 },
+        { activityId: 'swap-mover', x: 200, y: 0, width: 200, height: 120 },
         'coordinates convert from group A to group B'
     );
     mover = buttons.find(button => button.dataset.activityId === 'swap-mover');
-    assert.equal(mover.style.left, '800px', 'the activity does not jump between groups');
+    assert.equal(mover.style.left, '1000px', 'the activity does not jump between groups');
     assert.equal(mover.style.top, '100px');
     assert.equal(app.groups[0].x, 100, 'group A does not move');
     assert.equal(app.groups[1].x, 800, 'group B does not move');
@@ -2352,11 +2356,11 @@ test('dragging an activity between groups and out of groups converts coordinates
     assert.ok(!('groupId' in activity), 'groupId is removed from the activity');
     assert.deepEqual(
         { ...app.activityLayouts.get('swap-mover') },
-        { activityId: 'swap-mover', x: 800, y: 496, width: 200, height: 120 },
+        { activityId: 'swap-mover', x: 1000, y: 496, width: 200, height: 120 },
         'the visual position is kept and stays on the grid'
     );
     mover = buttons.find(button => button.dataset.activityId === 'swap-mover');
-    assert.equal(mover.style.left, '800px', 'the activity does not jump when leaving a group');
+    assert.equal(mover.style.left, '1000px', 'the activity does not jump when leaving a group');
     assert.equal(mover.style.top, '496px');
     assert.equal(app.groups[0].x, 100);
     assert.equal(app.groups[1].x, 800);
@@ -2431,13 +2435,185 @@ test('group drop detection uses the center, the full box, zoom, pan, and tempora
     assert.equal(offsetActivity.groupId, 'offset-b', 'an offset group can receive a dropped activity');
     assert.deepEqual(
         { ...app.activityLayouts.get('offset-free') },
-        { activityId: 'offset-free', x: 0, y: 0, width: 200, height: 120 },
-        'the conversion accounts for the temporary offset'
+        { activityId: 'offset-free', x: 0, y: 128, width: 200, height: 120 },
+        'the conversion accounts for the temporary offset and resolves the overlap'
     );
     freeOffset = buttons.find(button => button.dataset.activityId === 'offset-free');
-    assert.equal(freeOffset.style.left, '360px', 'the activity does not jump into an offset group');
-    assert.equal(freeOffset.style.top, '100px');
+    assert.equal(freeOffset.style.left, '360px', 'the activity renders with the temporary offset');
+    assert.equal(freeOffset.style.top, '228px');
     assert.equal(app.groups[1].x, 180, 'the temporary offset is still not persisted');
+});
+
+test('dropping an activity onto a group member expands the group and resolves the overlap', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, buttons, containers, pointer, storageData } = harness;
+    app.activities = [
+        { id: 'grow-member', name: 'Member', position: 0, groupId: 'grow-a', size: 'medium' },
+        { id: 'grow-free', name: 'Free', position: 1, size: 'medium' }
+    ];
+    app.activityLayouts = new Map([
+        ['grow-member', { activityId: 'grow-member', x: 0, y: 0, width: 200, height: 120 }],
+        ['grow-free', { activityId: 'grow-free', x: 800, y: 600, width: 200, height: 120 }]
+    ]);
+    app.groups = [{ id: 'grow-a', name: 'A', x: 100, y: 100, collapsed: false }];
+    app.renderMain();
+    let container = containers.find(item => item.dataset.groupId === 'grow-a');
+    assert.equal(container.style.left, '80px');
+    assert.equal(container.style.top, '64px');
+    assert.equal(container.style.width, '240px');
+    assert.equal(container.style.height, '176px');
+
+    const free = buttons.find(button => button.dataset.activityId === 'grow-free');
+    pointer('pointerdown', free, 0, 0);
+    pointer('pointermove', free, -700, -500);
+    pointer('pointerup', free, -700, -500);
+
+    const activity = app.activities.find(item => item.id === 'grow-free');
+    assert.equal(activity.groupId, 'grow-a', 'the dropped activity joins the group');
+    assert.deepEqual(
+        { ...app.activityLayouts.get('grow-member') },
+        { activityId: 'grow-member', x: 0, y: 0, width: 200, height: 120 },
+        'the existing activity is not moved'
+    );
+    assert.deepEqual(
+        { ...app.activityLayouts.get('grow-free') },
+        { activityId: 'grow-free', x: 0, y: 128, width: 200, height: 120 },
+        'the new activity moves to the nearest free grid slot'
+    );
+    assert.equal(app.groups[0].x, 100, 'group x stays at its saved value');
+    assert.equal(app.groups[0].y, 100, 'group y stays at its saved value');
+
+    container = containers.find(item => item.dataset.groupId === 'grow-a');
+    assert.equal(container.style.left, '80px', 'padding stays part of the required bounds');
+    assert.equal(container.style.top, '64px', 'the header stays part of the required bounds');
+    assert.equal(container.style.width, '240px');
+    assert.equal(container.style.height, '304px', 'the container grows to hold both activities');
+    const containerBox = container.getBoundingClientRect();
+    const memberButton = buttons.find(button => button.dataset.activityId === 'grow-member');
+    const freeButton = buttons.find(button => button.dataset.activityId === 'grow-free');
+    for (const button of [memberButton, freeButton]) {
+        const box = button.getBoundingClientRect();
+        assert.ok(
+            box.left >= containerBox.left && box.top >= containerBox.top &&
+            box.right <= containerBox.right && box.bottom <= containerBox.bottom,
+            'every activity is fully inside the container'
+        );
+    }
+    const memberBox = memberButton.getBoundingClientRect();
+    const freeBox = freeButton.getBoundingClientRect();
+    assert.ok(freeBox.top >= memberBox.bottom, 'the new activity does not overlap the existing one');
+
+    assert.ok(
+        storageData.layout.some(item => item.activityId === 'grow-free' && item.x === 0 && item.y === 128),
+        'the resolved position is persisted'
+    );
+    const exported = await app.storage.exportAll();
+    assert.equal(exported.activities.find(item => item.id === 'grow-free').groupId, 'grow-a', 'export keeps the membership');
+    app.activities = [];
+    await app.loadActivities();
+    assert.equal(app.activityLayouts.get('grow-free').y, 128, 'reload keeps the resolved layout');
+});
+
+test('a group shrinks back when a member is dragged out', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, buttons, containers, pointer } = harness;
+    app.activities = [
+        { id: 'shrink-a1', name: 'A1', position: 0, groupId: 'shrink-a', size: 'medium' },
+        { id: 'shrink-a2', name: 'A2', position: 1, groupId: 'shrink-a', size: 'medium' }
+    ];
+    app.activityLayouts = new Map([
+        ['shrink-a1', { activityId: 'shrink-a1', x: 0, y: 0, width: 200, height: 120 }],
+        ['shrink-a2', { activityId: 'shrink-a2', x: 0, y: 128, width: 200, height: 120 }]
+    ]);
+    app.groups = [{ id: 'shrink-a', name: 'A', x: 100, y: 100, collapsed: false }];
+    app.renderMain();
+    let container = containers.find(item => item.dataset.groupId === 'shrink-a');
+    assert.equal(container.style.height, '304px');
+
+    const second = buttons.find(button => button.dataset.activityId === 'shrink-a2');
+    pointer('pointerdown', second, 0, 0);
+    pointer('pointermove', second, 700, 272);
+    pointer('pointerup', second, 700, 272);
+
+    const activity = app.activities.find(item => item.id === 'shrink-a2');
+    assert.equal(activity.groupId, undefined, 'the activity leaves the group');
+    container = containers.find(item => item.dataset.groupId === 'shrink-a');
+    assert.equal(container.style.height, '176px', 'the group shrinks back to its remaining content');
+    assert.equal(container.style.width, '240px', 'the group is not left oversized');
+    assert.equal(buttons.find(button => button.dataset.activityId === 'shrink-a2').style.top, '496px', 'the removed activity keeps its visual position');
+});
+
+test('group overlap resolution works with zoom, pan, negative coordinates, and temporary offsets', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, buttons, containers, pointer } = harness;
+    app.activities = [
+        { id: 'neg-member', name: 'Member', position: 0, groupId: 'neg-a', size: 'medium' },
+        { id: 'neg-free', name: 'Free', position: 1, size: 'medium' }
+    ];
+    app.activityLayouts = new Map([
+        ['neg-member', { activityId: 'neg-member', x: 0, y: 0, width: 200, height: 120 }],
+        ['neg-free', { activityId: 'neg-free', x: 0, y: 0, width: 200, height: 120 }]
+    ]);
+    app.groups = [{ id: 'neg-a', name: 'A', x: -400, y: -300, collapsed: false }];
+    app.canvasZoom = 2;
+    app.canvasPan = { x: -100, y: 50 };
+    app.renderMain();
+
+    let free = buttons.find(button => button.dataset.activityId === 'neg-free');
+    pointer('pointerdown', free, 0, 0);
+    pointer('pointermove', free, -800, -600);
+    pointer('pointerup', free, -800, -600);
+    const activity = app.activities.find(item => item.id === 'neg-free');
+    assert.equal(activity.groupId, 'neg-a', 'the negative-coordinate group receives the activity');
+    assert.deepEqual(
+        { ...app.activityLayouts.get('neg-free') },
+        { activityId: 'neg-free', x: 0, y: 128, width: 200, height: 120 },
+        'grid snapping and overlap resolution survive zoom and pan'
+    );
+    assert.equal(app.groups[0].x, -400, 'negative group x is untouched');
+    assert.equal(app.groups[0].y, -300, 'negative group y is untouched');
+    free = buttons.find(button => button.dataset.activityId === 'neg-free');
+    assert.equal(free.style.left, '-400px');
+    assert.equal(free.style.top, '-172px', 'the resolved position keeps the negative frame');
+    assert.equal(containers.find(item => item.dataset.groupId === 'neg-a').style.height, '304px');
+
+    app.activities = [
+        { id: 'off-a1', name: 'A1', position: 0, groupId: 'off-a', size: 'medium' },
+        { id: 'off-b1', name: 'B1', position: 1, groupId: 'off-b', size: 'medium' },
+        { id: 'off-free', name: 'Free', position: 2, size: 'medium' }
+    ];
+    app.activityLayouts = new Map([
+        ['off-a1', { activityId: 'off-a1', x: 0, y: 0, width: 200, height: 120 }],
+        ['off-b1', { activityId: 'off-b1', x: 0, y: 0, width: 200, height: 120 }],
+        ['off-free', { activityId: 'off-free', x: 900, y: 600, width: 200, height: 120 }]
+    ]);
+    app.groups = [
+        { id: 'off-a', name: 'A', x: 100, y: 100, collapsed: false },
+        { id: 'off-b', name: 'B', x: 180, y: 100, collapsed: false }
+    ];
+    app.canvasZoom = 1;
+    app.canvasPan = { x: 0, y: 0 };
+    app.renderMain();
+    assert.deepEqual({ ...app.groupDisplayOffset('off-b') }, { x: 180, y: 0 });
+
+    let freeOffset = buttons.find(button => button.dataset.activityId === 'off-free');
+    pointer('pointerdown', freeOffset, 0, 0);
+    pointer('pointermove', freeOffset, -540, -500);
+    pointer('pointerup', freeOffset, -540, -500);
+    const offsetActivity = app.activities.find(item => item.id === 'off-free');
+    assert.equal(offsetActivity.groupId, 'off-b');
+    assert.deepEqual(
+        { ...app.activityLayouts.get('off-free') },
+        { activityId: 'off-free', x: 0, y: 128, width: 200, height: 120 },
+        'overlap resolution uses the offset-free relative frame'
+    );
+    assert.deepEqual({ ...app.groupDisplayOffset('off-b') }, { x: 180, y: 0 }, 'the temporary offset is unchanged');
+    assert.equal(app.groups[1].x, 180, 'the temporary offset is never persisted');
+    freeOffset = buttons.find(button => button.dataset.activityId === 'off-free');
+    assert.equal(freeOffset.style.left, '360px', 'rendering applies the temporary offset');
+    assert.equal(freeOffset.style.top, '228px');
+    const offMember = buttons.find(button => button.dataset.activityId === 'off-b1');
+    assert.ok(freeOffset.getBoundingClientRect().top >= offMember.getBoundingClientRect().bottom, 'the resolved activity does not overlap the member');
 });
 
 test('group dragging keeps using saved coordinates while temporary offsets are active', async () => {
