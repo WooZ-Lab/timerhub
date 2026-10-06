@@ -1678,6 +1678,9 @@ class TimerHubApp {
         };
         this.setupDialogAccessibility();
         this.setupActivityCanvasInteractions();
+        this.syncCanvasToolbarLayout();
+        window.addEventListener?.('resize', () => this.syncCanvasToolbarLayout());
+        window.addEventListener?.('orientationchange', () => this.syncCanvasToolbarLayout());
 
         // Navigation
         sel('navTimer')?.addEventListener('click', () => this.switchScreen('main'));
@@ -3197,6 +3200,24 @@ class TimerHubApp {
             toggleAll.title = label;
             toggleAll.dataset.action = anyExpanded ? 'collapse' : 'expand';
         }
+    }
+
+    syncCanvasToolbarLayout() {
+        const nav = document.querySelector?.('.navbar-actions');
+        if (!nav || typeof nav.getBoundingClientRect !== 'function') return;
+        const root = document.documentElement;
+        const styles = typeof window.getComputedStyle === 'function'
+            ? window.getComputedStyle(nav)
+            : null;
+        const anchoredToBottom = Boolean(styles) &&
+            styles.position === 'fixed' && (styles.bottom === '0px' || styles.bottom === '0');
+        if (!anchoredToBottom) {
+            root?.style?.removeProperty?.('--bottom-nav-height');
+            return;
+        }
+        const height = nav.getBoundingClientRect().height;
+        if (!Number.isFinite(height) || height <= 0) return;
+        root?.style?.setProperty?.('--bottom-nav-height', `${height}px`);
     }
 
     pruneCanvasSelection() {

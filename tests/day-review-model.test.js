@@ -2275,6 +2275,33 @@ test('add activity action stays available without selection or groups', () => {
     assert.equal(addActivityBtn.style.transform, undefined, 'canvas pan never moves the toolbar action');
     assert.equal(addActivityBtn.style.left, undefined, 'canvas pan never repositions the toolbar action');
     assert.equal(addActivityBtn.style.top, undefined, 'canvas pan never repositions the toolbar action');
+
+    app.renderMain();
+    app.zoomCanvasAt(2, 100, 100);
+    assert.equal(app.canvasZoom, 2, 'canvas zooming still works');
+    assert.equal(addActivityBtn.style.transform, undefined, 'canvas zoom never moves the toolbar action');
+});
+
+test('toolbar docking measures the real bottom navigation height', () => {
+    const { app, document, context } = createTestApp();
+    const nav = { getBoundingClientRect: () => ({ height: 103 }) };
+    document.querySelector = selector => (selector === '.navbar-actions' ? nav : null);
+    document.documentElement.style = {
+        values: {},
+        setProperty(name, value) { this.values[name] = value; },
+        removeProperty(name) { delete this.values[name]; }
+    };
+
+    context.window.getComputedStyle = () => ({ position: 'fixed', bottom: '0px' });
+    app.syncCanvasToolbarLayout();
+    assert.equal(document.documentElement.style.values['--bottom-nav-height'], '103px', 'the toolbar docks above the measured navigation');
+
+    context.window.getComputedStyle = () => ({ position: 'static', bottom: 'auto' });
+    app.syncCanvasToolbarLayout();
+    assert.equal(document.documentElement.style.values['--bottom-nav-height'], undefined, 'desktop navigation keeps the CSS fallback');
+
+    document.querySelector = () => null;
+    assert.doesNotThrow(() => app.syncCanvasToolbarLayout());
 });
 
 test('automatic snapshot failures are observable but do not fail saved user data', async () => {
