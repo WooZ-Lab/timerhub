@@ -129,8 +129,8 @@ function createTestApp(initialData = {}) {
         'clockodoBillableSelect', 'clockodoTestBtn', 'clockodoRemoveBtn', 'clockodoStatusValue', 'clockodoToggleKeyBtn',
         'automaticBackupStatus', 'automaticSnapshotSelect', 'restoreSnapshotBtn', 'backupRestoreModal',
         'backupRestoreMergeBtn', 'backupRestoreReplaceBtn', 'backupRestoreCancelBtn', 'backupRestoreCloseBtn',
-        'reviewExportDayBtn', 'reviewImportDayBtn', 'reviewShareDayBtn', 'exchangeSharePreparedBtn', 'dayExportModal', 'dayExportModalTitle', 'exchangeCodeDisplay',
-        'exchangeCopyCodeBtn', 'exchangeShowQrBtn', 'dayExportCloseBtn', 'dayExportDoneBtn',
+        'reviewExportDayBtn', 'reviewImportDayBtn', 'reviewShareDayBtn', 'dayExportModal', 'dayExportModalTitle', 'exchangeCodeDisplay',
+        'exchangeCopyCodeBtn', 'exchangeShowQrBtn', 'dayExportCloseBtn',
         'dayImportModal', 'dayImportModalTitle', 'exchangeFileInput', 'exchangeChooseFileBtn', 'exchangeFileName',
         'exchangeCodeInput', 'exchangeScanQrBtn', 'exchangeImportError', 'exchangePreview', 'exchangePreviewSummary',
         'exchangePreviewWarnings', 'exchangePreviewList', 'exchangeDecryptBtn', 'exchangeImportBtn',
@@ -4704,6 +4704,8 @@ test('canShare() returning false skips the share attempt and falls back safely',
     assert.equal(await sender.app.exportReviewDay(), true);
     const prepared = sender.app.lastExchange;
     let shareCalls = 0;
+    let infoMenuOpened = 0;
+    sender.app.showDayExportModal = () => { infoMenuOpened += 1; };
     sender.context.navigator.canShare = () => false;
     sender.context.navigator.share = async () => { shareCalls += 1; };
     const clicksBefore = sender.backupCapture.clicks;
@@ -4713,6 +4715,7 @@ test('canShare() returning false skips the share attempt and falls back safely',
     assert.equal(sender.backupCapture.clicks, clicksBefore + 1);
     assert.equal(sender.backupCapture.filename, prepared.fileName);
     assert.equal(sender.toasts.at(-1), sender.app.t('exchangeShareUnsupported'));
+    assert.equal(infoMenuOpened, 1, 'the fallback exposes the transfer code and QR');
     assert.equal(sender.app.lastExchange, prepared);
 });
 
@@ -4787,12 +4790,15 @@ test('unsupported file sharing falls back to a download without creating a new e
     const prepared = sender.app.lastExchange;
     sender.context.navigator.share = undefined;
     sender.context.navigator.canShare = undefined;
+    let infoMenuOpened = 0;
+    sender.app.showDayExportModal = () => { infoMenuOpened += 1; };
     const clicksBefore = sender.backupCapture.clicks;
 
     assert.equal(await sender.app.shareExchangeFile(), true);
     assert.equal(sender.backupCapture.clicks, clicksBefore + 1, 'unsupported sharing falls back to a download');
     assert.equal(sender.backupCapture.filename, prepared.fileName);
     assert.equal(sender.toasts.at(-1), sender.app.t('exchangeShareUnsupported'));
+    assert.equal(infoMenuOpened, 1, 'the fallback exposes the transfer code and QR');
     assert.equal(sender.app.lastExchange, prepared);
 });
 
@@ -4808,40 +4814,54 @@ test('Share without a prepared export is handled safely', async () => {
     assert.equal(receiver.backupCapture.clicks, 0);
 });
 
-test('tapping Share prepares the export automatically when none exists', async () => {
+test('the main Share action prepares the export and invokes native sharing directly', async () => {
     const sender = await createExchangeSender();
     assert.equal(sender.app.lastExchange, null);
-    assert.equal(await sender.app.openExchangeMenu(), true);
-    assert.ok(sender.app.lastExchange?.file, 'Share must prepare the export before opening the menu');
+    const shares = [];
+    sender.context.navigator.canShare = () => true;
+    sender.context.navigator.share = async options => { shares.push(options); };
+    let infoMenuOpened = 0;
+    sender.app.showDayExportModal = () => { infoMenuOpened += 1; };
+
+    assert.equal(await sender.app.shareDayExchange(), true);
+    assert.ok(sender.app.lastExchange?.file, 'Share must prepare the export when none exists');
     assert.equal(sender.app.lastExchange.payload.date, '2026-10-05');
     assert.equal(sender.app.lastExchange.shareFile.type, 'text/plain');
-    assert.equal(
-        sender.document.getElementById('exchangeCodeDisplay').textContent,
-        sender.app.getExchange().formatTransferCode(sender.app.lastExchange.secret)
-    );
+    assert.equal(shares.length, 1, 'the native share sheet must be invoked on the first press');
+    assert.equal(shares[0].files[0].name, sender.app.lastExchange.shareFileName);
+    assert.equal(infoMenuOpened, 0, 'the intermediate export menu must not open before native sharing');
 });
 
 test('repeated Share actions reuse the same prepared export, transfer code and exportId', async () => {
     const sender = await createExchangeSender();
-    assert.equal(await sender.app.openExchangeMenu(), true);
+    const shares = [];
+    sender.context.navigator.canShare = () => true;
+    sender.context.navigator.share = async options => { shares.push(options); };
+
+    assert.equal(await sender.app.shareDayExchange(), true);
     const prepared = sender.app.lastExchange;
     const qrPayload = sender.app.getExchange().buildQrPayload(prepared.secret);
 
-    assert.equal(await sender.app.openExchangeMenu(), true);
-    assert.equal(await sender.app.openExchangeMenu(), true);
+    assert.equal(await sender.app.shareDayExchange(), true);
+    assert.equal(await sender.app.shareDayExchange(), true);
 
     assert.equal(sender.app.lastExchange, prepared, 'Share must not create a new export for the same day');
     assert.equal(sender.app.lastExchange.exportId, prepared.exportId);
     assert.equal(sender.app.lastExchange.secret, prepared.secret);
     assert.equal(sender.app.getExchange().buildQrPayload(sender.app.lastExchange.secret), qrPayload);
+    assert.equal(shares.length, 3);
+    assert.equal(shares[0].files[0], prepared.shareFile);
+    assert.equal(shares[2].files[0], prepared.shareFile);
 });
 
 test('Share prepares a separate export only when the reviewed day changes', async () => {
     const sender = await createExchangeSender();
-    await sender.app.openExchangeMenu();
+    sender.context.navigator.canShare = () => true;
+    sender.context.navigator.share = async () => {};
+    await sender.app.shareDayExchange();
     const first = sender.app.lastExchange;
 
-    await sender.app.openExchangeMenu();
+    await sender.app.shareDayExchange();
     assert.equal(sender.app.lastExchange, first, 'the same day keeps the prepared export');
 
     await sender.app.addEntry({
@@ -4850,7 +4870,7 @@ test('Share prepares a separate export only when the reviewed day changes', asyn
         endTimestamp: new Date(2026, 9, 6, 9, 0).getTime()
     });
     sender.app.reviewDate = '2026-10-06';
-    assert.equal(await sender.app.openExchangeMenu(), true);
+    assert.equal(await sender.app.shareDayExchange(), true);
     assert.notEqual(sender.app.lastExchange, first);
     assert.equal(sender.app.lastExchange.payload.date, '2026-10-06');
 });
@@ -4858,7 +4878,7 @@ test('Share prepares a separate export only when the reviewed day changes', asyn
 test('Share on a day without completed entries reports and leaves the prepared export untouched', async () => {
     const sender = await createExchangeSender();
     sender.app.reviewDate = '2026-10-07';
-    assert.equal(await sender.app.openExchangeMenu(), false);
+    assert.equal(await sender.app.shareDayExchange(), false);
     assert.equal(sender.app.lastExchange, null);
     assert.equal(sender.toasts.at(-1), sender.app.t('exchangeNoEntries'));
 });

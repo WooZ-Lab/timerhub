@@ -1891,10 +1891,8 @@ class TimerHubApp {
 
         // Secure day exchange
         sel('reviewImportDayBtn')?.addEventListener('click', () => this.showDayImportModal());
-        sel('reviewShareDayBtn')?.addEventListener('click', () => this.openExchangeMenu());
+        sel('reviewShareDayBtn')?.addEventListener('click', () => this.shareDayExchange());
         sel('dayExportCloseBtn')?.addEventListener('click', () => this.closeDayExportModal());
-        sel('dayExportDoneBtn')?.addEventListener('click', () => this.closeDayExportModal());
-        sel('exchangeSharePreparedBtn')?.addEventListener('click', () => this.shareExchangeFile());
         sel('exchangeCopyCodeBtn')?.addEventListener('click', () => this.copyTransferCode());
         sel('exchangeShowQrBtn')?.addEventListener('click', () => this.showExchangeQr());
         sel('exchangeQrCloseBtn')?.addEventListener('click', () => this.closeExchangeQr());
@@ -6258,14 +6256,13 @@ class TimerHubApp {
         return true;
     }
 
-    async openExchangeMenu() {
+    async shareDayExchange() {
         let prepared = this.lastExchange;
         if (!prepared?.file || prepared.payload?.date !== this.reviewDate) {
             prepared = await this.prepareExchangeExport();
             if (!prepared) return false;
         }
-        this.showDayExportModal();
-        return true;
+        return this.shareExchangeFile();
     }
 
     createExchangeFile(envelope, fileName, type = 'application/octet-stream') {
@@ -6313,6 +6310,9 @@ class TimerHubApp {
             }
         }
         this.downloadExchangeFile(prepared.file);
+        // Native file sharing is unavailable: expose the transfer code and QR so
+        // the downloaded .timerhub file can still be transferred manually.
+        this.showDayExportModal();
         this.showToast(this.t('exchangeShareUnsupported'));
         return true;
     }

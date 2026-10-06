@@ -1335,11 +1335,14 @@ test('exchange actions render as exactly one compact Import and Share row', () =
     assert.equal(htmlSource.includes('exchangeQrNote'), false, 'the repeated QR explanation is removed');
 });
 
-test('the export menu offers the prepared share action', () => {
-    assert.match(htmlSource, /id="exchangeSharePreparedBtn"[\s\S]{0,400}data-i18n="share"/);
+test('the export information menu has no bottom action buttons', () => {
     const exportModal = htmlSource.slice(htmlSource.indexOf('id="dayExportModal"'), htmlSource.indexOf('id="dayImportModal"'));
-    assert.match(exportModal, /id="exchangeShowQrBtn"/, 'the menu still provides Show QR');
-    assert.match(exportModal, /id="exchangeCodeDisplay"/, 'the menu still shows the transfer code');
+    assert.equal(exportModal.includes('modal-footer'), false, 'the menu must not have a bottom action bar');
+    assert.equal(exportModal.includes('exchangeSharePreparedBtn'), false, 'no second Share button remains');
+    assert.equal(exportModal.includes('dayExportDoneBtn'), false, 'no bottom Close button remains');
+    assert.match(exportModal, /id="dayExportCloseBtn"/, 'the × close control remains');
+    assert.match(exportModal, /id="exchangeShowQrBtn"/, 'Show QR remains');
+    assert.match(exportModal, /id="exchangeCodeDisplay"/, 'the transfer code remains');
 });
 
 test('the transfer-code explanation is shortened and the QR note removed in every locale', () => {
