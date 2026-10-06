@@ -6220,7 +6220,12 @@ class TimerHubApp {
                 payload,
                 envelope,
                 fileName,
-                file: this.createExchangeFile(envelope, fileName)
+                file: this.createExchangeFile(envelope, fileName),
+                // Chromium's Web Share allow-list only accepts a fixed set of file
+                // extensions and MIME types, so the same encrypted bytes also get a
+                // share-safe representation (text/plain, ".timerhub.txt").
+                shareFileName: `${fileName}.txt`,
+                shareFile: this.createExchangeFile(envelope, `${fileName}.txt`, 'text/plain')
             };
             this.showDayExportModal();
             return true;
@@ -6230,10 +6235,10 @@ class TimerHubApp {
         }
     }
 
-    createExchangeFile(envelope, fileName) {
+    createExchangeFile(envelope, fileName, type = 'application/octet-stream') {
         const json = JSON.stringify(envelope);
-        if (typeof File === 'function') return new File([json], fileName, { type: 'application/octet-stream' });
-        const blob = new Blob([json], { type: 'application/octet-stream' });
+        if (typeof File === 'function') return new File([json], fileName, { type });
+        const blob = new Blob([json], { type });
         blob.name = fileName;
         return blob;
     }
@@ -6257,19 +6262,24 @@ class TimerHubApp {
             this.showToast(this.t('exchangeNothingToShare'));
             return false;
         }
-        const file = prepared.file;
-        const canShareFiles = typeof navigator.share === 'function' &&
-            typeof navigator.canShare === 'function' &&
-            navigator.canShare({ files: [file] });
-        if (canShareFiles) {
+        const shareFile = prepared.shareFile || prepared.file;
+        let canAttemptShare = typeof navigator.share === 'function';
+        if (canAttemptShare && typeof navigator.canShare === 'function') {
             try {
-                await navigator.share({ files: [file], title: this.t('exportDayTitle') });
+                canAttemptShare = navigator.canShare({ files: [shareFile] });
+            } catch (error) {
+                canAttemptShare = false;
+            }
+        }
+        if (canAttemptShare) {
+            try {
+                await navigator.share({ files: [shareFile], title: this.t('exportDayTitle') });
                 return true;
             } catch (error) {
                 if (error?.name === 'AbortError') return false;
             }
         }
-        this.downloadExchangeFile(file);
+        this.downloadExchangeFile(prepared.file);
         this.showToast(this.t('exchangeShareUnsupported'));
         return true;
     }
@@ -6367,7 +6377,7 @@ class TimerHubApp {
             this.refreshExchangeDecryptState();
             return false;
         }
-        if (!/\.timerhub$/i.test(file.name || '')) {
+        if (!/\.timerhub(\.txt)?$/i.test(file.name || '')) {
             this.exchangeFile = null;
             if (nameNode) nameNode.textContent = '';
             this.showExchangeError('invalid_exchange_file');

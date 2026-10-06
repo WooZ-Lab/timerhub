@@ -4668,16 +4668,117 @@ test('Share sends the already-prepared file through Web Share and never creates 
     assert.equal(await sender.app.exportReviewDay(), true);
     const prepared = sender.app.lastExchange;
     const shares = [];
-    sender.context.navigator.canShare = options => Array.isArray(options?.files) && options.files.length === 1;
+    const canShareCalls = [];
+    sender.context.navigator.canShare = options => {
+        canShareCalls.push(options);
+        return Array.isArray(options?.files) && options.files.length === 1;
+    };
     sender.context.navigator.share = async options => { shares.push(options); };
 
     assert.equal(await sender.app.shareExchangeFile(), true);
     assert.equal(shares.length, 1);
     assert.equal(shares[0].files.length, 1);
-    assert.equal(shares[0].files[0].name, prepared.fileName);
+    assert.equal(shares[0].files[0].name, prepared.shareFileName);
+    assert.equal(shares[0].files[0].type, 'text/plain');
     assert.equal(await shares[0].files[0].text(), JSON.stringify(prepared.envelope));
+    assert.equal(canShareCalls.length, 1);
+    assert.equal(canShareCalls[0].files[0].name, prepared.shareFileName, 'the capability check must test the share-safe file');
     assert.equal(sender.app.lastExchange, prepared);
     assert.equal(sender.backupCapture.clicks, 0, 'a supported share must not download the file');
+});
+
+test('the share-safe file uses the Web Share allow-listed extension and MIME type', async () => {
+    const sender = await createExchangeSender();
+    assert.equal(await sender.app.exportReviewDay(), true);
+    const prepared = sender.app.lastExchange;
+    assert.match(prepared.fileName, /^timerhub-exchange_\d+\.timerhub$/);
+    assert.equal(prepared.file.type, 'application/octet-stream');
+    assert.match(prepared.shareFileName, /^timerhub-exchange_\d+\.timerhub\.txt$/);
+    assert.equal(prepared.shareFile.type, 'text/plain');
+    assert.equal(await prepared.shareFile.text(), await prepared.file.text(), 'both representations carry the same encrypted snapshot');
+    assert.equal(sender.app.lastExchange.exportId, prepared.exportId);
+});
+
+test('canShare() returning false skips the share attempt and falls back safely', async () => {
+    const sender = await createExchangeSender();
+    assert.equal(await sender.app.exportReviewDay(), true);
+    const prepared = sender.app.lastExchange;
+    let shareCalls = 0;
+    sender.context.navigator.canShare = () => false;
+    sender.context.navigator.share = async () => { shareCalls += 1; };
+    const clicksBefore = sender.backupCapture.clicks;
+
+    assert.equal(await sender.app.shareExchangeFile(), true);
+    assert.equal(shareCalls, 0, 'a rejected capability check must not call share()');
+    assert.equal(sender.backupCapture.clicks, clicksBefore + 1);
+    assert.equal(sender.backupCapture.filename, prepared.fileName);
+    assert.equal(sender.toasts.at(-1), sender.app.t('exchangeShareUnsupported'));
+    assert.equal(sender.app.lastExchange, prepared);
+});
+
+test('a missing canShare() still attempts the actual share instead of declaring it unsupported', async () => {
+    const sender = await createExchangeSender();
+    assert.equal(await sender.app.exportReviewDay(), true);
+    const prepared = sender.app.lastExchange;
+    const shares = [];
+    sender.context.navigator.canShare = undefined;
+    sender.context.navigator.share = async options => { shares.push(options); };
+
+    assert.equal(await sender.app.shareExchangeFile(), true);
+    assert.equal(shares.length, 1, 'share() must be attempted when the browser lacks canShare');
+    assert.equal(shares[0].files[0].name, prepared.shareFileName);
+    assert.equal(sender.backupCapture.clicks, 0);
+});
+
+test('a genuine navigator.share rejection is caught and falls back without throwing', async () => {
+    const sender = await createExchangeSender();
+    assert.equal(await sender.app.exportReviewDay(), true);
+    const prepared = sender.app.lastExchange;
+    sender.context.navigator.canShare = () => true;
+    sender.context.navigator.share = async () => {
+        throw Object.assign(new Error('Permission denied'), { name: 'NotAllowedError' });
+    };
+    const clicksBefore = sender.backupCapture.clicks;
+
+    assert.equal(await sender.app.shareExchangeFile(), true);
+    assert.equal(sender.backupCapture.clicks, clicksBefore + 1);
+    assert.equal(sender.backupCapture.filename, prepared.fileName);
+    assert.equal(sender.toasts.at(-1), sender.app.t('exchangeShareUnsupported'));
+    assert.equal(sender.app.lastExchange, prepared);
+});
+
+test('cancelling the share sheet does not download and does not create a new export', async () => {
+    const sender = await createExchangeSender();
+    assert.equal(await sender.app.exportReviewDay(), true);
+    const prepared = sender.app.lastExchange;
+    sender.context.navigator.canShare = () => true;
+    sender.context.navigator.share = async () => {
+        throw Object.assign(new Error('Share canceled'), { name: 'AbortError' });
+    };
+    const clicksBefore = sender.backupCapture.clicks;
+    const toastsBefore = sender.toasts.length;
+
+    assert.equal(await sender.app.shareExchangeFile(), false);
+    assert.equal(sender.backupCapture.clicks, clicksBefore, 'cancelling must not trigger the download fallback');
+    assert.equal(sender.toasts.length, toastsBefore, 'cancelling must not add a fallback toast');
+    assert.equal(sender.app.lastExchange, prepared);
+});
+
+test('the import picker accepts the share-safe .timerhub.txt file', async () => {
+    const sender = await createExchangeSender();
+    assert.equal(await sender.app.exportReviewDay(), true);
+    const prepared = sender.app.lastExchange;
+    const receiver = createExchangeReceiver();
+    const file = {
+        name: prepared.shareFileName,
+        size: JSON.stringify(prepared.envelope).length,
+        text: async () => JSON.stringify(prepared.envelope)
+    };
+    assert.equal(receiver.app.handleExchangeFileSelected(file), true);
+    receiver.document.getElementById('exchangeCodeInput').value = receiver.app.getExchange().formatTransferCode(prepared.secret);
+    receiver.app.refreshExchangeDecryptState();
+    assert.equal(await receiver.app.decryptExchangeFile(), true);
+    assert.equal(receiver.app.pendingExchange.payload.entries.length, 2);
 });
 
 test('unsupported file sharing falls back to a download without creating a new export', async () => {
