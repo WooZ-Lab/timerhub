@@ -1224,9 +1224,17 @@ test('canvas toolbar, centered group modal, and single settings heading are wire
 
     const toolbarRule = styleSource.match(/\.canvas-toolbar\s*\{([^}]*)\}/s)?.[1] || '';
     assert.match(toolbarRule, /position:\s*absolute/);
+    assert.match(toolbarRule, /top:\s*calc\(var\(--navbar-height\) \+ 8px\)/);
     assert.match(toolbarRule, /display:\s*flex/);
     assert.match(toolbarRule, /overflow-x:\s*auto/);
     assert.match(toolbarRule, /max-height:\s*48px/);
+    assert.match(styleSource, /--navbar-height:\s*calc\(var\(--safe-top\) \+ 65px\)/);
+    assert.match(styleSource, /--navbar-height:\s*calc\(var\(--safe-top\) \+ 59px\)/);
+
+    assert.match(htmlSource, /<button id="addActivityBtn" class="canvas-tool-btn"[^>]*>\+<\/button>/);
+    assert.equal(/<button id="addActivityBtn"[^>]*\shidden/.test(htmlSource), false, 'add activity is never hidden in markup');
+    assert.match(source, /sel\('addActivityBtn'\)\?\.addEventListener\('click'/, 'add activity keeps the existing creation flow');
+    assert.equal(/addActivityBtn[^\n]*\.hidden/.test(source), false, 'no canvas state hides the add activity action');
 
     const toolButtonRule = styleSource.match(/\.canvas-tool-btn\s*\{([^}]*)\}/s)?.[1] || '';
     assert.match(toolButtonRule, /min-width:\s*40px/);

@@ -305,6 +305,7 @@ function createGroupCanvasHarness() {
                 }
             },
             setAttribute(name, value) { this[name] = String(value); },
+            append(...items) { for (const item of items) { item.parent = element; element.children.push(item); } },
             appendChild(item) { item.parent = element; element.children.push(item); return item; },
             replaceChildren(...items) { element.children = items; },
             addEventListener(type, handler) { handlers.set(type, handler); },
@@ -352,6 +353,8 @@ function createGroupCanvasHarness() {
     const status = makeElement();
     const filter = makeElement();
     filter.value = '';
+    const addActivityBtn = makeElement();
+    addActivityBtn.textContent = '+';
     const createGroupBtn = makeElement();
     createGroupBtn.hidden = true;
     const groupToggleAllBtn = makeElement();
@@ -362,6 +365,7 @@ function createGroupCanvasHarness() {
         activitiesGrid: stage,
         timerRunningStatus: status,
         logActivityFilter: filter,
+        addActivityBtn,
         createGroupBtn,
         groupToggleAllBtn
     })[id] || originalGetById(id);
@@ -378,7 +382,7 @@ function createGroupCanvasHarness() {
 
     return {
         app, context, storageData, viewport, stage,
-        buttons, handles, containers, status, createGroupBtn, groupToggleAllBtn,
+        buttons, handles, containers, status, addActivityBtn, createGroupBtn, groupToggleAllBtn,
         pointer, makeElement
     };
 }
@@ -2246,6 +2250,23 @@ test('group selection action tracks a valid selection only', async () => {
     app.setCanvasSelection(['sel-b']);
     app.switchScreen('review');
     assert.equal(app.selectedActivityIds.size, 0, 'leaving the canvas clears the selection');
+});
+
+test('add activity action stays available without selection or groups', () => {
+    const harness = createGroupCanvasHarness();
+    const { app, addActivityBtn } = harness;
+    app.activities = [];
+    app.groups = [];
+    app.selectedActivityIds = new Set();
+    app.renderMain();
+
+    assert.equal(addActivityBtn.hidden, false, 'the add action is visible on an empty canvas');
+    assert.equal(addActivityBtn.textContent, '+');
+
+    app.setCanvasSelection(['missing-activity']);
+    assert.equal(addActivityBtn.hidden, false, 'selection state never hides the add action');
+    app.setCanvasSelection([]);
+    assert.equal(addActivityBtn.hidden, false, 'clearing the selection never hides the add action');
 });
 
 test('automatic snapshot failures are observable but do not fail saved user data', async () => {
