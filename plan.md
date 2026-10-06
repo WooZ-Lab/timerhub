@@ -180,13 +180,13 @@ Gates: `npm test`, `node --check` changed files, `git diff --check`, diff review
 - [x] Phase 0 — baseline verified, plan committed locally.
 - [x] Phase 1 — exchange format + validation. Validation: `tests/exchange.test.js` payload allow-list, invalid intervals, unsupported versions, malformed payloads.
 - [x] Phase 2 — AES-256-GCM + transfer secret. Validation: round trip, wrong secret, tampered ciphertext/metadata, corrupted file, no plaintext, QR secret format. Full suite `npm test` 187 pass.
-- [ ] Phase 3 — day export
-- [ ] Phase 4 — import + decryption
-- [ ] Phase 5 — import preview
-- [ ] Phase 6 — import into Day Review
-- [ ] Phase 7 — repeat-import protection
-- [ ] Phase 8 — QR transfer
+- [x] Phase 3 — day export. Validation: encrypted file produced, no plaintext work data in file/filename, transfer code shown; `tests/exchange.test.js` + day-review export tests.
+- [x] Phase 4 — import + decryption. Validation: wrong code, tampered/unsupported file, wrong extension rejected before model mutation.
+- [x] Phase 5 — import preview. Validation: preview content, explicit Import button, nothing written on decrypt alone.
+- [x] Phase 6 — import into Day Review. Validation: exact timestamps, customer/service IDs and names preserved, `unsynced`/`manual`, no Clockodo calls, editable through existing editor.
+- [x] Phase 7 — repeat-import protection. Validation: second import warns + `Import again`, cancel writes nothing, confirmed repeat duplicates.
+- [x] Phase 8 — QR transfer. Validation: QR payload protocol+secret only; vendored qrcode-generator/jsQR round trip; scan fills the code input.
 - [ ] Phase 9 — local mobile test procedure
-- [ ] Phase 10 — UI + localization
+- [x] Phase 10 — UI + localization. Validation: toolbar actions with icons+text, EN/DE/RU keys symmetrical (push-flow translation reference test), touch-friendly classes reused.
 - [ ] Phase 11 — security + regression audit
 - [ ] Phase 12 — final end-to-end validation

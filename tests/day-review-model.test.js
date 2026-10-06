@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { webcrypto } from 'node:crypto';
 import test from 'node:test';
 import vm from 'node:vm';
 
 const source = await readFile(new URL('../app.js', import.meta.url), 'utf8');
 const clockodoClientSource = await readFile(new URL('../clockodo-client.js', import.meta.url), 'utf8');
+const exchangeSource = await readFile(new URL('../exchange.js', import.meta.url), 'utf8');
 
 function createTestApp(initialData = {}) {
     const storageData = {
@@ -126,7 +128,15 @@ function createTestApp(initialData = {}) {
         'clockodoEmailInput', 'clockodoApiKeyInput', 'clockodoCustomerIdInput', 'clockodoProjectIdInput', 'clockodoServiceIdInput', 'clockodoSaveBtn',
         'clockodoBillableSelect', 'clockodoTestBtn', 'clockodoRemoveBtn', 'clockodoStatusValue', 'clockodoToggleKeyBtn',
         'automaticBackupStatus', 'automaticSnapshotSelect', 'restoreSnapshotBtn', 'backupRestoreModal',
-        'backupRestoreMergeBtn', 'backupRestoreReplaceBtn', 'backupRestoreCancelBtn', 'backupRestoreCloseBtn'
+        'backupRestoreMergeBtn', 'backupRestoreReplaceBtn', 'backupRestoreCancelBtn', 'backupRestoreCloseBtn',
+        'reviewExportDayBtn', 'reviewImportDayBtn', 'dayExportModal', 'dayExportModalTitle', 'exchangeCodeDisplay',
+        'exchangeCopyCodeBtn', 'exchangeShowQrBtn', 'dayExportCloseBtn', 'dayExportDoneBtn',
+        'dayImportModal', 'dayImportModalTitle', 'exchangeFileInput', 'exchangeChooseFileBtn', 'exchangeFileName',
+        'exchangeCodeInput', 'exchangeScanQrBtn', 'exchangeImportError', 'exchangePreview', 'exchangePreviewSummary',
+        'exchangePreviewWarnings', 'exchangePreviewList', 'exchangeDecryptBtn', 'exchangeImportBtn',
+        'dayImportCloseBtn', 'dayImportCancelBtn', 'exchangeQrModal', 'exchangeQrCanvas', 'exchangeQrSecret',
+        'exchangeQrCloseBtn', 'exchangeQrDoneBtn', 'exchangeScanModal', 'exchangeScanVideo', 'exchangeScanStatus',
+        'exchangeScanCloseBtn', 'exchangeScanDoneBtn'
     ]) {
         elements.set(id, {
             id,
@@ -198,8 +208,16 @@ function createTestApp(initialData = {}) {
             setItem: (key, value) => localStorageData.set(key, String(value)),
             removeItem: key => localStorageData.delete(key)
         },
-        crypto: { randomUUID: () => 'test-uuid-1234', getRandomValues: bytes => { bytes.fill(7); return bytes; } },
+        crypto: {
+            randomUUID: () => 'test-uuid-1234',
+            getRandomValues: bytes => { bytes.fill(7); return bytes; },
+            subtle: webcrypto.subtle
+        },
         btoa,
+        atob,
+        TextEncoder,
+        TextDecoder,
+        Uint8Array,
         Array,
         Object,
         Date,
@@ -213,6 +231,7 @@ function createTestApp(initialData = {}) {
     });
 
     vm.runInContext(clockodoClientSource, context, { filename: 'clockodo-client.js' });
+    vm.runInContext(exchangeSource, context, { filename: 'exchange.js' });
     vm.runInContext(source, context, { filename: 'app.js' });
     const app = vm.runInContext('new TimerHubApp()', context);
     app.storage = mockStorage;
@@ -4541,6 +4560,234 @@ test('the UNKNOWN Send again action and a successful manual resend survive a rel
     const entry = afterResend.timeEntries.find(item => item.id === 'unknown-entry');
     assert.equal(entry.syncStatus, 'synced');
     assert.equal(entry.clockodoEntryId, 4321);
+});
+
+async function createExchangeSender() {
+    const harness = createTestApp();
+    const { app } = harness;
+    const start = new Date(2026, 9, 5, 15, 35, 0).getTime();
+    await app.addEntry({
+        id: 'exchange-a', activityId: 'act-1', activityNameSnapshot: 'Anfahrt',
+        startTimestamp: start, endTimestamp: start + 46 * 60000 + 3000,
+        notes: 'Drove to the site', customerId: '11', serviceId: '21',
+        customerName: 'Bau GmbH', serviceName: 'Anfahrt'
+    });
+    await app.addEntry({
+        id: 'exchange-b', activityId: 'act-1', activityNameSnapshot: 'Concrete pour',
+        startTimestamp: start + 60 * 60000, endTimestamp: start + 120 * 60000
+    });
+    app.activities = [{ id: 'act-1', name: 'Anfahrt', color: '#27AE60' }];
+    app.reviewDate = '2026-10-05';
+    app.renderLog = () => {};
+    return { ...harness, start };
+}
+
+function createExchangeReceiver({ customers = null } = {}) {
+    const harness = createTestApp();
+    harness.app.activities = [{ id: 'act-1', name: 'Anfahrt', color: '#27AE60' }];
+    harness.app.reviewDate = '2026-10-01';
+    harness.app.renderLog = () => {};
+    if (customers) harness.app.clockodoCustomers = customers;
+    return harness;
+}
+
+async function loadExchangeIntoReceiver(receiver, envelopeText, secret) {
+    const file = { name: 'timerhub-exchange.timerhub', size: envelopeText.length, text: async () => envelopeText };
+    receiver.app.handleExchangeFileSelected(file);
+    receiver.document.getElementById('exchangeCodeInput').value = receiver.app.getExchange().formatTransferCode(secret);
+    receiver.app.refreshExchangeDecryptState();
+    return receiver.app.decryptExchangeFile();
+}
+
+test('Day Review exports an encrypted .timerhub file without plaintext work data', async () => {
+    const { app, document, backupCapture } = await createExchangeSender();
+    const clicksBefore = backupCapture.clicks;
+    assert.equal(await app.exportReviewDay(), true);
+    assert.equal(backupCapture.clicks, clicksBefore + 1);
+    assert.match(backupCapture.filename, /^timerhub-exchange_\d+\.timerhub$/);
+    assert.equal(/Anfahrt|Concrete|Bau|2026-10-05/.test(backupCapture.filename), false);
+
+    const secret = app.lastExchange.secret;
+    assert.equal(typeof secret, 'string');
+    assert.equal(secret.length, 43);
+    const fileText = JSON.stringify(app.lastExchange.envelope);
+    for (const value of ['Anfahrt', 'Concrete pour', 'Drove to the site', 'Bau GmbH', '2026-10-05', app.lastExchange.exportId, secret]) {
+        assert.equal(fileText.includes(value), false, `exchange file must not contain ${value}`);
+    }
+    assert.equal(document.getElementById('exchangeCodeDisplay').textContent, app.getExchange().formatTransferCode(secret));
+});
+
+test('exporting a day without completed entries reports and downloads nothing', async () => {
+    const { app, toasts, backupCapture } = await createExchangeSender();
+    app.reviewDate = '2026-10-07';
+    const clicksBefore = backupCapture.clicks;
+    assert.equal(await app.exportReviewDay(), false);
+    assert.equal(backupCapture.clicks, clicksBefore);
+    assert.equal(toasts.at(-1), app.t('exchangeNoEntries'));
+});
+
+test('a received exchange file decrypts into a preview and imports only after explicit confirmation', async () => {
+    const sender = await createExchangeSender();
+    await sender.app.exportReviewDay();
+    const envelopeText = JSON.stringify(sender.app.lastExchange.envelope);
+    const secret = sender.app.lastExchange.secret;
+
+    const receiver = createExchangeReceiver();
+    let clockodoCalls = 0;
+    receiver.app.clockodoConfigured = true;
+    receiver.app.clockodoClient = {
+        buildEntryPayload: () => { clockodoCalls += 1; return {}; },
+        async createEntry() { clockodoCalls += 1; return { created: true, entryId: 1 }; }
+    };
+
+    assert.equal(await loadExchangeIntoReceiver(receiver, envelopeText, secret), true);
+    assert.equal(receiver.app.pendingExchange.payload.entries.length, 2);
+    assert.equal(receiver.app.pendingExchange.repeat, false);
+    assert.equal(receiver.app.timeEntries.length, 0, 'decryption alone must not import anything');
+
+    const summary = receiver.document.getElementById('exchangePreviewSummary').innerHTML;
+    assert.ok(summary.includes('2026-10-05'));
+    const previewList = receiver.document.getElementById('exchangePreviewList').innerHTML;
+    assert.ok(previewList.includes('Anfahrt'));
+    assert.ok(previewList.includes('Concrete pour'));
+    assert.ok(previewList.includes(receiver.app.t('customer')));
+    assert.equal(receiver.document.getElementById('exchangeImportBtn').textContent, receiver.app.t('importBtn'));
+
+    assert.equal(await receiver.app.confirmExchangeImport(), true);
+    assert.equal(clockodoCalls, 0, 'import must never trigger a Clockodo request');
+    assert.equal(receiver.app.reviewDate, '2026-10-05');
+    const imported = receiver.app.getDayEntries('2026-10-05');
+    assert.equal(imported.length, 2);
+    const first = imported.find(entry => entry.activityNameSnapshot === 'Anfahrt');
+    assert.equal(first.startTimestamp, sender.start);
+    assert.equal(first.endTimestamp, sender.start + 46 * 60000 + 3000);
+    assert.equal(first.notes, 'Drove to the site');
+    assert.equal(first.customerId, '11');
+    assert.equal(first.serviceId, '21');
+    assert.equal(first.customerName, 'Bau GmbH');
+    assert.equal(first.syncStatus, 'unsynced');
+    assert.equal(first.source, 'manual');
+
+    const reviewHtml = receiver.document.getElementById('reviewEntriesList').innerHTML;
+    assert.ok(reviewHtml.includes('concrete pour') || reviewHtml.includes('Concrete pour'));
+    assert.equal(reviewHtml.includes('sync-badge synced'), false);
+    assert.equal(reviewHtml.includes('sync-badge unknown'), false);
+});
+
+test('importing with the wrong transfer code fails safely and writes nothing', async () => {
+    const sender = await createExchangeSender();
+    await sender.app.exportReviewDay();
+    const envelopeText = JSON.stringify(sender.app.lastExchange.envelope);
+    const correct = sender.app.lastExchange.secret;
+    const wrong = (correct[0] === 'A' ? 'B' : 'A') + correct.slice(1);
+
+    const receiver = createExchangeReceiver();
+    assert.equal(await loadExchangeIntoReceiver(receiver, envelopeText, wrong), false);
+    assert.equal(receiver.app.pendingExchange, null);
+    assert.equal(receiver.app.timeEntries.length, 0);
+    assert.equal(
+        receiver.document.getElementById('exchangeImportError').textContent,
+        receiver.app.t('exchangeDecryptFailed')
+    );
+});
+
+test('a tampered or unsupported exchange file is rejected before import', async () => {
+    const sender = await createExchangeSender();
+    await sender.app.exportReviewDay();
+    const secret = sender.app.lastExchange.secret;
+
+    const tampered = JSON.parse(JSON.stringify(sender.app.lastExchange.envelope));
+    tampered.createdAt += 1;
+    const receiverA = createExchangeReceiver();
+    assert.equal(await loadExchangeIntoReceiver(receiverA, JSON.stringify(tampered), secret), false);
+    assert.equal(receiverA.app.timeEntries.length, 0);
+
+    const unsupported = JSON.parse(JSON.stringify(sender.app.lastExchange.envelope));
+    unsupported.version = 2;
+    const receiverB = createExchangeReceiver();
+    assert.equal(await loadExchangeIntoReceiver(receiverB, JSON.stringify(unsupported), secret), false);
+    assert.equal(
+        receiverB.document.getElementById('exchangeImportError').textContent,
+        receiverB.app.t('exchangeUnsupportedFormat')
+    );
+});
+
+test('an exchange file with the wrong extension is rejected', async () => {
+    const receiver = createExchangeReceiver();
+    assert.equal(receiver.app.handleExchangeFileSelected({ name: 'notes.json', size: 10, text: async () => '{}' }), false);
+    assert.equal(receiver.document.getElementById('exchangeImportError').textContent, receiver.app.t('exchangeInvalidFile'));
+});
+
+test('repeated imports warn, can be cancelled, and require explicit confirmation', async () => {
+    const sender = await createExchangeSender();
+    await sender.app.exportReviewDay();
+    const envelopeText = JSON.stringify(sender.app.lastExchange.envelope);
+    const secret = sender.app.lastExchange.secret;
+
+    const receiver = createExchangeReceiver();
+    assert.equal(await loadExchangeIntoReceiver(receiver, envelopeText, secret), true);
+    assert.equal(await receiver.app.confirmExchangeImport(), true);
+    assert.equal(receiver.app.getDayEntries('2026-10-05').length, 2);
+
+    assert.equal(await loadExchangeIntoReceiver(receiver, envelopeText, secret), true);
+    assert.equal(receiver.app.pendingExchange.repeat, true);
+    assert.equal(receiver.document.getElementById('exchangeImportBtn').textContent, receiver.app.t('importAgainBtn'));
+    assert.ok(receiver.document.getElementById('exchangePreviewWarnings').innerHTML.includes(receiver.app.t('exchangeWarningRepeat')));
+
+    receiver.app.closeDayImportModal();
+    assert.equal(receiver.app.getDayEntries('2026-10-05').length, 2, 'cancelling the repeated import must not duplicate entries');
+
+    assert.equal(await loadExchangeIntoReceiver(receiver, envelopeText, secret), true);
+    assert.equal(await receiver.app.confirmExchangeImport(), true);
+    assert.equal(receiver.app.getDayEntries('2026-10-05').length, 4, 'explicitly confirmed repeat import duplicates as requested');
+});
+
+test('the import preview warns about unknown Clockodo assignments', async () => {
+    const sender = await createExchangeSender();
+    await sender.app.exportReviewDay();
+    const envelopeText = JSON.stringify(sender.app.lastExchange.envelope);
+    const secret = sender.app.lastExchange.secret;
+
+    const receiver = createExchangeReceiver({ customers: [{ id: 99, name: 'Someone else' }] });
+    assert.equal(await loadExchangeIntoReceiver(receiver, envelopeText, secret), true);
+    assert.ok(receiver.app.pendingExchange.analysis.warnings.includes('exchangeWarningUnknownCustomer'));
+    assert.ok(receiver.document.getElementById('exchangePreviewWarnings').innerHTML.includes(receiver.app.t('exchangeWarningUnknownCustomer')));
+    assert.equal(receiver.app.timeEntries.length, 0);
+});
+
+test('a scanned transfer QR fills the code input and carries no work data', async () => {
+    const sender = await createExchangeSender();
+    await sender.app.exportReviewDay();
+    const secret = sender.app.lastExchange.secret;
+    const qrText = sender.app.getExchange().buildQrPayload(secret);
+    assert.equal(qrText.includes('Anfahrt'), false);
+    assert.equal(qrText.includes('Bau'), false);
+
+    const receiver = createExchangeReceiver();
+    const envelopeText = JSON.stringify(sender.app.lastExchange.envelope);
+    const file = { name: 'timerhub-exchange.timerhub', size: envelopeText.length, text: async () => envelopeText };
+    receiver.app.handleExchangeFileSelected(file);
+    assert.equal(receiver.app.handleExchangeQrValue('not-a-qr'), false);
+    assert.equal(receiver.app.handleExchangeQrValue(qrText), true);
+    assert.equal(
+        receiver.document.getElementById('exchangeCodeInput').value,
+        receiver.app.getExchange().formatTransferCode(secret)
+    );
+    assert.equal(await receiver.app.decryptExchangeFile(), true);
+    assert.equal(receiver.app.pendingExchange.payload.entries.length, 2);
+});
+
+test('an imported entry stays editable in the existing entry editor', async () => {
+    const sender = await createExchangeSender();
+    await sender.app.exportReviewDay();
+    const receiver = createExchangeReceiver();
+    assert.equal(await loadExchangeIntoReceiver(receiver, JSON.stringify(sender.app.lastExchange.envelope), sender.app.lastExchange.secret), true);
+    assert.equal(await receiver.app.confirmExchangeImport(), true);
+    const imported = receiver.app.getDayEntries('2026-10-05')[0];
+    receiver.app.showEntryEditModal(imported.id);
+    assert.equal(receiver.document.getElementById('entryEditDate').value, '2026-10-05');
+    assert.equal(receiver.document.getElementById('entryEditStart').value, receiver.app.toTimeString(new Date(imported.startTimestamp)));
+    assert.equal(receiver.document.getElementById('entryEditEnd').value, receiver.app.toTimeString(new Date(imported.endTimestamp)));
 });
 
 test('editing an activity scrolls both picker rows to center the selected items', () => {

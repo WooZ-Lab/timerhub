@@ -276,7 +276,7 @@ const extendedTranslations = {
         issueZeroDuration: 'Zero or negative duration',
         issueOverlapping: 'Overlaps with another entry',
         issueUnusuallyLong: 'Unusually long (>16h)',
-        notes: 'Notes', project: 'Project', service: 'Service', endDate: 'End Date',
+        notes: 'Notes', project: 'Project', service: 'Service', customer: 'Customer', endDate: 'End Date',
         entryTooLong: 'An entry cannot be longer than 24 hours.',
         confirmSyncTitle: 'Confirm Clockodo Synchronization',
         confirmSyncDesc: 'Review these {count} entries. Confirming saves a fixed local snapshot for Clockodo; nothing is sent yet.',
@@ -347,6 +347,47 @@ const extendedTranslations = {
         resendSyncNotice: 'These entries have already been synced to Clockodo. Do you really want to send them again? This can create duplicate Clockodo entries.',
         resendSyncBtn: 'Send again',
         unknownResendNotice: 'The previous Clockodo result for this entry is uncertain. Clockodo may already contain it. Check Clockodo first — continuing can create a duplicate entry.',
+        exportDay: 'Export day',
+        importDay: 'Import day',
+        exportDayTitle: 'Export day',
+        exportDayDesc: 'The encrypted .timerhub file was downloaded. Share it with the other worker and pass on the transfer code separately.',
+        importDayTitle: 'Import day',
+        importDayDesc: 'Choose a .timerhub file and enter the transfer code. The file is decrypted locally on this device.',
+        exchangeClockodoNote: 'Imported entries are not sent to Clockodo automatically. Review them and confirm with Review & Sync.',
+        transferCode: 'Transfer code',
+        transferCodePlaceholder: 'Enter the transfer code',
+        showQr: 'Show QR',
+        scanQr: 'Scan QR',
+        chooseFile: 'Choose file',
+        decrypt: 'Decrypt',
+        importBtn: 'Import',
+        importAgainBtn: 'Import again',
+        exchangeQrTitle: 'Transfer code QR',
+        exchangeQrNote: 'The QR contains only the transfer code. The encrypted entries stay in the .timerhub file.',
+        exchangeScanTitle: 'Scan transfer QR',
+        exchangeScanning: 'Point the camera at the transfer code QR.',
+        exchangeScanUnsupported: 'QR scanning is not supported here. Enter the transfer code manually.',
+        exchangeScanPermission: 'Camera access was denied. Enter the transfer code manually.',
+        exchangeSecurityNote: 'The transfer code unlocks the file. Send it through a different channel than the file when possible.',
+        exchangeNoEntries: 'There are no completed entries to export for this day.',
+        exchangeExportFailed: 'The day could not be exported. Try again.',
+        exchangeImportFailed: 'The day could not be imported. Try again.',
+        exchangeInvalidFile: 'This is not a valid TimerHub exchange file.',
+        exchangeUnsupportedFormat: 'This exchange file uses an unsupported version.',
+        exchangeInvalidTransferCode: 'This transfer code is not valid.',
+        exchangeDecryptFailed: 'Wrong transfer code or the file was modified or corrupted.',
+        exchangeInvalidPayload: 'The decrypted data is incomplete or invalid.',
+        exchangeInvalidQr: 'This QR code does not contain a valid transfer code.',
+        exchangeCryptoUnavailable: 'Secure encryption is not available in this browser context. Use HTTPS or localhost.',
+        exchangeChooseFileFirst: 'Choose a .timerhub file first.',
+        exchangeSourceDate: 'Source date',
+        exchangeWarningNewActivity: 'New activities will be created for names that do not exist yet.',
+        exchangeWarningDuplicate: 'Some entries already exist on this day and may be duplicated.',
+        exchangeWarningUnknownCustomer: 'Some customer IDs are not available in your Clockodo list.',
+        exchangeWarningUnknownService: 'Some service IDs are not available in your Clockodo list.',
+        exchangeWarningMissingAssignment: 'Some entries have no customer or service assignment.',
+        exchangeWarningRepeat: 'This export was already imported before.',
+        exchangeImportedCount: '{count} entries imported. Review them before syncing.',
         createGroup: 'Create Group', createGroupFromSelection: 'Group selection ({count})',
         groupName: 'Group name', groupNamePlaceholder: 'e.g., Site A',
         groupDefaultName: 'Group {number}', groupCreated: 'Group "{name}" created',
@@ -450,7 +491,7 @@ const extendedTranslations = {
         issueZeroDuration: 'Keine oder negative Dauer',
         issueOverlapping: 'Überlappt mit einem anderen Eintrag',
         issueUnusuallyLong: 'Ungewöhnlich lang (>16h)',
-        notes: 'Notizen', project: 'Projekt', service: 'Leistung', endDate: 'Enddatum',
+        notes: 'Notizen', project: 'Projekt', service: 'Leistung', customer: 'Kunde', endDate: 'Enddatum',
         entryTooLong: 'Ein Eintrag darf nicht länger als 24 Stunden sein.',
         confirmSyncTitle: 'Clockodo-Synchronisation bestätigen',
         confirmSyncDesc: 'Prüfe diese {count} Einträge. Die Bestätigung speichert einen festen lokalen Datensatz für Clockodo; es wird noch nichts gesendet.',
@@ -521,6 +562,47 @@ const extendedTranslations = {
         resendSyncNotice: 'Diese Einträge wurden bereits mit Clockodo synchronisiert. Möchtest du sie wirklich erneut senden? Dadurch können doppelte Clockodo-Einträge entstehen.',
         resendSyncBtn: 'Erneut senden',
         unknownResendNotice: 'Das vorherige Clockodo-Ergebnis für diesen Eintrag ist unklar. Clockodo enthält ihn möglicherweise bereits. Prüfe zuerst Clockodo – beim Fortfahren kann ein doppelter Eintrag entstehen.',
+        exportDay: 'Tag exportieren',
+        importDay: 'Tag importieren',
+        exportDayTitle: 'Tag exportieren',
+        exportDayDesc: 'Die verschlüsselte .timerhub-Datei wurde heruntergeladen. Sende sie an die andere Arbeitskraft und gib den Übertragungscode getrennt weiter.',
+        importDayTitle: 'Tag importieren',
+        importDayDesc: 'Wähle eine .timerhub-Datei und gib den Übertragungscode ein. Die Datei wird lokal auf diesem Gerät entschlüsselt.',
+        exchangeClockodoNote: 'Importierte Einträge werden nicht automatisch an Clockodo gesendet. Prüfe sie und bestätige mit „Prüfen & Synchronisieren“.',
+        transferCode: 'Übertragungscode',
+        transferCodePlaceholder: 'Übertragungscode eingeben',
+        showQr: 'QR anzeigen',
+        scanQr: 'QR scannen',
+        chooseFile: 'Datei wählen',
+        decrypt: 'Entschlüsseln',
+        importBtn: 'Importieren',
+        importAgainBtn: 'Erneut importieren',
+        exchangeQrTitle: 'QR für den Übertragungscode',
+        exchangeQrNote: 'Der QR enthält nur den Übertragungscode. Die verschlüsselten Einträge bleiben in der .timerhub-Datei.',
+        exchangeScanTitle: 'Übertragungs-QR scannen',
+        exchangeScanning: 'Richte die Kamera auf den QR-Code des Übertragungscodes.',
+        exchangeScanUnsupported: 'QR-Scannen wird hier nicht unterstützt. Gib den Übertragungscode manuell ein.',
+        exchangeScanPermission: 'Kamerazugriff wurde verweigert. Gib den Übertragungscode manuell ein.',
+        exchangeSecurityNote: 'Der Übertragungscode öffnet die Datei. Sende ihn möglichst über einen anderen Kanal als die Datei.',
+        exchangeNoEntries: 'Für diesen Tag gibt es keine abgeschlossenen Einträge zum Exportieren.',
+        exchangeExportFailed: 'Der Tag konnte nicht exportiert werden. Versuche es erneut.',
+        exchangeImportFailed: 'Der Tag konnte nicht importiert werden. Versuche es erneut.',
+        exchangeInvalidFile: 'Dies ist keine gültige TimerHub-Austauschdatei.',
+        exchangeUnsupportedFormat: 'Diese Austauschdatei verwendet eine nicht unterstützte Version.',
+        exchangeInvalidTransferCode: 'Dieser Übertragungscode ist ungültig.',
+        exchangeDecryptFailed: 'Falscher Übertragungscode oder die Datei wurde verändert bzw. beschädigt.',
+        exchangeInvalidPayload: 'Die entschlüsselten Daten sind unvollständig oder ungültig.',
+        exchangeInvalidQr: 'Dieser QR-Code enthält keinen gültigen Übertragungscode.',
+        exchangeCryptoUnavailable: 'Sichere Verschlüsselung ist in diesem Browserkontext nicht verfügbar. Nutze HTTPS oder localhost.',
+        exchangeChooseFileFirst: 'Wähle zuerst eine .timerhub-Datei.',
+        exchangeSourceDate: 'Quelldatum',
+        exchangeWarningNewActivity: 'Für unbekannte Namen werden neue Aktivitäten angelegt.',
+        exchangeWarningDuplicate: 'Einige Einträge existieren an diesem Tag bereits und können doppelt angelegt werden.',
+        exchangeWarningUnknownCustomer: 'Einige Kunden-IDs sind in deiner Clockodo-Liste nicht vorhanden.',
+        exchangeWarningUnknownService: 'Einige Leistungs-IDs sind in deiner Clockodo-Liste nicht vorhanden.',
+        exchangeWarningMissingAssignment: 'Einige Einträge haben keine Kunden- oder Leistungszuordnung.',
+        exchangeWarningRepeat: 'Dieser Export wurde bereits importiert.',
+        exchangeImportedCount: '{count} Einträge importiert. Prüfe sie vor dem Synchronisieren.',
         createGroup: 'Gruppe erstellen', createGroupFromSelection: 'Auswahl gruppieren ({count})',
         groupName: 'Gruppenname', groupNamePlaceholder: 'z. B. Baustelle A',
         groupDefaultName: 'Gruppe {number}', groupCreated: 'Gruppe "{name}" erstellt',
@@ -624,7 +706,7 @@ const extendedTranslations = {
         issueZeroDuration: 'Нулевая или отрицательная длительность',
         issueOverlapping: 'Пересекается с другой записью',
         issueUnusuallyLong: 'Необычно долго (>16 ч)',
-        notes: 'Заметки', project: 'Проект', service: 'Услуга', endDate: 'Дата окончания',
+        notes: 'Заметки', project: 'Проект', service: 'Услуга', customer: 'Клиент', endDate: 'Дата окончания',
         entryTooLong: 'Запись не может длиться более 24 часов.',
         confirmSyncTitle: 'Подтверждение синхронизации с Clockodo',
         confirmSyncDesc: 'Проверьте эти записи ({count}). Подтверждение сохранит локальный снимок для Clockodo; отправки пока не будет.',
@@ -695,6 +777,47 @@ const extendedTranslations = {
         resendSyncNotice: 'Эти записи уже синхронизированы с Clockodo. Вы действительно хотите отправить их снова? Это может создать дубликаты записей Clockodo.',
         resendSyncBtn: 'Отправить повторно',
         unknownResendNotice: 'Предыдущий результат Clockodo для этой записи неизвестен. Clockodo может уже содержать её. Сначала проверьте Clockodo — продолжение может создать дубликат записи.',
+        exportDay: 'Экспорт дня',
+        importDay: 'Импорт дня',
+        exportDayTitle: 'Экспорт дня',
+        exportDayDesc: 'Зашифрованный файл .timerhub скачан. Передайте его другому сотруднику, а код переноса — отдельно.',
+        importDayTitle: 'Импорт дня',
+        importDayDesc: 'Выберите файл .timerhub и введите код переноса. Файл расшифровывается локально на этом устройстве.',
+        exchangeClockodoNote: 'Импортированные записи не отправляются в Clockodo автоматически. Проверьте их и подтвердите через «Проверить и синхронизировать».',
+        transferCode: 'Код переноса',
+        transferCodePlaceholder: 'Введите код переноса',
+        showQr: 'Показать QR',
+        scanQr: 'Сканировать QR',
+        chooseFile: 'Выбрать файл',
+        decrypt: 'Расшифровать',
+        importBtn: 'Импортировать',
+        importAgainBtn: 'Импортировать снова',
+        exchangeQrTitle: 'QR-код кода переноса',
+        exchangeQrNote: 'QR содержит только код переноса. Зашифрованные записи остаются в файле .timerhub.',
+        exchangeScanTitle: 'Сканировать QR переноса',
+        exchangeScanning: 'Наведите камеру на QR-код кода переноса.',
+        exchangeScanUnsupported: 'Сканирование QR здесь не поддерживается. Введите код переноса вручную.',
+        exchangeScanPermission: 'Доступ к камере запрещён. Введите код переноса вручную.',
+        exchangeSecurityNote: 'Код переноса открывает файл. По возможности передавайте его другим каналом, не вместе с файлом.',
+        exchangeNoEntries: 'За этот день нет завершённых записей для экспорта.',
+        exchangeExportFailed: 'Не удалось экспортировать день. Попробуйте ещё раз.',
+        exchangeImportFailed: 'Не удалось импортировать день. Попробуйте ещё раз.',
+        exchangeInvalidFile: 'Это не действительный файл обмена TimerHub.',
+        exchangeUnsupportedFormat: 'Этот файл обмена использует неподдерживаемую версию.',
+        exchangeInvalidTransferCode: 'Этот код переноса недействителен.',
+        exchangeDecryptFailed: 'Неверный код переноса или файл изменён либо повреждён.',
+        exchangeInvalidPayload: 'Расшифрованные данные неполные или некорректные.',
+        exchangeInvalidQr: 'Этот QR-код не содержит действительный код переноса.',
+        exchangeCryptoUnavailable: 'Безопасное шифрование недоступно в этом контексте браузера. Используйте HTTPS или localhost.',
+        exchangeChooseFileFirst: 'Сначала выберите файл .timerhub.',
+        exchangeSourceDate: 'Дата источника',
+        exchangeWarningNewActivity: 'Для неизвестных названий будут созданы новые занятия.',
+        exchangeWarningDuplicate: 'Некоторые записи уже есть в этот день и могут дублироваться.',
+        exchangeWarningUnknownCustomer: 'Некоторые ID клиентов отсутствуют в вашем списке Clockodo.',
+        exchangeWarningUnknownService: 'Некоторые ID услуг отсутствуют в вашем списке Clockodo.',
+        exchangeWarningMissingAssignment: 'У некоторых записей нет привязки к клиенту или услуге.',
+        exchangeWarningRepeat: 'Этот экспорт уже импортировался ранее.',
+        exchangeImportedCount: 'Импортировано записей: {count}. Проверьте их перед синхронизацией.',
         createGroup: 'Создать группу', createGroupFromSelection: 'Сгруппировать ({count})',
         groupName: 'Название группы', groupNamePlaceholder: 'например, Объект A',
         groupDefaultName: 'Группа {number}', groupCreated: 'Группа «{name}» создана',
@@ -1169,6 +1292,10 @@ class TimerHubApp {
         this.syncConfirmationOpen = false;
         this.syncResendMode = false;
         this.syncUnknownEntryId = null;
+        this.lastExchange = null;
+        this.pendingExchange = null;
+        this.exchangeFile = null;
+        this.exchangeScanOperation = null;
         this.syncBatches = [];
         this.syncOperations = new Map();
         this.clockodoClient = window.ClockodoClient ? new window.ClockodoClient() : null;
@@ -1757,6 +1884,26 @@ class TimerHubApp {
         sel('syncConfirmCloseBtn')?.addEventListener('click', () => this.closeSyncConfirmationModal());
         sel('syncConfirmCancelBtn')?.addEventListener('click', () => this.closeSyncConfirmationModal());
         sel('syncConfirmSubmitBtn')?.addEventListener('click', () => this.confirmAndSyncClockodo());
+
+        // Secure day exchange
+        sel('reviewExportDayBtn')?.addEventListener('click', () => this.exportReviewDay());
+        sel('reviewImportDayBtn')?.addEventListener('click', () => this.showDayImportModal());
+        sel('dayExportCloseBtn')?.addEventListener('click', () => this.closeDayExportModal());
+        sel('dayExportDoneBtn')?.addEventListener('click', () => this.closeDayExportModal());
+        sel('exchangeCopyCodeBtn')?.addEventListener('click', () => this.copyTransferCode());
+        sel('exchangeShowQrBtn')?.addEventListener('click', () => this.showExchangeQr());
+        sel('exchangeQrCloseBtn')?.addEventListener('click', () => this.closeExchangeQr());
+        sel('exchangeQrDoneBtn')?.addEventListener('click', () => this.closeExchangeQr());
+        sel('dayImportCloseBtn')?.addEventListener('click', () => this.closeDayImportModal());
+        sel('dayImportCancelBtn')?.addEventListener('click', () => this.closeDayImportModal());
+        sel('exchangeChooseFileBtn')?.addEventListener('click', () => document.getElementById('exchangeFileInput')?.click());
+        sel('exchangeFileInput')?.addEventListener('change', event => this.handleExchangeFileSelected(event.target.files?.[0] || null));
+        sel('exchangeCodeInput')?.addEventListener('input', () => this.refreshExchangeDecryptState());
+        sel('exchangeDecryptBtn')?.addEventListener('click', () => this.decryptExchangeFile());
+        sel('exchangeImportBtn')?.addEventListener('click', () => this.confirmExchangeImport());
+        sel('exchangeScanQrBtn')?.addEventListener('click', () => this.openExchangeScan());
+        sel('exchangeScanCloseBtn')?.addEventListener('click', () => this.closeExchangeScan());
+        sel('exchangeScanDoneBtn')?.addEventListener('click', () => this.closeExchangeScan());
 
         // Clockodo settings
         sel('clockodoToggleKeyBtn')?.addEventListener('click', () => this.toggleClockodoKeyVisibility());
@@ -6022,6 +6169,504 @@ class TimerHubApp {
         } else {
             this.copyLog();
         }
+    }
+
+    getExchange() {
+        const api = (typeof window !== 'undefined' && window.TimerHubExchange) || globalThis.TimerHubExchange;
+        if (!api) throw Object.assign(new Error('exchange_unavailable'), { code: 'exchange_unavailable' });
+        return api;
+    }
+
+    normalizeExchangeActivityName(name) {
+        return String(name || '').trim().replace(/\s+/g, ' ').toLowerCase();
+    }
+
+    getDayExchangeEntries(date) {
+        return this.getDayEntries(date).filter(entry =>
+            entry.endTimestamp !== null &&
+            Number.isFinite(Number(entry.endTimestamp)) &&
+            Number(entry.endTimestamp) > Number(entry.startTimestamp)
+        );
+    }
+
+    async exportReviewDay() {
+        try {
+            const entries = this.getDayExchangeEntries(this.reviewDate);
+            if (!entries.length) {
+                this.showToast(this.t('exchangeNoEntries'));
+                return false;
+            }
+            const Exchange = this.getExchange();
+            const exportId = this.generateId();
+            const payload = Exchange.buildDayPayload({ entries, date: this.reviewDate, exportId });
+            const secret = Exchange.generateSecret();
+            const envelope = await Exchange.encryptPayload(payload, secret);
+            this.lastExchange = { secret, exportId, payload, envelope };
+            this.downloadExchangeFile(envelope);
+            this.showDayExportModal();
+            return true;
+        } catch (error) {
+            this.showToast(this.t('exchangeExportFailed'));
+            return false;
+        }
+    }
+
+    downloadExchangeFile(envelope) {
+        const blob = new Blob([JSON.stringify(envelope)], { type: 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = `timerhub-exchange_${Date.now()}.timerhub`;
+        anchor.rel = 'noopener';
+        anchor.style.display = 'none';
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    }
+
+    showDayExportModal() {
+        const display = document.getElementById('exchangeCodeDisplay');
+        if (display) {
+            display.textContent = this.lastExchange?.secret
+                ? this.getExchange().formatTransferCode(this.lastExchange.secret)
+                : '';
+        }
+        document.getElementById('dayExportModal')?.classList.add('active');
+    }
+
+    closeDayExportModal() {
+        document.getElementById('dayExportModal')?.classList.remove('active');
+    }
+
+    async copyTransferCode() {
+        const secret = this.lastExchange?.secret;
+        if (!secret) return false;
+        try {
+            await navigator.clipboard.writeText(secret);
+            this.showToast(this.t('copied'));
+            return true;
+        } catch (error) {
+            this.showToast(this.t('failedToCopy'));
+            return false;
+        }
+    }
+
+    showExchangeQr() {
+        const secret = this.lastExchange?.secret;
+        if (!secret) return false;
+        const secretNode = document.getElementById('exchangeQrSecret');
+        if (secretNode) secretNode.textContent = this.getExchange().formatTransferCode(secret);
+        this.renderExchangeQr(this.getExchange().buildQrPayload(secret));
+        document.getElementById('exchangeQrModal')?.classList.add('active');
+        return true;
+    }
+
+    renderExchangeQr(text) {
+        const canvas = document.getElementById('exchangeQrCanvas');
+        if (!canvas || typeof canvas.getContext !== 'function' || typeof globalThis.qrcode !== 'function') return false;
+        const qr = globalThis.qrcode(0, 'M');
+        qr.addData(text);
+        qr.make();
+        const count = qr.getModuleCount();
+        const size = Number(canvas.width) || 240;
+        const cell = Math.max(1, Math.floor(size / count));
+        const offset = Math.floor((size - cell * count) / 2);
+        const context = canvas.getContext('2d');
+        if (!context) return false;
+        context.fillStyle = '#ffffff';
+        context.fillRect(0, 0, size, size);
+        context.fillStyle = '#000000';
+        for (let row = 0; row < count; row++) {
+            for (let column = 0; column < count; column++) {
+                if (qr.isDark(row, column)) context.fillRect(offset + column * cell, offset + row * cell, cell, cell);
+            }
+        }
+        return true;
+    }
+
+    closeExchangeQr() {
+        document.getElementById('exchangeQrModal')?.classList.remove('active');
+    }
+
+    showDayImportModal() {
+        this.pendingExchange = null;
+        this.exchangeFile = null;
+        const fileInput = document.getElementById('exchangeFileInput');
+        if (fileInput) fileInput.value = '';
+        const fileName = document.getElementById('exchangeFileName');
+        if (fileName) fileName.textContent = '';
+        const codeInput = document.getElementById('exchangeCodeInput');
+        if (codeInput) codeInput.value = '';
+        this.hideExchangeError();
+        this.refreshExchangeDecryptState();
+        document.getElementById('dayImportModal')?.classList.add('active');
+    }
+
+    closeDayImportModal() {
+        this.closeExchangeScan();
+        document.getElementById('dayImportModal')?.classList.remove('active');
+    }
+
+    handleExchangeFileSelected(file) {
+        const nameNode = document.getElementById('exchangeFileName');
+        if (!file) {
+            this.exchangeFile = null;
+            if (nameNode) nameNode.textContent = '';
+            this.refreshExchangeDecryptState();
+            return false;
+        }
+        if (!/\.timerhub$/i.test(file.name || '')) {
+            this.exchangeFile = null;
+            if (nameNode) nameNode.textContent = '';
+            this.showExchangeError('invalid_exchange_file');
+            this.refreshExchangeDecryptState();
+            return false;
+        }
+        if (Number(file.size) > 4 * 1024 * 1024) {
+            this.exchangeFile = null;
+            if (nameNode) nameNode.textContent = '';
+            this.showExchangeError('invalid_exchange_file');
+            this.refreshExchangeDecryptState();
+            return false;
+        }
+        this.exchangeFile = file;
+        if (nameNode) nameNode.textContent = String(file.name || '');
+        this.hideExchangeError();
+        this.refreshExchangeDecryptState();
+        return true;
+    }
+
+    refreshExchangeDecryptState() {
+        this.pendingExchange = null;
+        const code = document.getElementById('exchangeCodeInput')?.value || '';
+        const decryptButton = document.getElementById('exchangeDecryptBtn');
+        if (decryptButton) decryptButton.disabled = !this.exchangeFile || code.trim().length === 0;
+        const preview = document.getElementById('exchangePreview');
+        if (preview) preview.style.display = 'none';
+        const importButton = document.getElementById('exchangeImportBtn');
+        if (importButton) {
+            importButton.style.display = 'none';
+            importButton.disabled = false;
+        }
+    }
+
+    readExchangeFileText(file) {
+        if (file && typeof file.text === 'function') return file.text();
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = event => resolve(String(event?.target?.result || ''));
+            reader.onerror = () => reject(new Error('exchange_read_failed'));
+            reader.readAsText(file);
+        });
+    }
+
+    async decryptExchangeFile() {
+        const Exchange = this.getExchange();
+        try {
+            if (!this.exchangeFile) {
+                this.showExchangeError('exchange_choose_file_first');
+                return false;
+            }
+            const raw = await this.readExchangeFileText(this.exchangeFile);
+            let envelope;
+            try {
+                envelope = JSON.parse(raw);
+            } catch (error) {
+                throw Object.assign(new Error('invalid_exchange_file'), { code: 'invalid_exchange_file' });
+            }
+            const secret = Exchange.normalizeTransferCode(document.getElementById('exchangeCodeInput')?.value || '');
+            const payload = await Exchange.decryptPayload(envelope, secret);
+            const repeat = await this.wasExchangeImported(payload.exportId);
+            this.pendingExchange = { payload, repeat, analysis: this.analyzeExchangePayload(payload) };
+            this.hideExchangeError();
+            this.renderExchangePreview();
+            return true;
+        } catch (error) {
+            this.pendingExchange = null;
+            this.showExchangeError(error?.code || 'exchange_decrypt_failed');
+            return false;
+        }
+    }
+
+    analyzeExchangePayload(payload) {
+        const existing = this.getDayEntries(payload.date);
+        const activityNames = new Set(this.activities.map(activity => this.normalizeExchangeActivityName(activity.name)));
+        const customerIds = new Set((this.clockodoCustomers || []).map(customer => String(customer.id)));
+        const serviceIds = new Set((this.clockodoServices || []).map(service => String(service.id)));
+        const rows = payload.entries.map(item => ({
+            ...item,
+            knownActivity: activityNames.has(this.normalizeExchangeActivityName(item.activityName)),
+            duplicate: existing.some(entry =>
+                Number(entry.startTimestamp) === Number(item.startTimestamp) &&
+                Number(entry.endTimestamp) === Number(item.endTimestamp) &&
+                this.normalizeExchangeActivityName(entry.activityNameSnapshot) === this.normalizeExchangeActivityName(item.activityName)
+            ),
+            unknownCustomer: Boolean(item.customerId && customerIds.size && !customerIds.has(String(item.customerId))),
+            unknownService: Boolean(item.serviceId && serviceIds.size && !serviceIds.has(String(item.serviceId)))
+        }));
+        const warnings = [];
+        if (rows.some(row => !row.knownActivity)) warnings.push('exchangeWarningNewActivity');
+        if (rows.some(row => row.duplicate)) warnings.push('exchangeWarningDuplicate');
+        if (rows.some(row => row.unknownCustomer)) warnings.push('exchangeWarningUnknownCustomer');
+        if (rows.some(row => row.unknownService)) warnings.push('exchangeWarningUnknownService');
+        if (payload.entries.some(entry => !entry.customerId || !entry.serviceId)) warnings.push('exchangeWarningMissingAssignment');
+        return { rows, warnings };
+    }
+
+    renderExchangePreview() {
+        const state = this.pendingExchange;
+        if (!state) return false;
+        const total = state.payload.entries.reduce((sum, entry) => sum + (entry.endTimestamp - entry.startTimestamp), 0);
+        const summary = document.getElementById('exchangePreviewSummary');
+        if (summary) {
+            summary.innerHTML = `<strong>${this.escapeHtml(this.t('exchangeSourceDate'))}: ${this.escapeHtml(state.payload.date)}</strong>`
+                + `<span>${this.escapeHtml(this.t('entriesCount', { count: state.payload.entries.length }))}</span>`
+                + `<span>${this.escapeHtml(this.t('total'))}: ${this.escapeHtml(this.formatDuration(total))}</span>`;
+        }
+        const warnings = document.getElementById('exchangePreviewWarnings');
+        if (warnings) {
+            const labels = {
+                exchangeWarningNewActivity: this.t('exchangeWarningNewActivity'),
+                exchangeWarningDuplicate: this.t('exchangeWarningDuplicate'),
+                exchangeWarningUnknownCustomer: this.t('exchangeWarningUnknownCustomer'),
+                exchangeWarningUnknownService: this.t('exchangeWarningUnknownService'),
+                exchangeWarningMissingAssignment: this.t('exchangeWarningMissingAssignment'),
+                exchangeWarningRepeat: this.t('exchangeWarningRepeat')
+            };
+            const keys = [...(state.repeat ? ['exchangeWarningRepeat'] : []), ...state.analysis.warnings];
+            warnings.innerHTML = keys.length
+                ? `<div class="warning" style="display:block;">${keys.map(key => `<div>${this.escapeHtml(labels[key] || '')}</div>`).join('')}</div>`
+                : '';
+        }
+        const list = document.getElementById('exchangePreviewList');
+        if (list) {
+            list.innerHTML = state.analysis.rows.map(row => {
+                const customer = row.customerName || row.customerId || '—';
+                const service = row.serviceName || row.serviceId || '—';
+                const notes = row.notes ? `<div class="exchange-preview-notes">${this.escapeHtml(row.notes)}</div>` : '';
+                return `<div class="exchange-preview-item">
+                    <div class="exchange-preview-times"><strong>${this.escapeHtml(this.formatTime(row.startTimestamp))}</strong><span>–</span><strong>${this.escapeHtml(this.formatTime(row.endTimestamp))}</strong><span class="exchange-preview-duration">${this.escapeHtml(this.formatDuration(row.endTimestamp - row.startTimestamp))}</span></div>
+                    <div class="exchange-preview-activity">${this.escapeHtml(row.activityName)}</div>
+                    <div class="exchange-preview-meta">${this.escapeHtml(this.t('customer'))}: ${this.escapeHtml(customer)} · ${this.escapeHtml(this.t('service'))}: ${this.escapeHtml(service)}</div>
+                    ${notes}
+                </div>`;
+            }).join('');
+        }
+        const preview = document.getElementById('exchangePreview');
+        if (preview) preview.style.display = '';
+        const importButton = document.getElementById('exchangeImportBtn');
+        if (importButton) {
+            importButton.style.display = '';
+            importButton.disabled = false;
+            importButton.textContent = state.repeat ? this.t('importAgainBtn') : this.t('importBtn');
+        }
+        return true;
+    }
+
+    async confirmExchangeImport() {
+        const state = this.pendingExchange;
+        if (!state) return false;
+        const importButton = document.getElementById('exchangeImportBtn');
+        if (importButton) importButton.disabled = true;
+        try {
+            const Exchange = this.getExchange();
+            const payload = Exchange.validatePayload(state.payload);
+            let created = 0;
+            for (const item of payload.entries) {
+                const activity = await this.resolveExchangeActivity(item);
+                await this.addEntry({
+                    activityId: activity.id,
+                    activityNameSnapshot: item.activityName,
+                    startTimestamp: item.startTimestamp,
+                    endTimestamp: item.endTimestamp,
+                    source: 'manual',
+                    notes: item.notes,
+                    customerId: item.customerId || '',
+                    serviceId: item.serviceId || '',
+                    customerName: item.customerName || '',
+                    serviceName: item.serviceName || ''
+                });
+                created += 1;
+            }
+            await this.recordExchangeImport(payload.exportId);
+            this.closeDayImportModal();
+            this.reviewDate = payload.date;
+            this.renderReview();
+            this.showToast(this.t('exchangeImportedCount', { count: created }));
+            return true;
+        } catch (error) {
+            if (importButton) importButton.disabled = false;
+            this.showExchangeError(error?.code || 'exchange_import_failed');
+            return false;
+        }
+    }
+
+    async resolveExchangeActivity(item) {
+        const key = this.normalizeExchangeActivityName(item.activityName);
+        const existing = this.activities.find(activity => this.normalizeExchangeActivityName(activity.name) === key);
+        if (existing) return existing;
+        const now = Date.now();
+        const activity = {
+            id: this.generateId(),
+            name: item.activityName,
+            color: this.COLORS[this.activities.length % this.COLORS.length],
+            shape: 'circle',
+            size: 'medium',
+            customerId: item.customerId || '',
+            serviceId: item.serviceId || '',
+            customerName: item.customerName || '',
+            serviceName: item.serviceName || '',
+            position: this.activities.length,
+            archived: false,
+            createdAt: now,
+            updatedAt: now
+        };
+        this.activities.push(activity);
+        await this.storage.saveActivity(activity);
+        return activity;
+    }
+
+    async getExchangeImports() {
+        const imports = await this.storage.getSetting('exchangeImports', []);
+        return Array.isArray(imports) ? imports : [];
+    }
+
+    async wasExchangeImported(exportId) {
+        return (await this.getExchangeImports()).some(item => item?.exportId === exportId);
+    }
+
+    async recordExchangeImport(exportId) {
+        const imports = (await this.getExchangeImports()).filter(item => item?.exportId !== exportId);
+        imports.push({ exportId, importedAt: Date.now() });
+        await this.storage.setSetting('exchangeImports', imports.slice(-100));
+    }
+
+    exchangeErrorMessage(code) {
+        const messages = {
+            invalid_exchange_file: this.t('exchangeInvalidFile'),
+            unsupported_exchange_version: this.t('exchangeUnsupportedFormat'),
+            invalid_transfer_code: this.t('exchangeInvalidTransferCode'),
+            exchange_decrypt_failed: this.t('exchangeDecryptFailed'),
+            invalid_exchange_payload: this.t('exchangeInvalidPayload'),
+            invalid_qr_payload: this.t('exchangeInvalidQr'),
+            secure_crypto_unavailable: this.t('exchangeCryptoUnavailable'),
+            exchange_unavailable: this.t('exchangeCryptoUnavailable'),
+            exchange_choose_file_first: this.t('exchangeChooseFileFirst'),
+            exchange_import_failed: this.t('exchangeImportFailed')
+        };
+        return messages[code] || this.t('exchangeImportFailed');
+    }
+
+    showExchangeError(code) {
+        const node = document.getElementById('exchangeImportError');
+        if (!node) return;
+        node.textContent = this.exchangeErrorMessage(code);
+        node.style.display = '';
+    }
+
+    hideExchangeError() {
+        const node = document.getElementById('exchangeImportError');
+        if (!node) return;
+        node.textContent = '';
+        node.style.display = 'none';
+    }
+
+    openExchangeScan() {
+        this.closeExchangeScan();
+        this.exchangeScanOperation = { stream: null, detector: null, frame: null, canvas: null, stopped: false };
+        const status = document.getElementById('exchangeScanStatus');
+        if (status) status.textContent = '';
+        document.getElementById('exchangeScanModal')?.classList.add('active');
+        if (!navigator.mediaDevices?.getUserMedia) {
+            if (status) status.textContent = this.t('exchangeScanUnsupported');
+            return false;
+        }
+        this.startExchangeScan();
+        return true;
+    }
+
+    async startExchangeScan() {
+        const operation = this.exchangeScanOperation;
+        if (!operation) return false;
+        const status = document.getElementById('exchangeScanStatus');
+        const video = document.getElementById('exchangeScanVideo');
+        let stream;
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+        } catch (error) {
+            if (status) status.textContent = this.t('exchangeScanPermission');
+            return false;
+        }
+        if (operation.stopped || this.exchangeScanOperation !== operation) {
+            stream.getTracks().forEach(track => track.stop());
+            return false;
+        }
+        operation.stream = stream;
+        if (video) {
+            video.srcObject = stream;
+            await video.play?.().catch(() => {});
+        }
+        const detectorSupported = typeof globalThis.BarcodeDetector === 'function';
+        const jsqrSupported = typeof globalThis.jsQR === 'function';
+        if (!detectorSupported && !jsqrSupported) {
+            if (status) status.textContent = this.t('exchangeScanUnsupported');
+            return false;
+        }
+        if (detectorSupported) operation.detector = new globalThis.BarcodeDetector({ formats: ['qr_code'] });
+        else operation.canvas = document.createElement('canvas');
+        if (status) status.textContent = this.t('exchangeScanning');
+        const tick = async () => {
+            if (operation.stopped || this.exchangeScanOperation !== operation) return;
+            try {
+                let value = null;
+                if (operation.detector) {
+                    const codes = await operation.detector.detect(video);
+                    value = codes?.[0]?.rawValue || null;
+                } else if (jsqrSupported && video?.videoWidth) {
+                    const canvas = operation.canvas;
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    const context = canvas.getContext('2d');
+                    context.drawImage(video, 0, 0);
+                    const image = context.getImageData(0, 0, canvas.width, canvas.height);
+                    const result = globalThis.jsQR(image.data, image.width, image.height, { inversionAttempts: 'dontInvert' });
+                    value = result?.data || null;
+                }
+                if (value && this.handleExchangeQrValue(value)) return;
+            } catch (error) {
+                // Keep scanning on transient frame errors.
+            }
+            operation.frame = setTimeout(tick, 350);
+        };
+        tick();
+        return true;
+    }
+
+    handleExchangeQrValue(value) {
+        try {
+            const secret = this.getExchange().parseQrPayload(value);
+            const input = document.getElementById('exchangeCodeInput');
+            if (input) input.value = this.getExchange().formatTransferCode(secret);
+            this.closeExchangeScan();
+            this.refreshExchangeDecryptState();
+            return true;
+        } catch (error) {
+            return false;
+        }
+    }
+
+    closeExchangeScan() {
+        const operation = this.exchangeScanOperation;
+        this.exchangeScanOperation = null;
+        if (operation) {
+            operation.stopped = true;
+            if (operation.frame) clearTimeout(operation.frame);
+            operation.stream?.getTracks?.().forEach(track => track.stop());
+        }
+        const video = document.getElementById('exchangeScanVideo');
+        if (video) video.srcObject = null;
+        document.getElementById('exchangeScanModal')?.classList.remove('active');
     }
 
     exportLog(format) {

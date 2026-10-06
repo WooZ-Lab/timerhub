@@ -72,6 +72,8 @@
             <div class="review-toolbar">
                 <button id="reviewAddEntryBtn" class="action-btn"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span data-i18n="addEntry">Add Entry</span></button>
                 <button id="reviewConfirmSyncBtn" class="action-btn btn-primary-green"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 7v5h-5M4.8 9a7.5 7.5 0 0 1 12.7-2L20 12M4 17v-5h5m10.2 3a7.5 7.5 0 0 1-12.7 2L4 12"/></svg><span data-i18n="reviewAndSync">Review &amp; Sync</span></button>
+                <button id="reviewExportDayBtn" class="action-btn" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v12m-4-4 4 4 4-4M5 21h14"/></svg><span data-i18n="exportDay">Export day</span></button>
+                <button id="reviewImportDayBtn" class="action-btn" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 15V3m-4 4 4-4 4 4M5 21h14"/></svg><span data-i18n="importDay">Import day</span></button>
             </div>
 
             <div id="reviewEntriesList" class="review-entries-list">
@@ -495,6 +497,103 @@
             </div>
         </div>
 
+        <!-- Modal: Export day -->
+        <div id="dayExportModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="dayExportModalTitle">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="dayExportModalTitle" data-i18n="exportDayTitle">Export day</h3>
+                    <button id="dayExportCloseBtn" class="modal-close" type="button" aria-label="Close" data-i18n-aria-label="close"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+                </div>
+                <div class="modal-body">
+                    <p data-i18n="exportDayDesc">The encrypted .timerhub file was downloaded. Share it with the other worker and pass on the transfer code separately.</p>
+                    <div class="form-group">
+                        <label data-i18n="transferCode">Transfer code</label>
+                        <div id="exchangeCodeDisplay" class="exchange-code" aria-live="polite"></div>
+                    </div>
+                    <div class="form-row">
+                        <button id="exchangeCopyCodeBtn" class="action-btn" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h2"/></svg><span data-i18n="copy">Copy</span></button>
+                        <button id="exchangeShowQrBtn" class="action-btn" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 14h2v6h-4v-2M14 18h2v2h-2z"/></svg><span data-i18n="showQr">Show QR</span></button>
+                    </div>
+                    <small class="settings-help" data-i18n="exchangeSecurityNote">The transfer code unlocks the file. Send it through a different channel than the file when possible.</small>
+                </div>
+                <div class="modal-footer">
+                    <button id="dayExportDoneBtn" class="btn-secondary" type="button" data-i18n="close">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: Import day -->
+        <div id="dayImportModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="dayImportModalTitle">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="dayImportModalTitle" data-i18n="importDayTitle">Import day</h3>
+                    <button id="dayImportCloseBtn" class="modal-close" type="button" aria-label="Close" data-i18n-aria-label="close"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+                </div>
+                <div class="modal-body">
+                    <p data-i18n="importDayDesc">Choose a .timerhub file and enter the transfer code. The file is decrypted locally on this device.</p>
+                    <small class="settings-help" data-i18n="exchangeClockodoNote">Imported entries are not sent to Clockodo automatically. Review them and confirm with Review &amp; Sync.</small>
+                    <input type="file" id="exchangeFileInput" accept=".timerhub,application/octet-stream" hidden>
+                    <div class="form-row">
+                        <button id="exchangeChooseFileBtn" class="action-btn" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6zM14 3v4h4"/></svg><span data-i18n="chooseFile">Choose file</span></button>
+                        <span id="exchangeFileName" class="exchange-file-name"></span>
+                    </div>
+                    <div class="form-group">
+                        <label for="exchangeCodeInput" data-i18n="transferCode">Transfer code</label>
+                        <input type="text" id="exchangeCodeInput" class="form-input exchange-code-input" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Enter the transfer code" data-i18n-placeholder="transferCodePlaceholder">
+                    </div>
+                    <div class="form-row">
+                        <button id="exchangeScanQrBtn" class="action-btn" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4M4 12h16"/></svg><span data-i18n="scanQr">Scan QR</span></button>
+                    </div>
+                    <div id="exchangeImportError" class="warning" role="alert" style="display:none;"></div>
+                    <div id="exchangePreview" style="display:none;">
+                        <div id="exchangePreviewSummary" class="exchange-preview-summary"></div>
+                        <div id="exchangePreviewWarnings" class="exchange-preview-warnings"></div>
+                        <div id="exchangePreviewList" class="exchange-preview-list"></div>
+                    </div>
+                </div>
+                <div class="modal-footer exchange-import-actions">
+                    <button id="dayImportCancelBtn" class="btn-secondary" type="button" data-i18n="cancel">Cancel</button>
+                    <button id="exchangeDecryptBtn" class="btn-primary" type="button" data-i18n="decrypt">Decrypt</button>
+                    <button id="exchangeImportBtn" class="btn-primary-green" type="button" style="display:none;" data-i18n="importBtn">Import</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: Exchange QR display -->
+        <div id="exchangeQrModal" class="modal modal-centered" role="dialog" aria-modal="true" aria-labelledby="exchangeQrModalTitle">
+            <div class="modal-content modal-small">
+                <div class="modal-header">
+                    <h3 id="exchangeQrModalTitle" data-i18n="exchangeQrTitle">Transfer code QR</h3>
+                    <button id="exchangeQrCloseBtn" class="modal-close" type="button" aria-label="Close" data-i18n-aria-label="close"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+                </div>
+                <div class="modal-body exchange-qr-body">
+                    <canvas id="exchangeQrCanvas" class="exchange-qr-canvas" width="240" height="240" aria-hidden="true"></canvas>
+                    <div id="exchangeQrSecret" class="exchange-code" aria-live="polite"></div>
+                    <small class="settings-help" data-i18n="exchangeQrNote">The QR contains only the transfer code. The encrypted entries stay in the .timerhub file.</small>
+                </div>
+                <div class="modal-footer">
+                    <button id="exchangeQrDoneBtn" class="btn-secondary" type="button" data-i18n="close">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: Exchange QR scanner -->
+        <div id="exchangeScanModal" class="modal modal-centered" role="dialog" aria-modal="true" aria-labelledby="exchangeScanModalTitle">
+            <div class="modal-content modal-small">
+                <div class="modal-header">
+                    <h3 id="exchangeScanModalTitle" data-i18n="exchangeScanTitle">Scan transfer QR</h3>
+                    <button id="exchangeScanCloseBtn" class="modal-close" type="button" aria-label="Close" data-i18n-aria-label="close"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+                </div>
+                <div class="modal-body exchange-scan-body">
+                    <video id="exchangeScanVideo" class="exchange-scan-video" playsinline muted></video>
+                    <div id="exchangeScanStatus" class="settings-help" role="status"></div>
+                </div>
+                <div class="modal-footer">
+                    <button id="exchangeScanDoneBtn" class="btn-secondary" type="button" data-i18n="close">Close</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Modal: Create Group from selection -->
         <div id="groupModal" class="modal modal-centered" role="dialog" aria-modal="true" aria-labelledby="groupModalTitle">
             <div class="modal-content modal-small">
@@ -521,7 +620,10 @@
         <div id="toast" class="toast"></div>
     </div>
 
+    <script src="vendor/qrcode.min.js"></script>
+    <script src="vendor/jsQR.min.js"></script>
     <script src="clockodo-client.js"></script>
+    <script src="exchange.js"></script>
     <script src="app.js"></script>
     <script>
         if ('serviceWorker' in navigator) {

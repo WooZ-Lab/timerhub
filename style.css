@@ -1177,6 +1177,130 @@ input:-webkit-autofill:active {
     font-weight: 700;
 }
 
+/* Secure day exchange */
+.exchange-code {
+    margin-top: 6px;
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+    user-select: all;
+}
+
+.exchange-code-input {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    letter-spacing: 0.04em;
+}
+
+.exchange-file-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-secondary);
+    font-size: 14px;
+    align-self: center;
+}
+
+.exchange-preview-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    align-items: baseline;
+    margin-top: 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background-color: var(--bg-secondary);
+    font-size: 14px;
+}
+
+.exchange-preview-warnings {
+    margin-top: 10px;
+}
+
+.exchange-preview-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+    max-height: 40vh;
+    overflow-y: auto;
+}
+
+.exchange-preview-item {
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background-color: var(--bg-secondary);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.exchange-preview-times {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-variant-numeric: tabular-nums;
+    font-size: 14px;
+}
+
+.exchange-preview-duration {
+    margin-left: auto;
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.exchange-preview-activity {
+    font-weight: 650;
+    overflow-wrap: anywhere;
+}
+
+.exchange-preview-meta,
+.exchange-preview-notes {
+    color: var(--text-secondary);
+    font-size: 13px;
+    overflow-wrap: anywhere;
+}
+
+.exchange-qr-body,
+.exchange-scan-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+.exchange-qr-canvas {
+    width: 240px;
+    height: 240px;
+    max-width: 100%;
+    background-color: #ffffff;
+    border-radius: var(--radius-sm);
+    image-rendering: pixelated;
+}
+
+.exchange-scan-video {
+    width: 100%;
+    max-height: 45vh;
+    border-radius: var(--radius-sm);
+    background-color: #000000;
+}
+
+.exchange-import-actions {
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
 .review-entry-header {
     display: flex;
     justify-content: space-between;

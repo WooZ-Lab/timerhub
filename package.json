@@ -7,6 +7,8 @@
     "test": "node --test"
   },
   "dependencies": {
+    "jsqr": "1.4.0",
+    "qrcode-generator": "2.0.4",
     "web-push": "^3.6.7"
   },
   "devDependencies": {

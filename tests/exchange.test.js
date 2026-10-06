@@ -5,6 +5,8 @@ import test from 'node:test';
 import vm from 'node:vm';
 
 const exchangeSource = await readFile(new URL('../exchange.js', import.meta.url), 'utf8');
+const qrcodeSource = await readFile(new URL('../vendor/qrcode.min.js', import.meta.url), 'utf8');
+const jsqrSource = await readFile(new URL('../vendor/jsQR.min.js', import.meta.url), 'utf8');
 
 function makeExchange() {
     const context = vm.createContext({
@@ -213,4 +215,45 @@ test('QR payload carries only the protocol tag and the transfer secret', () => {
     assert.throws(() => Exchange.parseQrPayload(`${qr}:extra`), error => error.code === 'invalid_qr_payload');
     assert.throws(() => Exchange.parseQrPayload('timerhub-exchange:2:abc'), error => error.code === 'invalid_qr_payload');
     assert.throws(() => Exchange.parseQrPayload(`https://example.test/?code=${secret}`), error => error.code === 'invalid_qr_payload');
+});
+
+test('the vendored QR generator and scanner round-trip the transfer payload', () => {
+    const Exchange = makeExchange();
+    const secret = Exchange.generateSecret(webcrypto);
+    const qrText = Exchange.buildQrPayload(secret);
+
+    const context = vm.createContext({});
+    vm.runInContext('globalThis.window = globalThis; globalThis.self = globalThis;', context);
+    vm.runInContext(qrcodeSource, context, { filename: 'qrcode.min.js' });
+    vm.runInContext(jsqrSource, context, { filename: 'jsQR.min.js' });
+    const qrcode = vm.runInContext('qrcode', context);
+    const jsQR = vm.runInContext('jsQR', context);
+
+    const qr = qrcode(0, 'M');
+    qr.addData(qrText);
+    qr.make();
+    const count = qr.getModuleCount();
+    const scale = 4;
+    const quiet = 4 * scale;
+    const size = count * scale + quiet * 2;
+    const pixels = new Uint8ClampedArray(size * size * 4).fill(255);
+    for (let row = 0; row < count; row++) {
+        for (let column = 0; column < count; column++) {
+            if (!qr.isDark(row, column)) continue;
+            for (let dy = 0; dy < scale; dy++) {
+                for (let dx = 0; dx < scale; dx++) {
+                    const x = quiet + column * scale + dx;
+                    const y = quiet + row * scale + dy;
+                    const offset = (y * size + x) * 4;
+                    pixels[offset] = 0;
+                    pixels[offset + 1] = 0;
+                    pixels[offset + 2] = 0;
+                    pixels[offset + 3] = 255;
+                }
+            }
+        }
+    }
+    const decoded = jsQR(pixels, size, size, { inversionAttempts: 'dontInvert' });
+    assert.equal(decoded?.data, qrText);
+    assert.equal(decoded.data.includes('Anfahrt'), false);
 });
