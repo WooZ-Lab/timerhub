@@ -1223,13 +1223,27 @@ test('canvas toolbar, centered group modal, and single settings heading are wire
     assert.equal(/add-button/.test(htmlSource), false, 'standalone canvas FAB buttons are gone');
 
     const toolbarRule = styleSource.match(/\.canvas-toolbar\s*\{([^}]*)\}/s)?.[1] || '';
-    assert.match(toolbarRule, /position:\s*absolute/);
-    assert.match(toolbarRule, /top:\s*calc\(var\(--navbar-height\) \+ 8px\)/);
+    assert.match(toolbarRule, /position:\s*fixed/);
+    assert.match(toolbarRule, /bottom:\s*var\(--bottom-nav-height\)/);
+    assert.equal(/(?:^|[;{])\s*top:/.test(toolbarRule), false, 'the toolbar no longer sits at the top of the screen');
+    assert.match(toolbarRule, /height:\s*var\(--toolbar-height\)/);
     assert.match(toolbarRule, /display:\s*flex/);
     assert.match(toolbarRule, /overflow-x:\s*auto/);
-    assert.match(toolbarRule, /max-height:\s*48px/);
-    assert.match(styleSource, /--navbar-height:\s*calc\(var\(--safe-top\) \+ 65px\)/);
-    assert.match(styleSource, /--navbar-height:\s*calc\(var\(--safe-top\) \+ 59px\)/);
+    assert.match(styleSource, /--toolbar-height:\s*48px/);
+    assert.match(styleSource, /--bottom-nav-height:\s*env\(safe-area-inset-bottom,\s*0px\)/);
+    assert.match(styleSource, /--bottom-nav-height:\s*calc\(69px \+ env\(safe-area-inset-bottom,\s*0px\)\)/);
+    assert.match(
+        styleSource,
+        /#activityCanvasViewport\s*\{[^}]*bottom:\s*calc\(var\(--bottom-nav-height\) \+ var\(--toolbar-height\)\)/s,
+        'the canvas keeps its height above the toolbar and bottom navigation'
+    );
+
+    const mainScreenIndex = htmlSource.indexOf('id="mainScreen"');
+    const statusIndex = htmlSource.indexOf('id="timerRunningStatus"');
+    const toolbarIndex = htmlSource.indexOf('id="canvasToolbar"');
+    const viewportIndex = htmlSource.indexOf('id="activityCanvasViewport"');
+    assert.ok(mainScreenIndex < statusIndex && statusIndex < toolbarIndex && toolbarIndex < viewportIndex, 'toolbar is a direct sibling of the canvas');
+    assert.equal(htmlSource.slice(viewportIndex).includes('id="canvasToolbar"'), false, 'toolbar lives outside the canvas viewport');
 
     assert.match(htmlSource, /<button id="addActivityBtn" class="canvas-tool-btn"[^>]*>\+<\/button>/);
     assert.equal(/<button id="addActivityBtn"[^>]*\shidden/.test(htmlSource), false, 'add activity is never hidden in markup');

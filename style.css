@@ -32,6 +32,8 @@
     /* Spacing */
     --safe-top: max(12px, env(safe-area-inset-top, 0px));
     --navbar-height: calc(var(--safe-top) + 65px);
+    --toolbar-height: 48px;
+    --bottom-nav-height: env(safe-area-inset-bottom, 0px);
     --safe-bottom: max(12px, env(safe-area-inset-bottom, 0px));
     --safe-left: max(12px, env(safe-area-inset-left, 0px));
     --safe-right: max(12px, env(safe-area-inset-right, 0px));
@@ -1637,7 +1639,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .small-btn { min-height:var(--touch-target); }
 .color-option, .shape-option, .size-btn { min-width:var(--touch-target); min-height:var(--touch-target); }
 @media (max-width: 600px) {
-    :root { --navbar-height: calc(var(--safe-top) + 59px); }
+    :root { --navbar-height: calc(var(--safe-top) + 59px); --bottom-nav-height: calc(69px + env(safe-area-inset-bottom, 0px)); }
     .navbar-content { height:58px; padding:0 16px; }
     .navbar-actions { position:fixed; z-index:150; left:0; right:0; bottom:0; padding:7px max(12px, env(safe-area-inset-right)) calc(7px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px; background:var(--navbar-bg); border-top:1px solid var(--navbar-border); box-shadow:0 -4px 14px rgba(16,32,23,.06); }
     .nav-btn { width:100%; min-width:0; min-height:54px; padding:5px 2px; flex-direction:column; gap:2px; font-size:10px; line-height:1.12; }
@@ -1714,15 +1716,15 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     box-shadow:inset 0 1px 3px rgba(18,42,28,.04); touch-action:none; overscroll-behavior:contain;
 }
 .canvas-toolbar {
-    position:absolute; z-index:60;
-    top:calc(var(--navbar-height) + 8px);
-    left:max(10px, env(safe-area-inset-left));
-    right:max(10px, env(safe-area-inset-right));
+    position:fixed; z-index:145;
+    left:0; right:0;
+    bottom:var(--bottom-nav-height);
+    height:var(--toolbar-height);
     display:flex; align-items:center; gap:4px;
-    min-height:48px; max-height:48px; padding:3px 4px;
-    border:1px solid var(--border-color); border-radius:var(--radius-md);
-    background:color-mix(in srgb, var(--bg-secondary) 92%, transparent);
-    box-shadow:var(--shadow-card); backdrop-filter:blur(12px);
+    padding:0 max(10px, env(safe-area-inset-left)) 0 max(10px, env(safe-area-inset-right));
+    border:0; border-top:1px solid var(--border-color); border-radius:0;
+    background:var(--bg-secondary);
+    box-shadow:0 -4px 14px rgba(16,32,23,.06);
     overflow-x:auto; overflow-y:hidden; white-space:nowrap;
     -webkit-overflow-scrolling:touch; touch-action:pan-x; scrollbar-width:thin;
 }
@@ -2200,9 +2202,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
 #activityCanvasViewport {
     position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: calc(var(--bottom-nav-height) + var(--toolbar-height));
+    width: auto;
+    height: auto;
     min-height: 0;
     margin: 0;
     padding: 0;

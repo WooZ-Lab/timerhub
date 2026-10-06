@@ -2254,7 +2254,7 @@ test('group selection action tracks a valid selection only', async () => {
 
 test('add activity action stays available without selection or groups', () => {
     const harness = createGroupCanvasHarness();
-    const { app, addActivityBtn } = harness;
+    const { app, addActivityBtn, viewport, pointer } = harness;
     app.activities = [];
     app.groups = [];
     app.selectedActivityIds = new Set();
@@ -2267,6 +2267,14 @@ test('add activity action stays available without selection or groups', () => {
     assert.equal(addActivityBtn.hidden, false, 'selection state never hides the add action');
     app.setCanvasSelection([]);
     assert.equal(addActivityBtn.hidden, false, 'clearing the selection never hides the add action');
+
+    pointer('pointerdown', viewport, 0, 0);
+    pointer('pointermove', viewport, 60, 40);
+    pointer('pointerup', viewport, 60, 40);
+    assert.deepEqual({ ...app.canvasPan }, { x: 60, y: 40 }, 'canvas panning still works');
+    assert.equal(addActivityBtn.style.transform, undefined, 'canvas pan never moves the toolbar action');
+    assert.equal(addActivityBtn.style.left, undefined, 'canvas pan never repositions the toolbar action');
+    assert.equal(addActivityBtn.style.top, undefined, 'canvas pan never repositions the toolbar action');
 });
 
 test('automatic snapshot failures are observable but do not fail saved user data', async () => {
