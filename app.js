@@ -346,6 +346,7 @@ const extendedTranslations = {
         retryDiagnosticUnavailable: 'The batch is not in a retryable state.',
         resendSyncNotice: 'These entries have already been synced to Clockodo. Do you really want to send them again? This can create duplicate Clockodo entries.',
         resendSyncBtn: 'Send again',
+        unknownResendNotice: 'The previous Clockodo result for this entry is uncertain. Clockodo may already contain it. Check Clockodo first — continuing can create a duplicate entry.',
         createGroup: 'Create Group', createGroupFromSelection: 'Group selection ({count})',
         groupName: 'Group name', groupNamePlaceholder: 'e.g., Site A',
         groupDefaultName: 'Group {number}', groupCreated: 'Group "{name}" created',
@@ -519,6 +520,7 @@ const extendedTranslations = {
         retryDiagnosticUnavailable: 'Der Stapel kann derzeit nicht wiederholt werden.',
         resendSyncNotice: 'Diese Einträge wurden bereits mit Clockodo synchronisiert. Möchtest du sie wirklich erneut senden? Dadurch können doppelte Clockodo-Einträge entstehen.',
         resendSyncBtn: 'Erneut senden',
+        unknownResendNotice: 'Das vorherige Clockodo-Ergebnis für diesen Eintrag ist unklar. Clockodo enthält ihn möglicherweise bereits. Prüfe zuerst Clockodo – beim Fortfahren kann ein doppelter Eintrag entstehen.',
         createGroup: 'Gruppe erstellen', createGroupFromSelection: 'Auswahl gruppieren ({count})',
         groupName: 'Gruppenname', groupNamePlaceholder: 'z. B. Baustelle A',
         groupDefaultName: 'Gruppe {number}', groupCreated: 'Gruppe "{name}" erstellt',
@@ -692,6 +694,7 @@ const extendedTranslations = {
         retryDiagnosticUnavailable: 'Пакет сейчас нельзя повторить.',
         resendSyncNotice: 'Эти записи уже синхронизированы с Clockodo. Вы действительно хотите отправить их снова? Это может создать дубликаты записей Clockodo.',
         resendSyncBtn: 'Отправить повторно',
+        unknownResendNotice: 'Предыдущий результат Clockodo для этой записи неизвестен. Clockodo может уже содержать её. Сначала проверьте Clockodo — продолжение может создать дубликат записи.',
         createGroup: 'Создать группу', createGroupFromSelection: 'Сгруппировать ({count})',
         groupName: 'Название группы', groupNamePlaceholder: 'например, Объект A',
         groupDefaultName: 'Группа {number}', groupCreated: 'Группа «{name}» создана',
@@ -1165,6 +1168,7 @@ class TimerHubApp {
         this.confirmedSyncEntries = [];
         this.syncConfirmationOpen = false;
         this.syncResendMode = false;
+        this.syncUnknownEntryId = null;
         this.syncBatches = [];
         this.syncOperations = new Map();
         this.clockodoClient = window.ClockodoClient ? new window.ClockodoClient() : null;
@@ -2318,6 +2322,9 @@ class TimerHubApp {
             const retryButton = entry.syncStatus === SYNC_STATUS.FAILED && batch
                 ? `<button class="review-action-btn review-retry-entry" type="button" data-batch-id="${this.escapeHtml(batch.id)}" data-entry-id="${this.escapeHtml(entry.id)}" aria-label="${this.escapeHtml(`${this.t('retry')}: ${activityLabel}`)}"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 7v5h-5M4.8 9a7.5 7.5 0 0 1 12.7-2L20 12M4 17v-5h5m10.2 3a7.5 7.5 0 0 1-12.7 2L4 12"/></svg>${this.t('retry')}</button>`
                 : '';
+            const resendUnknownButton = entry.syncStatus === SYNC_STATUS.UNKNOWN && batch
+                ? `<button class="review-action-btn review-resend-unknown" type="button" data-entry-id="${this.escapeHtml(entry.id)}" aria-label="${this.escapeHtml(`${this.t('resendSyncBtn')}: ${activityLabel}`)}"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 7v5h-5M4.8 9a7.5 7.5 0 0 1 12.7-2L20 12M4 17v-5h5m10.2 3a7.5 7.5 0 0 1-12.7 2L4 12"/></svg>${this.t('resendSyncBtn')}</button>`
+                : '';
             const unknownNotice = entry.syncStatus === SYNC_STATUS.UNKNOWN ? `<small>${this.t('syncOutcomeUnknown')}</small>` : '';
             const localOnlyNotice = entry.syncStatus === SYNC_STATUS.LOCAL_ONLY ? `<small>${this.t('syncLocalOnlyNotice')}</small>` : '';
             const errorNotice = entry.clockodoError && entry.syncStatus === SYNC_STATUS.FAILED
@@ -2332,11 +2339,20 @@ class TimerHubApp {
                 <span class="review-entry-duration">${this.escapeHtml(duration)}</span></div>
                 <div class="review-entry-title"><span class="review-activity-dot" style="background-color:${this.escapeHtml(activity?.color || '#27AE60')}"></span>${this.escapeHtml(activityLabel)}</div>
                 ${meta ? `<div class="review-entry-tags">${entry.project ? `<span class="review-tag">${this.escapeHtml(entry.project)}</span>` : ''}${entry.service ? `<span class="review-tag">${this.escapeHtml(entry.service)}</span>` : ''}</div>` : ''}${notes}${issueText ? `<small>${this.escapeHtml(issueText)}</small>` : ''}${conflictNote}${errorNotice}${unknownNotice}${localOnlyNotice}
-                <div class="review-entry-footer"><span class="sync-badge ${this.escapeHtml(entry.syncStatus)}">${this.escapeHtml(status)}</span><div class="review-entry-actions"><button class="review-action-btn review-edit-entry" type="button" data-entry-id="${this.escapeHtml(entry.id)}" aria-label="${this.escapeHtml(`${this.t('edit')}: ${activityLabel}`)}" ${entry.syncStatus === SYNC_STATUS.CONFIRMED || entry.syncStatus === SYNC_STATUS.SYNCING ? `disabled title="${this.escapeHtml(this.t('confirmedEntryLocked'))}"` : ''}><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m4 16.5-.8 4.3 4.3-.8L19 8.5 15.5 5 4 16.5Z"/><path d="m13.5 7 3.5 3.5"/></svg>${this.t('edit')}</button>${retryButton}</div></div>${retryDiagnostic}
+                <div class="review-entry-footer"><span class="sync-badge ${this.escapeHtml(entry.syncStatus)}">${this.escapeHtml(status)}</span><div class="review-entry-actions"><button class="review-action-btn review-edit-entry" type="button" data-entry-id="${this.escapeHtml(entry.id)}" aria-label="${this.escapeHtml(`${this.t('edit')}: ${activityLabel}`)}" ${entry.syncStatus === SYNC_STATUS.CONFIRMED || entry.syncStatus === SYNC_STATUS.SYNCING ? `disabled title="${this.escapeHtml(this.t('confirmedEntryLocked'))}"` : ''}><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m4 16.5-.8 4.3 4.3-.8L19 8.5 15.5 5 4 16.5Z"/><path d="m13.5 7 3.5 3.5"/></svg>${this.t('edit')}</button>${retryButton}${resendUnknownButton}</div></div>${retryDiagnostic}
             </article>`;
         }).join('');
         list.querySelectorAll('.review-edit-entry').forEach(button => button.addEventListener('click', () => this.showEntryEditModal(button.dataset.entryId)));
         list.querySelectorAll('.review-retry-entry').forEach(button => button.addEventListener('click', () => this.retryFailedEntry(button.dataset.batchId, button.dataset.entryId)));
+        list.querySelectorAll('.review-resend-unknown').forEach(button => button.addEventListener('click', () => this.showUnknownResendConfirmation(button.dataset.entryId)));
+    }
+
+    renderSyncConfirmEntry(entry) {
+        const activity = this.activities.find(item => item.id === entry.activityId);
+        const title = activity?.name || entry.activityNameSnapshot || this.t('activity');
+        const sendStart = this.clockodoSendTimestamp(entry.startTimestamp);
+        const sendEnd = this.clockodoSendTimestamp(entry.endTimestamp);
+        return `<div class="sync-confirm-item"><span>${this.escapeHtml(title)} · ${this.escapeHtml(this.formatTime(sendStart))}–${this.escapeHtml(this.formatTime(sendEnd))}</span><strong>${this.formatDuration(this.getEntryDuration(entry))}</strong></div>`;
     }
 
     showSyncConfirmationModal() {
@@ -2350,6 +2366,7 @@ class TimerHubApp {
         const synced = entries.filter(entry => entry.syncStatus === SYNC_STATUS.SYNCED);
         const resend = this.clockodoConfigured && !pendingBatch && unsynced.length === 0 && synced.length > 0;
         this.syncResendMode = resend;
+        this.syncUnknownEntryId = null;
         const eligible = pendingBatch
             ? pendingBatch.entries.filter(entry => [SYNC_STATUS.CONFIRMED, SYNC_STATUS.SYNCING, SYNC_STATUS.FAILED].includes(entry.syncStatus))
             : (resend ? synced : unsynced);
@@ -2366,13 +2383,7 @@ class TimerHubApp {
         desc.textContent = this.clockodoConfigured
             ? this.t('confirmSyncDesc', { count: eligible.length })
             : this.t('confirmSyncDescLocal', { count: eligible.length });
-        list.innerHTML = eligible.map(entry => {
-            const activity = this.activities.find(item => item.id === entry.activityId);
-            const title = activity?.name || entry.activityNameSnapshot || this.t('activity');
-            const sendStart = this.clockodoSendTimestamp(entry.startTimestamp);
-            const sendEnd = this.clockodoSendTimestamp(entry.endTimestamp);
-            return `<div class="sync-confirm-item"><span>${this.escapeHtml(title)} · ${this.escapeHtml(this.formatTime(sendStart))}–${this.escapeHtml(this.formatTime(sendEnd))}</span><strong>${this.formatDuration(this.getEntryDuration(entry))}</strong></div>`;
-        }).join('') || `<div class="review-empty">${this.t('noEntriesToSync')}</div>`;
+        list.innerHTML = eligible.map(entry => this.renderSyncConfirmEntry(entry)).join('') || `<div class="review-empty">${this.t('noEntriesToSync')}</div>`;
         const total = eligible.reduce((sum, entry) => sum + this.getEntryDuration(entry), 0);
         summary.innerHTML = `<span>${this.t('syncSummaryTotal')}</span><strong>${this.formatDuration(total)}</strong>`;
         notice.textContent = resend
@@ -2390,11 +2401,37 @@ class TimerHubApp {
         document.getElementById('syncConfirmModal').classList.add('active');
     }
 
+    showUnknownResendConfirmation(entryId) {
+        const entry = this.timeEntries.find(item => String(item.id) === String(entryId));
+        if (!entry || entry.syncStatus !== SYNC_STATUS.UNKNOWN) return false;
+        if (!this.clockodoConfigured || !this.clockodoClient) {
+            this.showToast(this.t('clockodoConfigMissing'));
+            return false;
+        }
+        const invalid = this.getEntryDuration(entry) <= 0 || this.getEntryDuration(entry) > 24 * 60 * 60 * 1000;
+        this.syncUnknownEntryId = String(entry.id);
+        this.syncResendMode = false;
+        this.syncConfirmationOpen = true;
+        this.confirmedSyncEntries = [{ ...entry }];
+        document.getElementById('syncConfirmDesc').textContent = this.t('confirmSyncDesc', { count: 1 });
+        document.getElementById('syncConfirmEntriesList').innerHTML = this.renderSyncConfirmEntry(entry);
+        document.getElementById('syncConfirmSummary').innerHTML = `<span>${this.t('syncSummaryTotal')}</span><strong>${this.formatDuration(this.getEntryDuration(entry))}</strong>`;
+        const notice = document.getElementById('syncConfirmAlreadySyncedNotice');
+        notice.textContent = invalid ? this.t('dayReviewInvalid') : this.t('unknownResendNotice');
+        notice.style.display = '';
+        const submit = document.getElementById('syncConfirmSubmitBtn');
+        submit.disabled = invalid;
+        submit.textContent = this.t('resendSyncBtn');
+        document.getElementById('syncConfirmModal').classList.add('active');
+        return true;
+    }
+
     closeSyncConfirmationModal() {
         document.getElementById('syncConfirmModal')?.classList.remove('active');
         this.confirmedSyncEntries = [];
         this.syncConfirmationOpen = false;
         this.syncResendMode = false;
+        this.syncUnknownEntryId = null;
     }
 
     async confirmDayReview({ resend = false } = {}) {
@@ -2442,6 +2479,11 @@ class TimerHubApp {
 
     async confirmAndSyncClockodo() {
         if (!this.syncConfirmationOpen) return false;
+        if (this.syncUnknownEntryId) {
+            const entryId = this.syncUnknownEntryId;
+            this.closeSyncConfirmationModal();
+            return this.resendUnknownEntry(entryId);
+        }
         const resend = this.syncResendMode === true;
         let batch = null;
         if (!resend) {
@@ -2458,6 +2500,43 @@ class TimerHubApp {
             return batch;
         }
         return this.syncConfirmedBatch(batch.id);
+    }
+
+    async resendUnknownEntry(entryId) {
+        const entry = this.timeEntries.find(item => String(item.id) === String(entryId));
+        if (!entry || entry.syncStatus !== SYNC_STATUS.UNKNOWN) return false;
+        if (!this.clockodoConfigured || !this.clockodoClient) {
+            this.showToast(this.t('clockodoConfigMissing'));
+            return false;
+        }
+        // A manual resend always creates a fresh confirmed batch with a new idempotency key.
+        // The original "timerhub-entry:<id>" operation stays untouched and permanently protected.
+        const date = this.getEntryDate(entry);
+        const dateBatches = this.syncBatches.filter(batch => batch.date === date);
+        const version = dateBatches.reduce((latest, batch) => Math.max(latest, Number(batch.version) || 0), 0) + 1;
+        const batchId = this.generateId();
+        const frozenEntry = {
+            ...entry,
+            syncStatus: SYNC_STATUS.CONFIRMED,
+            syncBatchId: batchId,
+            clockodoResend: true,
+            clockodoIdempotencyKey: `timerhub-entry:${entry.id}:resend:${batchId}`,
+            clockodoPayload: null
+        };
+        const batch = {
+            id: batchId,
+            date,
+            version,
+            state: SYNC_STATUS.CONFIRMED,
+            confirmedAt: Date.now(),
+            entries: [{ ...frozenEntry, durationMs: frozenEntry.endTimestamp - frozenEntry.startTimestamp }]
+        };
+        await this.storage.saveConfirmedBatch(batch, [frozenEntry]);
+        const local = this.timeEntries.find(item => String(item.id) === String(entryId));
+        if (local) Object.assign(local, frozenEntry);
+        else this.timeEntries.push(frozenEntry);
+        this.syncBatches.push(batch);
+        return this.syncConfirmedBatch(batchId);
     }
 
     async persistSyncProgress(batch) {

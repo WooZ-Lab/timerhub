@@ -4380,6 +4380,169 @@ test('a partially synced day keeps the normal flow without a resend prompt', asy
     assert.deepEqual(JSON.parse(JSON.stringify(dayApp.confirmedSyncEntries.map(entry => entry.id))), ["partial-unsynced"]);
 });
 
+async function createUnknownDayApp({ onResend = null } = {}) {
+    const { app, document, storageData } = createTestApp();
+    const start = new Date(2026, 9, 5, 8, 0).getTime();
+    await app.addEntry({
+        id: 'unknown-entry', activityId: 'act-1', activityNameSnapshot: 'Anfahrt',
+        startTimestamp: start, endTimestamp: start + 46 * 60000 + 3000,
+        customerId: '12', serviceId: '56', notes: 'Drive'
+    });
+    app.reviewDate = '2026-10-05';
+    app.clockodoConfigured = true;
+    app.showToast = () => {};
+    app.getPushClientId = () => 'client_1234567890abcdef';
+    app.getClockodoAccessToken = () => 'a'.repeat(48);
+    const sent = [];
+    app.clockodoClient = {
+        buildEntryPayload(entry) {
+            return { id: entry.id, customers_id: Number(entry.customerId), services_id: Number(entry.serviceId), text: entry.notes || null };
+        },
+        async createEntry(clientId, token, payload, idempotencyKey) {
+            sent.push({ payload, idempotencyKey });
+            if (sent.length === 1) {
+                throw Object.assign(new Error('uncertain'), { code: 'network_outcome_unknown' });
+            }
+            return onResend ? onResend(sent) : { created: true, entryId: 4321 };
+        }
+    };
+    app.showSyncConfirmationModal();
+    const firstBatch = await app.confirmAndSyncClockodo();
+    assert.equal(firstBatch.state, 'unknown');
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].idempotencyKey, 'timerhub-entry:unknown-entry');
+    return { app, document, storageData, sent, firstBatch };
+}
+
+test('an UNKNOWN entry shows a Send again action in Day Review', async () => {
+    const { app, document } = await createUnknownDayApp();
+    app.renderReview();
+    const html = document.getElementById('reviewEntriesList').innerHTML;
+    assert.ok(html.includes('sync-badge unknown'), 'the purple UNKNOWN badge remains');
+    assert.ok(html.includes('review-resend-unknown'), 'the UNKNOWN entry offers Send again');
+    assert.ok(html.includes(app.t('resendSyncBtn')));
+    assert.equal(html.includes('review-retry-entry'), false, 'UNKNOWN does not show the FAILED retry action');
+});
+
+test('manual resend of an UNKNOWN entry opens a confirmation with the duplicate warning', async () => {
+    const { app, document, sent } = await createUnknownDayApp();
+    const opened = app.showUnknownResendConfirmation('unknown-entry');
+    assert.equal(opened, true);
+    assert.equal(app.syncUnknownEntryId, 'unknown-entry');
+    assert.equal(app.syncResendMode, false);
+    assert.equal(document.getElementById('syncConfirmAlreadySyncedNotice').textContent, app.t('unknownResendNotice'));
+    assert.equal(document.getElementById('syncConfirmSubmitBtn').textContent, app.t('resendSyncBtn'));
+    assert.equal(document.getElementById('syncConfirmSubmitBtn').disabled, false);
+    assert.equal(sent.length, 1, 'opening the confirmation must not send anything');
+});
+
+test('cancelling the UNKNOWN manual resend sends nothing and clears the pending entry', async () => {
+    const { app, sent } = await createUnknownDayApp();
+    app.showUnknownResendConfirmation('unknown-entry');
+    app.closeSyncConfirmationModal();
+    assert.equal(app.syncUnknownEntryId, null);
+    assert.equal(sent.length, 1);
+    assert.equal(await app.confirmAndSyncClockodo(), false);
+    assert.equal(sent.length, 1);
+});
+
+test('confirming a manual resend uses a new idempotency key and marks the entry SYNCED', async () => {
+    const { app, storageData, sent, firstBatch } = await createUnknownDayApp();
+    app.showUnknownResendConfirmation('unknown-entry');
+    const resendBatch = await app.confirmAndSyncClockodo();
+    assert.equal(resendBatch.state, 'synced');
+    assert.equal(sent.length, 2);
+    assert.notEqual(sent[1].idempotencyKey, sent[0].idempotencyKey);
+    assert.match(sent[1].idempotencyKey, /^timerhub-entry:unknown-entry:resend:/);
+    assert.deepEqual(sent[1].payload, sent[0].payload);
+
+    const entry = app.timeEntries.find(item => item.id === 'unknown-entry');
+    assert.equal(entry.syncStatus, 'synced');
+    assert.equal(entry.clockodoEntryId, 4321);
+    assert.equal(entry.clockodoError, null);
+    assert.equal(entry.syncBatchId, resendBatch.id);
+    assert.equal(storageData.timeEntries.find(item => item.id === 'unknown-entry').syncStatus, 'synced');
+
+    const original = app.syncBatches.find(item => item.id === firstBatch.id);
+    assert.equal(original.state, 'unknown', 'the historical UNKNOWN batch is preserved');
+    assert.equal(original.entries[0].syncStatus, 'unknown');
+});
+
+test('the original UNKNOWN operation stays protected after a manual resend', async () => {
+    const { app, sent, firstBatch } = await createUnknownDayApp();
+    assert.equal(await app.retrySyncBatch(firstBatch.id), false);
+    assert.equal(sent.length, 1);
+
+    app.showUnknownResendConfirmation('unknown-entry');
+    await app.confirmAndSyncClockodo();
+    assert.equal(sent.length, 2);
+
+    assert.equal(await app.retrySyncBatch(firstBatch.id), false, 'the original unknown batch can never be retried');
+    assert.equal(sent.length, 2);
+});
+
+test('a definitive failure during a manual resend marks the entry FAILED with diagnostics', async () => {
+    const { app, sent } = await createUnknownDayApp({
+        onResend: () => {
+            throw Object.assign(new Error('rejected'), {
+                code: 'clockodo_rejected',
+                details: { status: 422, message: 'Service is not available for this customer.' }
+            });
+        }
+    });
+    app.showUnknownResendConfirmation('unknown-entry');
+    const batch = await app.confirmAndSyncClockodo();
+    assert.equal(batch.state, 'failed');
+    assert.equal(sent.length, 2);
+    const entry = app.timeEntries.find(item => item.id === 'unknown-entry');
+    assert.equal(entry.syncStatus, 'failed');
+    assert.equal(entry.clockodoError, 'clockodo_rejected');
+    assert.equal(entry.clockodoErrorDetails.message, 'Service is not available for this customer.');
+});
+
+test('another uncertain result during a manual resend keeps the entry UNKNOWN without automatic retry', async () => {
+    const { app, sent, firstBatch } = await createUnknownDayApp({
+        onResend: () => { throw Object.assign(new Error('uncertain'), { code: 'timeout_outcome_unknown' }); }
+    });
+    app.showUnknownResendConfirmation('unknown-entry');
+    const resendBatch = await app.confirmAndSyncClockodo();
+    assert.equal(resendBatch.state, 'unknown');
+    assert.equal(sent.length, 2);
+    assert.notEqual(sent[1].idempotencyKey, sent[0].idempotencyKey);
+    assert.equal(app.timeEntries.find(item => item.id === 'unknown-entry').syncStatus, 'unknown');
+    assert.equal(await app.retrySyncBatch(firstBatch.id), false);
+    assert.equal(await app.retrySyncBatch(resendBatch.id), false);
+    assert.equal(sent.length, 2);
+});
+
+test('UNKNOWN entries remain excluded from the automatic Review & Sync eligibility lists', async () => {
+    const { app, document } = await createUnknownDayApp();
+    app.showSyncConfirmationModal();
+    assert.equal(app.syncResendMode, false);
+    assert.deepEqual(JSON.parse(JSON.stringify(app.confirmedSyncEntries)), []);
+    assert.equal(document.getElementById('syncConfirmSubmitBtn').disabled, true);
+    assert.ok(document.getElementById('syncConfirmEntriesList').innerHTML.includes(app.t('noEntriesToSync')));
+});
+
+test('the UNKNOWN Send again action and a successful manual resend survive a reload', async () => {
+    const { app, storageData } = await createUnknownDayApp();
+    const { app: reloaded, document: reloadedDocument } = createTestApp({ timeEntries: storageData.timeEntries, syncBatches: storageData.syncBatches });
+    await reloaded.loadTimeEntries();
+    reloaded.reviewDate = '2026-10-05';
+    reloaded.renderReview();
+    assert.ok(reloadedDocument.getElementById('reviewEntriesList').innerHTML.includes('review-resend-unknown'));
+    assert.equal(reloaded.timeEntries.find(item => item.id === 'unknown-entry').syncStatus, 'unknown');
+
+    app.showUnknownResendConfirmation('unknown-entry');
+    await app.confirmAndSyncClockodo();
+
+    const { app: afterResend } = createTestApp({ timeEntries: storageData.timeEntries, syncBatches: storageData.syncBatches });
+    await afterResend.loadTimeEntries();
+    const entry = afterResend.timeEntries.find(item => item.id === 'unknown-entry');
+    assert.equal(entry.syncStatus, 'synced');
+    assert.equal(entry.clockodoEntryId, 4321);
+});
+
 test('editing an activity scrolls both picker rows to center the selected items', () => {
     const { app, document } = createTestApp();
     const selectedColor = { offsetLeft: 400, offsetWidth: 48 };

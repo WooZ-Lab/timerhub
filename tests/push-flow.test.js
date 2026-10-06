@@ -929,6 +929,41 @@ test('Clockodo Worker reports authentication and uncertain malformed-create outc
     assert.equal(calls, 2);
 });
 
+test('Clockodo Worker accepts a new manual-resend key after an uncertain create outcome', async t => {
+    const backend = makeBackend();
+    const originalFetch = globalThis.fetch;
+    let externalResponse = Response.json({ unexpected: true });
+    let calls = 0;
+    globalThis.fetch = async () => { calls += 1; return externalResponse; };
+    t.after(() => { globalThis.fetch = originalFetch; });
+
+    const clientId = 'clockodo_resend_test_12345';
+    const token = 'resend-access-token'.padEnd(48, 'q');
+    const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+    await backend.request(`/api/clockodo/config?clientId=${clientId}`, {
+        method: 'PUT', headers: auth, body: JSON.stringify({ apiUser: 'person@example.test', apiKey: 'private-key' })
+    });
+    const payload = {
+        time_since: '2026-09-28T08:00:00.000Z', time_until: '2026-09-28T09:00:00.000Z',
+        customers_id: 3, services_id: 9, billable: 1
+    };
+    const send = key => backend.request(`/api/clockodo/entries?clientId=${clientId}`, {
+        method: 'POST', headers: { ...auth, 'Idempotency-Key': key }, body: JSON.stringify(payload)
+    });
+
+    const uncertain = await send('timerhub-entry:manual-entry');
+    assert.equal(uncertain.status, 502);
+    const blocked = await send('timerhub-entry:manual-entry');
+    assert.equal(blocked.status, 409, 'the original uncertain key stays protected');
+    assert.deepEqual(await blocked.json(), { error: 'operation_outcome_unknown' });
+
+    externalResponse = Response.json({ entry: { id: 4711 } });
+    const resent = await send('timerhub-entry:manual-entry:resend:batch-2');
+    assert.equal(resent.status, 200, 'a distinct manual-resend key is a new operation');
+    assert.deepEqual(await resent.json(), { created: true, entryId: 4711 });
+    assert.equal(calls, 2);
+});
+
 test('Clockodo Worker loads customers and services from documented paginated endpoints without leaking the API key', async t => {
     const backend = makeBackend();
     const originalFetch = globalThis.fetch;
