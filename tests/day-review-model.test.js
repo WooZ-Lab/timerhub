@@ -134,7 +134,7 @@ function createTestApp(initialData = {}) {
         'dayImportModal', 'dayImportModalTitle', 'exchangeFileInput', 'exchangeChooseFileBtn', 'exchangeFileName',
         'exchangeCodeInput', 'exchangeScanQrBtn', 'exchangeImportError', 'exchangePreview', 'exchangePreviewSummary',
         'exchangePreviewWarnings', 'exchangePreviewList', 'exchangeDecryptBtn', 'exchangeImportBtn',
-        'dayImportCloseBtn', 'dayImportCancelBtn', 'exchangeQrModal', 'exchangeQrCanvas', 'exchangeQrSecret',
+        'dayImportCloseBtn', 'dayImportCancelBtn', 'exchangeQrModal', 'exchangeQrCanvas',
         'exchangeQrCloseBtn', 'exchangeQrDoneBtn', 'exchangeScanModal', 'exchangeScanVideo', 'exchangeScanStatus',
         'exchangeScanCloseBtn', 'exchangeScanDoneBtn'
     ]) {
@@ -198,6 +198,7 @@ function createTestApp(initialData = {}) {
         },
         document: testDocument,
         Blob,
+        File,
         URL: {
             createObjectURL(blob) { backupCapture.blob = blob; return 'blob:timerhub-test'; },
             revokeObjectURL(url) { backupCapture.revoked.push(url); }
@@ -4603,9 +4604,11 @@ test('Day Review exports an encrypted .timerhub file without plaintext work data
     const { app, document, backupCapture } = await createExchangeSender();
     const clicksBefore = backupCapture.clicks;
     assert.equal(await app.exportReviewDay(), true);
-    assert.equal(backupCapture.clicks, clicksBefore + 1);
-    assert.match(backupCapture.filename, /^timerhub-exchange_\d+\.timerhub$/);
-    assert.equal(/Anfahrt|Concrete|Bau|2026-10-05/.test(backupCapture.filename), false);
+    assert.equal(backupCapture.clicks, clicksBefore, 'export prepares the file without downloading it');
+    assert.match(app.lastExchange.fileName, /^timerhub-exchange_\d+\.timerhub$/);
+    assert.equal(/Anfahrt|Concrete|Bau|2026-10-05/.test(app.lastExchange.fileName), false);
+    assert.ok(app.lastExchange.file, 'the prepared export carries a shareable file');
+    assert.equal(app.lastExchange.file.name, app.lastExchange.fileName);
 
     const secret = app.lastExchange.secret;
     assert.equal(typeof secret, 'string');
@@ -4614,6 +4617,7 @@ test('Day Review exports an encrypted .timerhub file without plaintext work data
     for (const value of ['Anfahrt', 'Concrete pour', 'Drove to the site', 'Bau GmbH', '2026-10-05', app.lastExchange.exportId, secret]) {
         assert.equal(fileText.includes(value), false, `exchange file must not contain ${value}`);
     }
+    assert.equal(await app.lastExchange.file.text(), fileText);
     assert.equal(document.getElementById('exchangeCodeDisplay').textContent, app.getExchange().formatTransferCode(secret));
 });
 
@@ -4624,6 +4628,96 @@ test('exporting a day without completed entries reports and downloads nothing', 
     assert.equal(await app.exportReviewDay(), false);
     assert.equal(backupCapture.clicks, clicksBefore);
     assert.equal(toasts.at(-1), app.t('exchangeNoEntries'));
+});
+
+test('one export creates one snapshot and reopening the QR never creates a new export', async () => {
+    const { app } = await createExchangeSender();
+    assert.equal(await app.exportReviewDay(), true);
+    const prepared = app.lastExchange;
+    const qrPayload = app.getExchange().buildQrPayload(prepared.secret);
+
+    assert.equal(app.showExchangeQr(), true);
+    app.closeExchangeQr();
+    assert.equal(app.showExchangeQr(), true);
+    app.closeExchangeQr();
+
+    assert.equal(app.lastExchange, prepared, 'reopening the QR must not replace the prepared export');
+    assert.equal(app.lastExchange.exportId, prepared.exportId);
+    assert.equal(app.lastExchange.secret, prepared.secret);
+    assert.equal(app.getExchange().buildQrPayload(app.lastExchange.secret), qrPayload);
+});
+
+test('closing the QR view preserves the prepared export for import and share', async () => {
+    const sender = await createExchangeSender();
+    assert.equal(await sender.app.exportReviewDay(), true);
+    const prepared = sender.app.lastExchange;
+
+    sender.app.showExchangeQr();
+    sender.app.closeExchangeQr();
+
+    assert.equal(sender.app.lastExchange, prepared);
+    assert.equal(sender.app.renderedExchangeQr, sender.app.getExchange().buildQrPayload(prepared.secret));
+
+    const receiver = createExchangeReceiver();
+    assert.equal(await loadExchangeIntoReceiver(receiver, JSON.stringify(prepared.envelope), prepared.secret), true);
+    assert.equal(receiver.app.pendingExchange.payload.entries.length, 2);
+});
+
+test('Share sends the already-prepared file through Web Share and never creates a new export', async () => {
+    const sender = await createExchangeSender();
+    assert.equal(await sender.app.exportReviewDay(), true);
+    const prepared = sender.app.lastExchange;
+    const shares = [];
+    sender.context.navigator.canShare = options => Array.isArray(options?.files) && options.files.length === 1;
+    sender.context.navigator.share = async options => { shares.push(options); };
+
+    assert.equal(await sender.app.shareExchangeFile(), true);
+    assert.equal(shares.length, 1);
+    assert.equal(shares[0].files.length, 1);
+    assert.equal(shares[0].files[0].name, prepared.fileName);
+    assert.equal(await shares[0].files[0].text(), JSON.stringify(prepared.envelope));
+    assert.equal(sender.app.lastExchange, prepared);
+    assert.equal(sender.backupCapture.clicks, 0, 'a supported share must not download the file');
+});
+
+test('unsupported file sharing falls back to a download without creating a new export', async () => {
+    const sender = await createExchangeSender();
+    assert.equal(await sender.app.exportReviewDay(), true);
+    const prepared = sender.app.lastExchange;
+    sender.context.navigator.share = undefined;
+    sender.context.navigator.canShare = undefined;
+    const clicksBefore = sender.backupCapture.clicks;
+
+    assert.equal(await sender.app.shareExchangeFile(), true);
+    assert.equal(sender.backupCapture.clicks, clicksBefore + 1, 'unsupported sharing falls back to a download');
+    assert.equal(sender.backupCapture.filename, prepared.fileName);
+    assert.equal(sender.toasts.at(-1), sender.app.t('exchangeShareUnsupported'));
+    assert.equal(sender.app.lastExchange, prepared);
+});
+
+test('Share without a prepared export is handled safely', async () => {
+    const receiver = createExchangeReceiver();
+    const shares = [];
+    receiver.context.navigator.canShare = () => true;
+    receiver.context.navigator.share = async options => { shares.push(options); };
+
+    assert.equal(await receiver.app.shareExchangeFile(), false);
+    assert.equal(shares.length, 0);
+    assert.equal(receiver.toasts.at(-1), receiver.app.t('exchangeNothingToShare'));
+    assert.equal(receiver.backupCapture.clicks, 0);
+});
+
+test('the shortened transfer-code explanation is localized in EN, DE, and RU', () => {
+    const { app } = createTestApp();
+    const expected = {
+        en: 'The transfer code unlocks the file.',
+        de: 'Der Übertragungscode öffnet die Datei.',
+        ru: 'Код переноса открывает файл.'
+    };
+    for (const [language, text] of Object.entries(expected)) {
+        app.currentLanguage = language;
+        assert.equal(app.t('exchangeSecurityNote'), text, `${language} transfer-code explanation`);
+    }
 });
 
 test('a received exchange file decrypts into a preview and imports only after explicit confirmation', async () => {

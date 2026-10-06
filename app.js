@@ -347,8 +347,12 @@ const extendedTranslations = {
         resendSyncNotice: 'These entries have already been synced to Clockodo. Do you really want to send them again? This can create duplicate Clockodo entries.',
         resendSyncBtn: 'Send again',
         unknownResendNotice: 'The previous Clockodo result for this entry is uncertain. Clockodo may already contain it. Check Clockodo first — continuing can create a duplicate entry.',
-        exportDay: 'Export day',
-        importDay: 'Import day',
+        exportDay: 'Export',
+        importDay: 'Import',
+        exchangeActions: 'Day exchange',
+        shareExchangeDay: 'Share exchange file',
+        exchangeNothingToShare: 'Export the day first.',
+        exchangeShareUnsupported: 'File sharing is not supported here. The file was downloaded instead.',
         exportDayTitle: 'Export day',
         exportDayDesc: 'The encrypted .timerhub file was downloaded. Share it with the other worker and pass on the transfer code separately.',
         importDayTitle: 'Import day',
@@ -363,12 +367,11 @@ const extendedTranslations = {
         importBtn: 'Import',
         importAgainBtn: 'Import again',
         exchangeQrTitle: 'Transfer code QR',
-        exchangeQrNote: 'The QR contains only the transfer code. The encrypted entries stay in the .timerhub file.',
         exchangeScanTitle: 'Scan transfer QR',
         exchangeScanning: 'Point the camera at the transfer code QR.',
         exchangeScanUnsupported: 'QR scanning is not supported here. Enter the transfer code manually.',
         exchangeScanPermission: 'Camera access was denied. Enter the transfer code manually.',
-        exchangeSecurityNote: 'The transfer code unlocks the file. Send it through a different channel than the file when possible.',
+        exchangeSecurityNote: 'The transfer code unlocks the file.',
         exchangeNoEntries: 'There are no completed entries to export for this day.',
         exchangeExportFailed: 'The day could not be exported. Try again.',
         exchangeImportFailed: 'The day could not be imported. Try again.',
@@ -562,8 +565,12 @@ const extendedTranslations = {
         resendSyncNotice: 'Diese Einträge wurden bereits mit Clockodo synchronisiert. Möchtest du sie wirklich erneut senden? Dadurch können doppelte Clockodo-Einträge entstehen.',
         resendSyncBtn: 'Erneut senden',
         unknownResendNotice: 'Das vorherige Clockodo-Ergebnis für diesen Eintrag ist unklar. Clockodo enthält ihn möglicherweise bereits. Prüfe zuerst Clockodo – beim Fortfahren kann ein doppelter Eintrag entstehen.',
-        exportDay: 'Tag exportieren',
-        importDay: 'Tag importieren',
+        exportDay: 'Export',
+        importDay: 'Import',
+        exchangeActions: 'Tagesaustausch',
+        shareExchangeDay: 'Austauschdatei teilen',
+        exchangeNothingToShare: 'Exportiere zuerst den Tag.',
+        exchangeShareUnsupported: 'Teilen von Dateien wird hier nicht unterstützt. Die Datei wurde stattdessen heruntergeladen.',
         exportDayTitle: 'Tag exportieren',
         exportDayDesc: 'Die verschlüsselte .timerhub-Datei wurde heruntergeladen. Sende sie an die andere Arbeitskraft und gib den Übertragungscode getrennt weiter.',
         importDayTitle: 'Tag importieren',
@@ -578,12 +585,11 @@ const extendedTranslations = {
         importBtn: 'Importieren',
         importAgainBtn: 'Erneut importieren',
         exchangeQrTitle: 'QR für den Übertragungscode',
-        exchangeQrNote: 'Der QR enthält nur den Übertragungscode. Die verschlüsselten Einträge bleiben in der .timerhub-Datei.',
         exchangeScanTitle: 'Übertragungs-QR scannen',
         exchangeScanning: 'Richte die Kamera auf den QR-Code des Übertragungscodes.',
         exchangeScanUnsupported: 'QR-Scannen wird hier nicht unterstützt. Gib den Übertragungscode manuell ein.',
         exchangeScanPermission: 'Kamerazugriff wurde verweigert. Gib den Übertragungscode manuell ein.',
-        exchangeSecurityNote: 'Der Übertragungscode öffnet die Datei. Sende ihn möglichst über einen anderen Kanal als die Datei.',
+        exchangeSecurityNote: 'Der Übertragungscode öffnet die Datei.',
         exchangeNoEntries: 'Für diesen Tag gibt es keine abgeschlossenen Einträge zum Exportieren.',
         exchangeExportFailed: 'Der Tag konnte nicht exportiert werden. Versuche es erneut.',
         exchangeImportFailed: 'Der Tag konnte nicht importiert werden. Versuche es erneut.',
@@ -777,8 +783,12 @@ const extendedTranslations = {
         resendSyncNotice: 'Эти записи уже синхронизированы с Clockodo. Вы действительно хотите отправить их снова? Это может создать дубликаты записей Clockodo.',
         resendSyncBtn: 'Отправить повторно',
         unknownResendNotice: 'Предыдущий результат Clockodo для этой записи неизвестен. Clockodo может уже содержать её. Сначала проверьте Clockodo — продолжение может создать дубликат записи.',
-        exportDay: 'Экспорт дня',
-        importDay: 'Импорт дня',
+        exportDay: 'Экспорт',
+        importDay: 'Импорт',
+        exchangeActions: 'Обмен днём',
+        shareExchangeDay: 'Поделиться файлом обмена',
+        exchangeNothingToShare: 'Сначала экспортируйте день.',
+        exchangeShareUnsupported: 'Отправка файлов здесь не поддерживается. Файл скачан вместо этого.',
         exportDayTitle: 'Экспорт дня',
         exportDayDesc: 'Зашифрованный файл .timerhub скачан. Передайте его другому сотруднику, а код переноса — отдельно.',
         importDayTitle: 'Импорт дня',
@@ -793,12 +803,11 @@ const extendedTranslations = {
         importBtn: 'Импортировать',
         importAgainBtn: 'Импортировать снова',
         exchangeQrTitle: 'QR-код кода переноса',
-        exchangeQrNote: 'QR содержит только код переноса. Зашифрованные записи остаются в файле .timerhub.',
         exchangeScanTitle: 'Сканировать QR переноса',
         exchangeScanning: 'Наведите камеру на QR-код кода переноса.',
         exchangeScanUnsupported: 'Сканирование QR здесь не поддерживается. Введите код переноса вручную.',
         exchangeScanPermission: 'Доступ к камере запрещён. Введите код переноса вручную.',
-        exchangeSecurityNote: 'Код переноса открывает файл. По возможности передавайте его другим каналом, не вместе с файлом.',
+        exchangeSecurityNote: 'Код переноса открывает файл.',
         exchangeNoEntries: 'За этот день нет завершённых записей для экспорта.',
         exchangeExportFailed: 'Не удалось экспортировать день. Попробуйте ещё раз.',
         exchangeImportFailed: 'Не удалось импортировать день. Попробуйте ещё раз.',
@@ -1293,6 +1302,7 @@ class TimerHubApp {
         this.syncResendMode = false;
         this.syncUnknownEntryId = null;
         this.lastExchange = null;
+        this.renderedExchangeQr = null;
         this.pendingExchange = null;
         this.exchangeFile = null;
         this.exchangeScanOperation = null;
@@ -1888,6 +1898,7 @@ class TimerHubApp {
         // Secure day exchange
         sel('reviewExportDayBtn')?.addEventListener('click', () => this.exportReviewDay());
         sel('reviewImportDayBtn')?.addEventListener('click', () => this.showDayImportModal());
+        sel('reviewShareDayBtn')?.addEventListener('click', () => this.shareExchangeFile());
         sel('dayExportCloseBtn')?.addEventListener('click', () => this.closeDayExportModal());
         sel('dayExportDoneBtn')?.addEventListener('click', () => this.closeDayExportModal());
         sel('exchangeCopyCodeBtn')?.addEventListener('click', () => this.copyTransferCode());
@@ -6201,8 +6212,16 @@ class TimerHubApp {
             const payload = Exchange.buildDayPayload({ entries, date: this.reviewDate, exportId });
             const secret = Exchange.generateSecret();
             const envelope = await Exchange.encryptPayload(payload, secret);
-            this.lastExchange = { secret, exportId, payload, envelope };
-            this.downloadExchangeFile(envelope);
+            const fileName = `timerhub-exchange_${Date.now()}.timerhub`;
+            this.renderedExchangeQr = null;
+            this.lastExchange = {
+                secret,
+                exportId,
+                payload,
+                envelope,
+                fileName,
+                file: this.createExchangeFile(envelope, fileName)
+            };
             this.showDayExportModal();
             return true;
         } catch (error) {
@@ -6211,18 +6230,48 @@ class TimerHubApp {
         }
     }
 
-    downloadExchangeFile(envelope) {
-        const blob = new Blob([JSON.stringify(envelope)], { type: 'application/octet-stream' });
-        const url = URL.createObjectURL(blob);
+    createExchangeFile(envelope, fileName) {
+        const json = JSON.stringify(envelope);
+        if (typeof File === 'function') return new File([json], fileName, { type: 'application/octet-stream' });
+        const blob = new Blob([json], { type: 'application/octet-stream' });
+        blob.name = fileName;
+        return blob;
+    }
+
+    downloadExchangeFile(file) {
+        const url = URL.createObjectURL(file);
         const anchor = document.createElement('a');
         anchor.href = url;
-        anchor.download = `timerhub-exchange_${Date.now()}.timerhub`;
+        anchor.download = file?.name || `timerhub-exchange_${Date.now()}.timerhub`;
         anchor.rel = 'noopener';
         anchor.style.display = 'none';
         document.body.appendChild(anchor);
         anchor.click();
         document.body.removeChild(anchor);
         setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    }
+
+    async shareExchangeFile() {
+        const prepared = this.lastExchange;
+        if (!prepared?.file) {
+            this.showToast(this.t('exchangeNothingToShare'));
+            return false;
+        }
+        const file = prepared.file;
+        const canShareFiles = typeof navigator.share === 'function' &&
+            typeof navigator.canShare === 'function' &&
+            navigator.canShare({ files: [file] });
+        if (canShareFiles) {
+            try {
+                await navigator.share({ files: [file], title: this.t('exportDayTitle') });
+                return true;
+            } catch (error) {
+                if (error?.name === 'AbortError') return false;
+            }
+        }
+        this.downloadExchangeFile(file);
+        this.showToast(this.t('exchangeShareUnsupported'));
+        return true;
     }
 
     showDayExportModal() {
@@ -6255,9 +6304,11 @@ class TimerHubApp {
     showExchangeQr() {
         const secret = this.lastExchange?.secret;
         if (!secret) return false;
-        const secretNode = document.getElementById('exchangeQrSecret');
-        if (secretNode) secretNode.textContent = this.getExchange().formatTransferCode(secret);
-        this.renderExchangeQr(this.getExchange().buildQrPayload(secret));
+        const qrPayload = this.getExchange().buildQrPayload(secret);
+        if (this.renderedExchangeQr !== qrPayload) {
+            this.renderExchangeQr(qrPayload);
+            this.renderedExchangeQr = qrPayload;
+        }
         document.getElementById('exchangeQrModal')?.classList.add('active');
         return true;
     }

@@ -1318,6 +1318,31 @@ test('duplicated Day Review and Time Log screen headings are removed while navig
     assert.match(logScreen, /id="logDateFilter"/, 'log screen content is unchanged');
 });
 
+test('exchange actions render as one compact Import / Export / Share row', () => {
+    assert.match(htmlSource, /class="exchange-actions"[^>]*data-i18n-aria-label="exchangeActions"/);
+    assert.match(htmlSource, /id="reviewImportDayBtn"[\s\S]{0,200}data-i18n="importDay"/);
+    assert.match(htmlSource, /id="reviewExportDayBtn"[\s\S]{0,200}data-i18n="exportDay"/);
+    assert.match(htmlSource, /id="reviewShareDayBtn"[\s\S]{0,200}data-i18n-aria-label="shareExchangeDay"/);
+    assert.equal(htmlSource.includes('exchangeQrSecret'), false, 'the QR view must not repeat the transfer code');
+    assert.equal(htmlSource.includes('exchangeQrNote'), false, 'the repeated QR explanation is removed');
+});
+
+test('the transfer-code explanation is shortened and the QR note removed in every locale', () => {
+    const browser = makeBrowserHarness(makeBackend());
+    const dictionaries = vm.runInContext('translations', browser.context);
+    const expected = {
+        en: 'The transfer code unlocks the file.',
+        de: 'Der Übertragungscode öffnet die Datei.',
+        ru: 'Код переноса открывает файл.'
+    };
+    for (const language of ['en', 'de', 'ru']) {
+        assert.equal(dictionaries[language].exchangeSecurityNote, expected[language]);
+        assert.equal(Object.hasOwn(dictionaries[language], 'exchangeQrNote'), false);
+        assert.equal(dictionaries[language].exportDay, language === 'ru' ? 'Экспорт' : 'Export');
+        assert.equal(dictionaries[language].importDay, language === 'ru' ? 'Импорт' : 'Import');
+    }
+});
+
 test('activity name, color, and shape selections persist when saving', async () => {
     const browser = makeBrowserHarness(makeBackend());
     const saved = [];

@@ -1301,6 +1301,30 @@ input:-webkit-autofill:active {
     gap: 8px;
 }
 
+.exchange-actions {
+    display: flex;
+    gap: 8px;
+    min-width: 0;
+}
+
+.exchange-actions .exchange-action {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.exchange-actions .exchange-share {
+    flex: 0 0 auto;
+    width: var(--touch-target);
+    min-width: var(--touch-target);
+    padding: 0;
+}
+
+@media (max-width: 600px) {
+    .exchange-actions {
+        grid-column: 1 / -1;
+    }
+}
+
 .review-entry-header {
     display: flex;
     justify-content: space-between;
