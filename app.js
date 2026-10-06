@@ -6472,6 +6472,7 @@ class TimerHubApp {
         try {
             const Exchange = this.getExchange();
             const payload = Exchange.validatePayload(state.payload);
+            await this.recordExchangeImport(payload.exportId);
             let created = 0;
             for (const item of payload.entries) {
                 const activity = await this.resolveExchangeActivity(item);
@@ -6489,7 +6490,6 @@ class TimerHubApp {
                 });
                 created += 1;
             }
-            await this.recordExchangeImport(payload.exportId);
             this.closeDayImportModal();
             this.reviewDate = payload.date;
             this.renderReview();

@@ -186,7 +186,52 @@ Gates: `npm test`, `node --check` changed files, `git diff --check`, diff review
 - [x] Phase 6 — import into Day Review. Validation: exact timestamps, customer/service IDs and names preserved, `unsynced`/`manual`, no Clockodo calls, editable through existing editor.
 - [x] Phase 7 — repeat-import protection. Validation: second import warns + `Import again`, cancel writes nothing, confirmed repeat duplicates.
 - [x] Phase 8 — QR transfer. Validation: QR payload protocol+secret only; vendored qrcode-generator/jsQR round trip; scan fills the code input.
-- [ ] Phase 9 — local mobile test procedure
+- [x] Phase 9 — local mobile test procedure. Validation: `python3 -m http.server 8099` served `/`, `/index.html`, `/app.js`, `/exchange.js`, `/vendor/qrcode.min.js`, `/vendor/jsQR.min.js`, `/sw.js`, `/manifest.json` with HTTP 200 over localhost and the LAN address; server now stopped. Physical phone/camera step not executable in this Android/Termux session (noted below).
 - [x] Phase 10 — UI + localization. Validation: toolbar actions with icons+text, EN/DE/RU keys symmetrical (push-flow translation reference test), touch-friendly classes reused.
-- [ ] Phase 11 — security + regression audit
-- [ ] Phase 12 — final end-to-end validation
+- [x] Phase 11 — security + regression audit. Results below.
+- [x] Phase 12 — final end-to-end validation. Automated E2E below; physical mobile gate pending operator.
+
+## Phase 9 — exact local mobile procedure (operator)
+
+1. On a computer in the repo: run the project's local server (`./run-server.sh` → `python3 -m http.server 8000`).
+2. Find the LAN IP (`ip addr` / `ipconfig`).
+3. Plain HTTP over a LAN IP is NOT a secure context: `crypto.subtle` is undefined, so export/import intentionally fail with the localized "secure encryption unavailable" message. Use HTTPS for mobile testing:
+   - Preferred (project toolchain, PC): `npx wrangler dev --ip 0.0.0.0 --port 8443 --local-protocol https` (workerd does not support Android, so this runs on the PC, not Termux).
+   - Static alternative: generate a self-signed cert with `openssl req -x509 -newkey rsa:2048 -nodes -keyout key.pem -out cert.pem -days 2` and serve with an HTTPS-capable static server (`npx http-server -S -C cert.pem -K key.pem -a 0.0.0.0 -p 8443`).
+4. Phone (same Wi-Fi) opens `https://<PC-LAN-IP>:8443` and accepts the self-signed certificate warning.
+5. Export a day on device A, save the `.timerhub` file, copy the transfer code.
+6. Transfer the file out-of-band; on device B: Import day → choose file → paste code (or Scan QR) → Decrypt → preview → Import.
+7. Verify Day Review entries, timestamps and customer/service assignments; verify no Clockodo request happened; use Review & Sync explicitly.
+8. Repeat the import to see the "already imported" warning and Import again.
+
+This session could only execute steps 1–2 plus automated end-to-end; the physical camera/device step remains an operator action.
+
+## Phase 11 — security + regression audit results
+
+1. No plaintext work data uploaded — pass (export is local-only; no network call in any exchange method).
+2. No transfer secret uploaded — pass (never persisted, only clipboard/QR/in-memory).
+3. No Clockodo credentials exported — pass (payload field allow-list).
+4. No Worker credentials exported — pass.
+5. No auth tokens exported — pass (tests assert token/entry-id/sync-state absence).
+6. No sync state exported — pass (`syncStatus`, batches, payloads excluded and covered by tests).
+7. QR contains no work data — pass (strict `timerhub-exchange:1:<secret>`; jsQR round-trip test).
+8. `.timerhub` undecryptable without secret — pass (AES-256-GCM wrong-secret test).
+9. Tampering detected — pass (ciphertext + metadata AAD tests).
+10. Wrong secrets fail safely — pass (localized error, no partial import).
+11. Import does not trigger Clockodo — pass (spy assertions in two tests).
+12. Imported entries reach Clockodo only via Review & Sync — pass (E2E test).
+13. Existing Clockodo sync behavior intact — pass (full suite).
+14. UNKNOWN/FAILED/SYNCED handling intact — pass (full suite).
+15. Customer/Service assignment behavior intact — pass (full suite + import preservation test).
+16. Day Review behavior intact — pass (full suite).
+17. Localization intact — pass (translation reference test).
+18. No existing tests weakened — pass (existing tests only extended by harness capabilities; no assertions removed/changed for existing behavior).
+- Filenames contain no work data (tested). No exchange data in URLs/query params/logs/console/Worker requests. `exchangeImports` stores only `exportId` + timestamp.
+
+## Phase 12 — end-to-end validation results
+
+Automated E2E: realistic day → export (file has no plaintext; filename clean) → wrong secret fails → tampered/unsupported file fails → decrypt with correct secret → preview (date/count/totals/warnings) → explicit Import → Day Review timestamps/customer/service/activity/notes preserved and `unsynced` → zero Clockodo calls → explicit Review & Sync sends both entries → repeat import warns, cancel writes nothing, confirmed repeat creates duplicates as intended.
+
+Gates: `npm test` 199 pass; `node --check` on changed JS; `git diff --check` clean; no unrelated modifications.
+
+Physical mobile device test: NOT executed in this Android/Termux session (requires a second device/browser and a camera). This is the only incomplete gate.

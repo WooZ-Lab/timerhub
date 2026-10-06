@@ -4777,6 +4777,41 @@ test('a scanned transfer QR fills the code input and carries no work data', asyn
     assert.equal(receiver.app.pendingExchange.payload.entries.length, 2);
 });
 
+test('end-to-end: imported entries reach Clockodo only through the explicit confirm step', async () => {
+    const sender = await createExchangeSender();
+    await sender.app.exportReviewDay();
+    const receiver = createExchangeReceiver();
+    assert.equal(await loadExchangeIntoReceiver(receiver, JSON.stringify(sender.app.lastExchange.envelope), sender.app.lastExchange.secret), true);
+    assert.equal(await receiver.app.confirmExchangeImport(), true);
+    assert.equal(receiver.app.getDayEntries('2026-10-05').length, 2);
+
+    const sent = [];
+    receiver.app.clockodoConfigured = true;
+    receiver.app.clockodoCustomerId = '11';
+    receiver.app.clockodoServiceId = '21';
+    receiver.app.getPushClientId = () => 'client_1234567890abcdef';
+    receiver.app.getClockodoAccessToken = () => 'a'.repeat(48);
+    receiver.app.clockodoClient = {
+        buildEntryPayload(entry) {
+            return {
+                id: entry.id,
+                customers_id: Number(entry.customerId || receiver.app.clockodoCustomerId),
+                services_id: Number(entry.serviceId || receiver.app.clockodoServiceId)
+            };
+        },
+        async createEntry(clientId, token, payload) {
+            sent.push(payload);
+            return { created: true, entryId: 5000 + sent.length };
+        }
+    };
+    assert.equal(sent.length, 0, 'importing must never send to Clockodo');
+    receiver.app.showSyncConfirmationModal();
+    const batch = await receiver.app.confirmAndSyncClockodo();
+    assert.equal(batch.state, 'synced');
+    assert.equal(sent.length, 2);
+    assert.equal(receiver.app.getDayEntries('2026-10-05').every(entry => entry.syncStatus === 'synced'), true);
+});
+
 test('an imported entry stays editable in the existing entry editor', async () => {
     const sender = await createExchangeSender();
     await sender.app.exportReviewDay();
