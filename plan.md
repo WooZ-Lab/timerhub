@@ -178,8 +178,8 @@ Gates: `npm test`, `node --check` changed files, `git diff --check`, diff review
 ## Phase status
 
 - [x] Phase 0 — baseline verified, plan committed locally.
-- [ ] Phase 1 — exchange format + validation
-- [ ] Phase 2 — AES-256-GCM + transfer secret
+- [x] Phase 1 — exchange format + validation. Validation: `tests/exchange.test.js` payload allow-list, invalid intervals, unsupported versions, malformed payloads.
+- [x] Phase 2 — AES-256-GCM + transfer secret. Validation: round trip, wrong secret, tampered ciphertext/metadata, corrupted file, no plaintext, QR secret format. Full suite `npm test` 187 pass.
 - [ ] Phase 3 — day export
 - [ ] Phase 4 — import + decryption
 - [ ] Phase 5 — import preview
