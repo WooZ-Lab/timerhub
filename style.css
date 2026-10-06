@@ -1767,6 +1767,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     background:var(--bg-secondary);
     box-shadow:var(--shadow-card);
 }
+.group-container.group-drop-target {
+    border-style:solid;
+    border-color:var(--brand);
+    background:color-mix(in srgb, var(--brand) 14%, transparent);
+    box-shadow:0 0 0 3px color-mix(in srgb, var(--brand) 28%, transparent), var(--shadow-card);
+}
 .group-title {
     position:absolute; top:0; left:0; right:0; height:36px;
     display:flex; align-items:center; gap:4px; padding:0 6px 0 4px;

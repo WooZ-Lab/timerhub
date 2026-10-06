@@ -2874,29 +2874,50 @@ class TimerHubApp {
         return { left, top, right, bottom, width: right - left, height: bottom - top };
     }
 
+    groupCollapsedBounds(group) {
+        const left = group.x - CANVAS_GROUP_PADDING;
+        const top = group.y - CANVAS_GROUP_HEADER;
+        return {
+            left,
+            top,
+            right: left + CANVAS_GROUP_COLLAPSED_WIDTH,
+            bottom: top + CANVAS_GROUP_COLLAPSED_HEIGHT
+        };
+    }
+
+    resolveGroupCollision(bounds, obstacles) {
+        let left = bounds.left;
+        let top = bounds.top;
+        let shifted = true;
+        while (shifted) {
+            shifted = false;
+            for (const other of obstacles) {
+                const candidate = { left, top, right: left + bounds.width, bottom: top + bounds.height };
+                if (!this.rectanglesIntersect(candidate, other)) continue;
+                const shiftRight = other.right + CANVAS_GROUP_PADDING - candidate.left;
+                const shiftDown = other.bottom + CANVAS_GROUP_PADDING - candidate.top;
+                if (shiftRight <= shiftDown) left += shiftRight;
+                else top += shiftDown;
+                shifted = true;
+            }
+        }
+        return { left, top };
+    }
+
     computeGroupDisplayOffsets() {
         const offsets = new Map();
+        const obstacles = [];
+        for (const group of this.groups) {
+            if (!this.groupMemberBoxes(group, false).length) continue;
+            if (group.collapsed) obstacles.push(this.groupCollapsedBounds(group));
+        }
         const placed = [];
         for (const group of this.groups) {
             if (group.collapsed) continue;
             const boxes = this.groupMemberBoxes(group, false);
             if (!boxes.length) continue;
             const bounds = this.groupContainerBounds(boxes);
-            let left = bounds.left;
-            let top = bounds.top;
-            let shifted = true;
-            while (shifted) {
-                shifted = false;
-                for (const other of placed) {
-                    const candidate = { left, top, right: left + bounds.width, bottom: top + bounds.height };
-                    if (!this.rectanglesIntersect(candidate, other)) continue;
-                    const shiftRight = other.right + CANVAS_GROUP_PADDING - candidate.left;
-                    const shiftDown = other.bottom + CANVAS_GROUP_PADDING - candidate.top;
-                    if (shiftRight <= shiftDown) left += shiftRight;
-                    else top += shiftDown;
-                    shifted = true;
-                }
-            }
+            const { left, top } = this.resolveGroupCollision(bounds, [...obstacles, ...placed]);
             placed.push({ left, top, right: left + bounds.width, bottom: top + bounds.height });
             offsets.set(group.id, { x: left - bounds.left, y: top - bounds.top });
         }
@@ -2942,6 +2963,76 @@ class TimerHubApp {
         } else if (boxes.length) {
             this.applyGroupGeometry(container, boxes);
         }
+    }
+
+    activityClientCenter(button) {
+        if (!button || typeof button.getBoundingClientRect !== 'function') return null;
+        const box = button.getBoundingClientRect();
+        return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+    }
+
+    groupDropTargetAt(clientX, clientY) {
+        const stage = document.getElementById('activitiesGrid');
+        if (!stage) return null;
+        const matches = [];
+        for (const group of this.groups) {
+            if (!this.activities.some(activity => activity.groupId === group.id)) continue;
+            const container = stage.querySelector(
+                `.group-container[data-group-id="${CSS.escape(group.id)}"]`
+            );
+            if (!container || typeof container.getBoundingClientRect !== 'function') continue;
+            const box = container.getBoundingClientRect();
+            if (clientX < box.left || clientX > box.right || clientY < box.top || clientY > box.bottom) continue;
+            matches.push({ group, area: Math.max(0, box.width) * Math.max(0, box.height) });
+        }
+        if (!matches.length) return null;
+        matches.sort((a, b) => (a.area - b.area) || (this.groups.indexOf(a.group) - this.groups.indexOf(b.group)));
+        return matches[0].group;
+    }
+
+    setCanvasDropTarget(groupId) {
+        const stage = document.getElementById('activitiesGrid');
+        if (!stage) return;
+        for (const group of this.groups) {
+            const container = stage.querySelector(
+                `.group-container[data-group-id="${CSS.escape(group.id)}"]`
+            );
+            if (!container) continue;
+            container.classList.toggle('group-drop-target', group.id === groupId);
+        }
+    }
+
+    updateMoveDropTarget(gesture) {
+        const activity = this.activities.find(item => item.id === gesture.activityId);
+        const center = this.activityClientCenter(gesture.activityButton);
+        const target = center ? this.groupDropTargetAt(center.x, center.y) : null;
+        const currentGroupId = activity?.groupId || null;
+        const targetId = target && target.id !== currentGroupId ? target.id : null;
+        if (gesture.dropTargetGroupId === targetId) return;
+        gesture.dropTargetGroupId = targetId;
+        this.setCanvasDropTarget(targetId);
+    }
+
+    reassignActivityToGroup(activity, targetGroup, displayLayout) {
+        const targetOffset = targetGroup ? this.groupDisplayOffset(targetGroup.id) : { x: 0, y: 0 };
+        const originX = targetGroup ? targetGroup.x : 0;
+        const originY = targetGroup ? targetGroup.y : 0;
+        const stored = {
+            activityId: activity.id,
+            x: displayLayout.x - originX - targetOffset.x,
+            y: displayLayout.y - originY - targetOffset.y,
+            width: displayLayout.width,
+            height: displayLayout.height
+        };
+        if (targetGroup) activity.groupId = targetGroup.id;
+        else delete activity.groupId;
+        this.activityLayouts.set(activity.id, stored);
+        this.renderMain();
+        Promise.all([
+            Promise.resolve(this.storage.saveActivity(activity)),
+            Promise.resolve(this.storage.saveLayout(stored))
+        ]).catch(() => this.showToast(this.t('canvasLayoutSaveFailed')));
+        return stored;
     }
 
     async toggleGroupCollapsed(groupId) {
@@ -3513,6 +3604,7 @@ class TimerHubApp {
                     this.canvasGesture.activityButton?.classList.remove('dragging');
                     this.canvasGesture.groupTitle?.classList.remove('dragging');
                     if (this.canvasGesture.mode === 'select') this.hideCanvasSelectionRect();
+                    if (this.canvasGesture.mode === 'move') this.setCanvasDropTarget(null);
                     this.canvasGesture = null;
                 }
 
@@ -3548,6 +3640,7 @@ class TimerHubApp {
                 groupTitle: group ? groupTitle : null,
                 groupStartX: group?.x,
                 groupStartY: group?.y,
+                dropTargetGroupId: null,
                 startX: event.clientX,
                 startY: event.clientY,
                 lastX: event.clientX,
@@ -3663,6 +3756,8 @@ class TimerHubApp {
                     x: nextX,
                     y: nextY
                 });
+
+                this.updateMoveDropTarget(gesture);
             } else if (gesture.mode === 'resize') {
                 const worldDx = dx / this.canvasZoom;
                 const worldDy = dy / this.canvasZoom;
@@ -3772,6 +3867,17 @@ class TimerHubApp {
                         button.style.left = `${finalLayout.x}px`;
                         button.style.top = `${finalLayout.y}px`;
                         this.positionActivityResizeHandle(gesture.activityId, finalLayout);
+                        this.setCanvasDropTarget(null);
+                        gesture.dropTargetGroupId = null;
+                        const activity = this.activities.find(item => item.id === gesture.activityId);
+                        const center = this.activityClientCenter(button);
+                        const target = center ? this.groupDropTargetAt(center.x, center.y) : null;
+                        const targetId = target?.id || null;
+                        const currentId = activity ? (activity.groupId || null) : null;
+                        if (activity && targetId !== currentId) {
+                            this.reassignActivityToGroup(activity, target, finalLayout);
+                            return;
+                        }
                     }
 
                     this.saveActivityCanvasLayout(finalLayout);
