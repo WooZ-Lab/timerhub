@@ -1318,13 +1318,28 @@ test('duplicated Day Review and Time Log screen headings are removed while navig
     assert.match(logScreen, /id="logDateFilter"/, 'log screen content is unchanged');
 });
 
-test('exchange actions render as one compact Import / Export / Share row', () => {
+test('exchange actions render as exactly one compact Import and Share row', () => {
     assert.match(htmlSource, /class="exchange-actions"[^>]*data-i18n-aria-label="exchangeActions"/);
-    assert.match(htmlSource, /id="reviewImportDayBtn"[\s\S]{0,200}data-i18n="importDay"/);
-    assert.match(htmlSource, /id="reviewExportDayBtn"[\s\S]{0,200}data-i18n="exportDay"/);
-    assert.match(htmlSource, /id="reviewShareDayBtn"[\s\S]{0,200}data-i18n-aria-label="shareExchangeDay"/);
+    assert.equal((htmlSource.match(/reviewExportDayBtn/g) || []).length, 0, 'the standalone Export button is removed');
+    const rowStart = htmlSource.indexOf('class="exchange-actions"');
+    const row = htmlSource.slice(rowStart, htmlSource.indexOf('</div>', rowStart));
+    assert.equal((row.match(/<button /g) || []).length, 2, 'the exchange row contains exactly Import and Share');
+    assert.match(row, /id="reviewImportDayBtn"[\s\S]{0,220}data-i18n="importDay"/);
+    assert.match(row, /id="reviewImportDayBtn"[\s\S]{0,160}M12 3v12m-4-4 4 4 4-4/, 'Import uses the downward arrow icon');
+    assert.equal(/M12 15V3/.test(row), false, 'the confusing upward import arrow is gone');
+    assert.match(row, /id="reviewShareDayBtn"[\s\S]{0,400}data-i18n="share"/);
+    assert.match(row, /<circle cx="18" cy="5" r="3"\/>/, 'Share uses the node icon');
+    assert.match(row, /<circle cx="6" cy="12" r="3"\/>/);
+    assert.match(row, /<circle cx="18" cy="19" r="3"\/>/);
     assert.equal(htmlSource.includes('exchangeQrSecret'), false, 'the QR view must not repeat the transfer code');
     assert.equal(htmlSource.includes('exchangeQrNote'), false, 'the repeated QR explanation is removed');
+});
+
+test('the export menu offers the prepared share action', () => {
+    assert.match(htmlSource, /id="exchangeSharePreparedBtn"[\s\S]{0,400}data-i18n="share"/);
+    const exportModal = htmlSource.slice(htmlSource.indexOf('id="dayExportModal"'), htmlSource.indexOf('id="dayImportModal"'));
+    assert.match(exportModal, /id="exchangeShowQrBtn"/, 'the menu still provides Show QR');
+    assert.match(exportModal, /id="exchangeCodeDisplay"/, 'the menu still shows the transfer code');
 });
 
 test('the transfer-code explanation is shortened and the QR note removed in every locale', () => {
@@ -1338,8 +1353,10 @@ test('the transfer-code explanation is shortened and the QR note removed in ever
     for (const language of ['en', 'de', 'ru']) {
         assert.equal(dictionaries[language].exchangeSecurityNote, expected[language]);
         assert.equal(Object.hasOwn(dictionaries[language], 'exchangeQrNote'), false);
-        assert.equal(dictionaries[language].exportDay, language === 'ru' ? 'Экспорт' : 'Export');
+        assert.equal(Object.hasOwn(dictionaries[language], 'exportDay'), false);
+        assert.equal(Object.hasOwn(dictionaries[language], 'shareExchangeDay'), false);
         assert.equal(dictionaries[language].importDay, language === 'ru' ? 'Импорт' : 'Import');
+        assert.equal(typeof dictionaries[language].share, 'string');
     }
 });
 

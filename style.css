@@ -1297,7 +1297,7 @@ input:-webkit-autofill:active {
 }
 
 .exchange-import-actions {
-    flex-wrap: wrap;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
 }
 
@@ -1310,13 +1310,6 @@ input:-webkit-autofill:active {
 .exchange-actions .exchange-action {
     flex: 1 1 auto;
     min-width: 0;
-}
-
-.exchange-actions .exchange-share {
-    flex: 0 0 auto;
-    width: var(--touch-target);
-    min-width: var(--touch-target);
-    padding: 0;
 }
 
 @media (max-width: 600px) {
@@ -1800,7 +1793,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .modal-body { padding:20px; }
 .modal-close { width:var(--touch-target); height:var(--touch-target); color:var(--text-secondary); }
 .modal-footer { background:var(--bg-secondary); }
-.btn-primary, .btn-secondary, .btn-danger { min-height:var(--control-height); border-radius:var(--radius-sm); }
+.btn-primary, .btn-secondary, .btn-danger, .btn-primary-green { min-height:var(--control-height); border-radius:var(--radius-sm); }
 .btn-primary { background:var(--brand); color:#fff; }
 .btn-primary:active { background:var(--brand-strong); }
 .menu-item { min-height:var(--touch-target); display:flex; align-items:center; gap:11px; border-radius:var(--radius-sm); }
@@ -2062,7 +2055,29 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
 .review-entry-card {
     min-width: 0;
+    cursor: pointer;
+}
+
+.review-entry-card.review-entry-locked {
     cursor: default;
+}
+
+.review-edit-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    color: var(--text-tertiary);
+}
+
+.review-edit-icon svg {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
 .review-entry-header,

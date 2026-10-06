@@ -347,14 +347,12 @@ const extendedTranslations = {
         resendSyncNotice: 'These entries have already been synced to Clockodo. Do you really want to send them again? This can create duplicate Clockodo entries.',
         resendSyncBtn: 'Send again',
         unknownResendNotice: 'The previous Clockodo result for this entry is uncertain. Clockodo may already contain it. Check Clockodo first — continuing can create a duplicate entry.',
-        exportDay: 'Export',
         importDay: 'Import',
         exchangeActions: 'Day exchange',
-        shareExchangeDay: 'Share exchange file',
         exchangeNothingToShare: 'Export the day first.',
         exchangeShareUnsupported: 'File sharing is not supported here. The file was downloaded instead.',
         exportDayTitle: 'Export day',
-        exportDayDesc: 'The encrypted .timerhub file was downloaded. Share it with the other worker and pass on the transfer code separately.',
+        exportDayDesc: 'The encrypted exchange file is ready. Share it with the other worker and pass on the transfer code separately.',
         importDayTitle: 'Import day',
         importDayDesc: 'Choose a .timerhub file and enter the transfer code. The file is decrypted locally on this device.',
         exchangeClockodoNote: 'Imported entries are not sent to Clockodo automatically. Review them and confirm with Review & Sync.',
@@ -565,14 +563,12 @@ const extendedTranslations = {
         resendSyncNotice: 'Diese Einträge wurden bereits mit Clockodo synchronisiert. Möchtest du sie wirklich erneut senden? Dadurch können doppelte Clockodo-Einträge entstehen.',
         resendSyncBtn: 'Erneut senden',
         unknownResendNotice: 'Das vorherige Clockodo-Ergebnis für diesen Eintrag ist unklar. Clockodo enthält ihn möglicherweise bereits. Prüfe zuerst Clockodo – beim Fortfahren kann ein doppelter Eintrag entstehen.',
-        exportDay: 'Export',
         importDay: 'Import',
         exchangeActions: 'Tagesaustausch',
-        shareExchangeDay: 'Austauschdatei teilen',
         exchangeNothingToShare: 'Exportiere zuerst den Tag.',
         exchangeShareUnsupported: 'Teilen von Dateien wird hier nicht unterstützt. Die Datei wurde stattdessen heruntergeladen.',
         exportDayTitle: 'Tag exportieren',
-        exportDayDesc: 'Die verschlüsselte .timerhub-Datei wurde heruntergeladen. Sende sie an die andere Arbeitskraft und gib den Übertragungscode getrennt weiter.',
+        exportDayDesc: 'Die verschlüsselte Austauschdatei ist bereit. Teile sie mit der anderen Arbeitskraft und gib den Übertragungscode getrennt weiter.',
         importDayTitle: 'Tag importieren',
         importDayDesc: 'Wähle eine .timerhub-Datei und gib den Übertragungscode ein. Die Datei wird lokal auf diesem Gerät entschlüsselt.',
         exchangeClockodoNote: 'Importierte Einträge werden nicht automatisch an Clockodo gesendet. Prüfe sie und bestätige mit „Prüfen & Synchronisieren“.',
@@ -783,14 +779,12 @@ const extendedTranslations = {
         resendSyncNotice: 'Эти записи уже синхронизированы с Clockodo. Вы действительно хотите отправить их снова? Это может создать дубликаты записей Clockodo.',
         resendSyncBtn: 'Отправить повторно',
         unknownResendNotice: 'Предыдущий результат Clockodo для этой записи неизвестен. Clockodo может уже содержать её. Сначала проверьте Clockodo — продолжение может создать дубликат записи.',
-        exportDay: 'Экспорт',
         importDay: 'Импорт',
         exchangeActions: 'Обмен днём',
-        shareExchangeDay: 'Поделиться файлом обмена',
         exchangeNothingToShare: 'Сначала экспортируйте день.',
         exchangeShareUnsupported: 'Отправка файлов здесь не поддерживается. Файл скачан вместо этого.',
         exportDayTitle: 'Экспорт дня',
-        exportDayDesc: 'Зашифрованный файл .timerhub скачан. Передайте его другому сотруднику, а код переноса — отдельно.',
+        exportDayDesc: 'Зашифрованный файл обмена готов. Передайте его другому сотруднику, а код переноса — отдельно.',
         importDayTitle: 'Импорт дня',
         importDayDesc: 'Выберите файл .timerhub и введите код переноса. Файл расшифровывается локально на этом устройстве.',
         exchangeClockodoNote: 'Импортированные записи не отправляются в Clockodo автоматически. Проверьте их и подтвердите через «Проверить и синхронизировать».',
@@ -1896,11 +1890,11 @@ class TimerHubApp {
         sel('syncConfirmSubmitBtn')?.addEventListener('click', () => this.confirmAndSyncClockodo());
 
         // Secure day exchange
-        sel('reviewExportDayBtn')?.addEventListener('click', () => this.exportReviewDay());
         sel('reviewImportDayBtn')?.addEventListener('click', () => this.showDayImportModal());
-        sel('reviewShareDayBtn')?.addEventListener('click', () => this.shareExchangeFile());
+        sel('reviewShareDayBtn')?.addEventListener('click', () => this.openExchangeMenu());
         sel('dayExportCloseBtn')?.addEventListener('click', () => this.closeDayExportModal());
         sel('dayExportDoneBtn')?.addEventListener('click', () => this.closeDayExportModal());
+        sel('exchangeSharePreparedBtn')?.addEventListener('click', () => this.shareExchangeFile());
         sel('exchangeCopyCodeBtn')?.addEventListener('click', () => this.copyTransferCode());
         sel('exchangeShowQrBtn')?.addEventListener('click', () => this.showExchangeQr());
         sel('exchangeQrCloseBtn')?.addEventListener('click', () => this.closeExchangeQr());
@@ -2491,16 +2485,39 @@ class TimerHubApp {
             const retryDiagnostic = this.retryDiagnostic && !this.retryDiagnostic.pending && String(this.retryDiagnostic.entryId) === String(entry.id)
                 ? this.renderRetryDiagnostic(this.retryDiagnostic)
                 : '';
-            return `${gap}<article class="review-entry-card${issues.length ? ' suspicious-entry' : ''}${isConflict ? ' conflict-entry' : ''}" data-entry-id="${this.escapeHtml(entry.id)}">
+            const editIcon = `<span class="review-edit-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m4 16.5-.8 4.3 4.3-.8L19 8.5 15.5 5 4 16.5Z"/><path d="m13.5 7 3.5 3.5"/></svg></span>`;
+            const locked = entry.syncStatus === SYNC_STATUS.CONFIRMED || entry.syncStatus === SYNC_STATUS.SYNCING;
+            return `${gap}<article class="review-entry-card${issues.length ? ' suspicious-entry' : ''}${isConflict ? ' conflict-entry' : ''}${locked ? ' review-entry-locked' : ''}" data-entry-id="${this.escapeHtml(entry.id)}" role="button" tabindex="0" aria-label="${this.escapeHtml(`${this.t('edit')}: ${activityLabel}`)}"${locked ? ' aria-disabled="true"' : ''}>
                 <div class="review-entry-header">
                 <div class="review-entry-times"><strong>${this.escapeHtml(start)}</strong><span>–</span><strong>${this.escapeHtml(end)}</strong></div>
                 <span class="review-entry-duration">${this.escapeHtml(duration)}</span></div>
                 <div class="review-entry-title"><span class="review-activity-dot" style="background-color:${this.escapeHtml(activity?.color || '#27AE60')}"></span>${this.escapeHtml(activityLabel)}</div>
                 ${meta ? `<div class="review-entry-tags">${entry.project ? `<span class="review-tag">${this.escapeHtml(entry.project)}</span>` : ''}${entry.service ? `<span class="review-tag">${this.escapeHtml(entry.service)}</span>` : ''}</div>` : ''}${notes}${issueText ? `<small>${this.escapeHtml(issueText)}</small>` : ''}${conflictNote}${errorNotice}${unknownNotice}${localOnlyNotice}
-                <div class="review-entry-footer"><span class="sync-badge ${this.escapeHtml(entry.syncStatus)}">${this.escapeHtml(status)}</span><div class="review-entry-actions"><button class="review-action-btn review-edit-entry" type="button" data-entry-id="${this.escapeHtml(entry.id)}" aria-label="${this.escapeHtml(`${this.t('edit')}: ${activityLabel}`)}" ${entry.syncStatus === SYNC_STATUS.CONFIRMED || entry.syncStatus === SYNC_STATUS.SYNCING ? `disabled title="${this.escapeHtml(this.t('confirmedEntryLocked'))}"` : ''}><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m4 16.5-.8 4.3 4.3-.8L19 8.5 15.5 5 4 16.5Z"/><path d="m13.5 7 3.5 3.5"/></svg>${this.t('edit')}</button>${retryButton}${resendUnknownButton}</div></div>${retryDiagnostic}
+                <div class="review-entry-footer"><span class="sync-badge ${this.escapeHtml(entry.syncStatus)}">${this.escapeHtml(status)}</span><div class="review-entry-actions">${retryButton}${resendUnknownButton}${editIcon}</div></div>${retryDiagnostic}
             </article>`;
         }).join('');
-        list.querySelectorAll('.review-edit-entry').forEach(button => button.addEventListener('click', () => this.showEntryEditModal(button.dataset.entryId)));
+        list.querySelectorAll('.review-entry-card').forEach(card => {
+            const entryId = card.dataset.entryId;
+            const entry = this.timeEntries.find(item => String(item.id) === String(entryId));
+            const locked = Boolean(entry) && [SYNC_STATUS.CONFIRMED, SYNC_STATUS.SYNCING].includes(entry.syncStatus);
+            const openEditor = () => {
+                if (locked) {
+                    this.showToast(this.t('confirmedEntryLocked'));
+                    return;
+                }
+                this.showEntryEditModal(entryId);
+            };
+            card.addEventListener('click', event => {
+                if (event.target.closest?.('.review-action-btn')) return;
+                openEditor();
+            });
+            card.addEventListener('keydown', event => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                if (event.target.closest?.('.review-action-btn')) return;
+                event.preventDefault();
+                openEditor();
+            });
+        });
         list.querySelectorAll('.review-retry-entry').forEach(button => button.addEventListener('click', () => this.retryFailedEntry(button.dataset.batchId, button.dataset.entryId)));
         list.querySelectorAll('.review-resend-unknown').forEach(button => button.addEventListener('click', () => this.showUnknownResendConfirmation(button.dataset.entryId)));
     }
@@ -6200,12 +6217,12 @@ class TimerHubApp {
         );
     }
 
-    async exportReviewDay() {
+    async prepareExchangeExport() {
         try {
             const entries = this.getDayExchangeEntries(this.reviewDate);
             if (!entries.length) {
                 this.showToast(this.t('exchangeNoEntries'));
-                return false;
+                return null;
             }
             const Exchange = this.getExchange();
             const exportId = this.generateId();
@@ -6227,12 +6244,28 @@ class TimerHubApp {
                 shareFileName: `${fileName}.txt`,
                 shareFile: this.createExchangeFile(envelope, `${fileName}.txt`, 'text/plain')
             };
-            this.showDayExportModal();
-            return true;
+            return this.lastExchange;
         } catch (error) {
             this.showToast(this.t('exchangeExportFailed'));
-            return false;
+            return null;
         }
+    }
+
+    async exportReviewDay() {
+        const prepared = await this.prepareExchangeExport();
+        if (!prepared) return false;
+        this.showDayExportModal();
+        return true;
+    }
+
+    async openExchangeMenu() {
+        let prepared = this.lastExchange;
+        if (!prepared?.file || prepared.payload?.date !== this.reviewDate) {
+            prepared = await this.prepareExchangeExport();
+            if (!prepared) return false;
+        }
+        this.showDayExportModal();
+        return true;
     }
 
     createExchangeFile(envelope, fileName, type = 'application/octet-stream') {
@@ -6402,7 +6435,10 @@ class TimerHubApp {
         this.pendingExchange = null;
         const code = document.getElementById('exchangeCodeInput')?.value || '';
         const decryptButton = document.getElementById('exchangeDecryptBtn');
-        if (decryptButton) decryptButton.disabled = !this.exchangeFile || code.trim().length === 0;
+        if (decryptButton) {
+            decryptButton.disabled = !this.exchangeFile || code.trim().length === 0;
+            decryptButton.style.display = '';
+        }
         const preview = document.getElementById('exchangePreview');
         if (preview) preview.style.display = 'none';
         const importButton = document.getElementById('exchangeImportBtn');
@@ -6516,6 +6552,11 @@ class TimerHubApp {
         }
         const preview = document.getElementById('exchangePreview');
         if (preview) preview.style.display = '';
+        const decryptButton = document.getElementById('exchangeDecryptBtn');
+        if (decryptButton) {
+            decryptButton.disabled = true;
+            decryptButton.style.display = 'none';
+        }
         const importButton = document.getElementById('exchangeImportBtn');
         if (importButton) {
             importButton.style.display = '';

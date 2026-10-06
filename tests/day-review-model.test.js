@@ -129,7 +129,7 @@ function createTestApp(initialData = {}) {
         'clockodoBillableSelect', 'clockodoTestBtn', 'clockodoRemoveBtn', 'clockodoStatusValue', 'clockodoToggleKeyBtn',
         'automaticBackupStatus', 'automaticSnapshotSelect', 'restoreSnapshotBtn', 'backupRestoreModal',
         'backupRestoreMergeBtn', 'backupRestoreReplaceBtn', 'backupRestoreCancelBtn', 'backupRestoreCloseBtn',
-        'reviewExportDayBtn', 'reviewImportDayBtn', 'dayExportModal', 'dayExportModalTitle', 'exchangeCodeDisplay',
+        'reviewExportDayBtn', 'reviewImportDayBtn', 'reviewShareDayBtn', 'exchangeSharePreparedBtn', 'dayExportModal', 'dayExportModalTitle', 'exchangeCodeDisplay',
         'exchangeCopyCodeBtn', 'exchangeShowQrBtn', 'dayExportCloseBtn', 'dayExportDoneBtn',
         'dayImportModal', 'dayImportModalTitle', 'exchangeFileInput', 'exchangeChooseFileBtn', 'exchangeFileName',
         'exchangeCodeInput', 'exchangeScanQrBtn', 'exchangeImportError', 'exchangePreview', 'exchangePreviewSummary',
@@ -4806,6 +4806,112 @@ test('Share without a prepared export is handled safely', async () => {
     assert.equal(shares.length, 0);
     assert.equal(receiver.toasts.at(-1), receiver.app.t('exchangeNothingToShare'));
     assert.equal(receiver.backupCapture.clicks, 0);
+});
+
+test('tapping Share prepares the export automatically when none exists', async () => {
+    const sender = await createExchangeSender();
+    assert.equal(sender.app.lastExchange, null);
+    assert.equal(await sender.app.openExchangeMenu(), true);
+    assert.ok(sender.app.lastExchange?.file, 'Share must prepare the export before opening the menu');
+    assert.equal(sender.app.lastExchange.payload.date, '2026-10-05');
+    assert.equal(sender.app.lastExchange.shareFile.type, 'text/plain');
+    assert.equal(
+        sender.document.getElementById('exchangeCodeDisplay').textContent,
+        sender.app.getExchange().formatTransferCode(sender.app.lastExchange.secret)
+    );
+});
+
+test('repeated Share actions reuse the same prepared export, transfer code and exportId', async () => {
+    const sender = await createExchangeSender();
+    assert.equal(await sender.app.openExchangeMenu(), true);
+    const prepared = sender.app.lastExchange;
+    const qrPayload = sender.app.getExchange().buildQrPayload(prepared.secret);
+
+    assert.equal(await sender.app.openExchangeMenu(), true);
+    assert.equal(await sender.app.openExchangeMenu(), true);
+
+    assert.equal(sender.app.lastExchange, prepared, 'Share must not create a new export for the same day');
+    assert.equal(sender.app.lastExchange.exportId, prepared.exportId);
+    assert.equal(sender.app.lastExchange.secret, prepared.secret);
+    assert.equal(sender.app.getExchange().buildQrPayload(sender.app.lastExchange.secret), qrPayload);
+});
+
+test('Share prepares a separate export only when the reviewed day changes', async () => {
+    const sender = await createExchangeSender();
+    await sender.app.openExchangeMenu();
+    const first = sender.app.lastExchange;
+
+    await sender.app.openExchangeMenu();
+    assert.equal(sender.app.lastExchange, first, 'the same day keeps the prepared export');
+
+    await sender.app.addEntry({
+        id: 'exchange-c', activityId: 'act-1', activityNameSnapshot: 'Anfahrt',
+        startTimestamp: new Date(2026, 9, 6, 8, 0).getTime(),
+        endTimestamp: new Date(2026, 9, 6, 9, 0).getTime()
+    });
+    sender.app.reviewDate = '2026-10-06';
+    assert.equal(await sender.app.openExchangeMenu(), true);
+    assert.notEqual(sender.app.lastExchange, first);
+    assert.equal(sender.app.lastExchange.payload.date, '2026-10-06');
+});
+
+test('Share on a day without completed entries reports and leaves the prepared export untouched', async () => {
+    const sender = await createExchangeSender();
+    sender.app.reviewDate = '2026-10-07';
+    assert.equal(await sender.app.openExchangeMenu(), false);
+    assert.equal(sender.app.lastExchange, null);
+    assert.equal(sender.toasts.at(-1), sender.app.t('exchangeNoEntries'));
+});
+
+test('after decryption the dialog hides Decrypt and promotes Import', async () => {
+    const sender = await createExchangeSender();
+    await sender.app.exportReviewDay();
+    const receiver = createExchangeReceiver();
+    assert.equal(await loadExchangeIntoReceiver(receiver, JSON.stringify(sender.app.lastExchange.envelope), sender.app.lastExchange.secret), true);
+
+    const decrypt = receiver.document.getElementById('exchangeDecryptBtn');
+    const importButton = receiver.document.getElementById('exchangeImportBtn');
+    assert.equal(decrypt.style.display, 'none', 'Decrypt is no longer offered after a successful decryption');
+    assert.equal(decrypt.disabled, true);
+    assert.equal(importButton.style.display, '', 'Import becomes the next action');
+    assert.equal(importButton.textContent, receiver.app.t('importBtn'));
+    assert.equal(receiver.document.getElementById('exchangePreview').style.display, '');
+});
+
+test('changing the file or transfer code restores the Decrypt action', async () => {
+    const sender = await createExchangeSender();
+    await sender.app.exportReviewDay();
+    const receiver = createExchangeReceiver();
+    await loadExchangeIntoReceiver(receiver, JSON.stringify(sender.app.lastExchange.envelope), sender.app.lastExchange.secret);
+    assert.equal(receiver.document.getElementById('exchangeDecryptBtn').style.display, 'none');
+
+    receiver.document.getElementById('exchangeCodeInput').value = '';
+    receiver.app.refreshExchangeDecryptState();
+    assert.equal(receiver.document.getElementById('exchangeDecryptBtn').style.display, '');
+    assert.equal(receiver.document.getElementById('exchangeImportBtn').style.display, 'none');
+    assert.equal(receiver.app.pendingExchange, null);
+});
+
+test('Day Review cards are fully tappable and only carry a small pencil icon', async () => {
+    const sender = await createExchangeSender();
+    sender.app.renderReview();
+    const html = sender.document.getElementById('reviewEntriesList').innerHTML;
+    assert.equal(html.includes('review-edit-entry'), false, 'the large standalone edit button is gone');
+    assert.match(html, /class="review-entry-card[^"]*"[^>]*role="button"/);
+    assert.match(html, /class="review-entry-card[^"]*"[^>]*tabindex="0"/);
+    assert.match(html, /class="review-entry-card[^"]*"[^>]*aria-label="Edit: /);
+    assert.equal((html.match(/<span class="review-edit-icon" aria-hidden="true">/g) || []).length, 2, 'one small pencil icon per card');
+    assert.equal(html.includes('>Edit</button>'), false, 'no standalone edit button text remains');
+});
+
+test('locked Day Review cards stay disabled but keep the small pencil icon', async () => {
+    const sender = await createExchangeSender();
+    sender.app.timeEntries[0].syncStatus = 'confirmed';
+    sender.app.renderReview();
+    const html = sender.document.getElementById('reviewEntriesList').innerHTML;
+    assert.match(html, /class="review-entry-card[^"]*review-entry-locked[^"]*"[^>]*aria-disabled="true"/);
+    assert.equal(html.includes('review-edit-entry'), false);
+    assert.match(html, /class="review-edit-icon"/);
 });
 
 test('the shortened transfer-code explanation is localized in EN, DE, and RU', () => {
