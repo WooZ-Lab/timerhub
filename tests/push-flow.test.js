@@ -9,6 +9,7 @@ import webpush from 'web-push';
 import worker, { TimerHubDurableObject } from '../worker/index.js';
 
 const source = await readFile(new URL('../app.js', import.meta.url), 'utf8');
+const clockodoClientSource = await readFile(new URL('../clockodo-client.js', import.meta.url), 'utf8');
 const htmlSource = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 const styleSource = await readFile(new URL('../style.css', import.meta.url), 'utf8');
 const serviceWorkerSource = await readFile(new URL('../sw.js', import.meta.url), 'utf8');
@@ -165,6 +166,7 @@ function makeBrowserHarness(backend, initialSubscription = null) {
         clearTimeout,
         console
     });
+    vm.runInContext(clockodoClientSource, context, { filename: 'clockodo-client.js' });
     vm.runInContext(source, context, { filename: 'app.js' });
     const app = vm.runInContext('Object.create(TimerHubApp.prototype)', context);
     Object.assign(app, {

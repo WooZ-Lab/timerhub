@@ -1516,8 +1516,10 @@ class TimerHubApp {
         if (client && typeof client.roundToNearestFiveMinutes === 'function') {
             return client.roundToNearestFiveMinutes(value);
         }
-        const fiveMinutes = 5 * 60 * 1000;
-        return Math.round(value / fiveMinutes) * fiveMinutes;
+        if (typeof ClockodoClient !== 'undefined' && typeof ClockodoClient.roundToNearestFiveMinutes === 'function') {
+            return ClockodoClient.roundToNearestFiveMinutes(value);
+        }
+        return value;
     }
 
     entryInterval(entry) {

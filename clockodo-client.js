@@ -172,7 +172,7 @@
             const value = Number(timestamp);
             if (!Number.isFinite(value)) return value;
             const fiveMinutes = 5 * 60 * 1000;
-            return Math.round(value / fiveMinutes) * fiveMinutes;
+            return Math.ceil(value / fiveMinutes - 0.5) * fiveMinutes;
         }
 
         static isNormalizedEntryPayload(payload) {

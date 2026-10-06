@@ -212,6 +212,7 @@ function createTestApp(initialData = {}) {
         AbortController
     });
 
+    vm.runInContext(clockodoClientSource, context, { filename: 'clockodo-client.js' });
     vm.runInContext(source, context, { filename: 'app.js' });
     const app = vm.runInContext('new TimerHubApp()', context);
     app.storage = mockStorage;
@@ -698,7 +699,7 @@ test('Day Review and the Clockodo payload share the same nearest-five-minute rou
     assert.equal(app.clockodoSendTimestamp(start), clientStart, 'the Day Review wrapper uses the shared client rounding');
     assert.equal(app.clockodoSendTimestamp(end), clientEnd);
     assert.equal(app.formatTime(clientStart), '12:35');
-    assert.equal(app.formatTime(clientEnd), '12:45');
+    assert.equal(app.formatTime(clientEnd), '12:40');
 
     app.reviewDate = '2026-10-05';
     app.activities = [{ id: 'round-act', name: 'Paint', position: 0 }];
@@ -709,7 +710,7 @@ test('Day Review and the Clockodo payload share the same nearest-five-minute rou
     app.renderReview();
     const html = document.getElementById('reviewEntriesList').innerHTML;
     assert.match(html, /12:35/, 'Day Review displays the rounded start');
-    assert.match(html, /12:45/, 'Day Review displays the rounded end');
+    assert.match(html, /12:40/, 'Day Review displays the rounded end');
     assert.equal(app.timeEntries[0].startTimestamp, start, 'the raw start timestamp is untouched');
     assert.equal(app.timeEntries[0].endTimestamp, end, 'the raw end timestamp is untouched');
 
@@ -3994,6 +3995,8 @@ test('conflict detection uses five-minute rounded boundaries instead of exact ti
     assert.equal(app.roundToFiveMinutes(t(12, 38, 0)), t(12, 40, 0), '12:38 rounds to 12:40');
     assert.equal(app.roundToFiveMinutes(t(12, 40, 0)), t(12, 40, 0), 'exact five-minute boundaries stay unchanged');
     assert.equal(app.roundToFiveMinutes(t(12, 37, 29)), t(12, 35, 0), 'below the midpoint rounds down');
+    assert.equal(app.roundToFiveMinutes(t(12, 37, 30)), t(12, 35, 0), 'the exact midpoint rounds down');
+    assert.equal(app.roundToFiveMinutes(t(12, 37, 31)), t(12, 40, 0), 'above the midpoint rounds up');
     assert.deepEqual([...app.getOverlappingEntryIds()], [], 'rounding turns the exact overlap into touching boundaries');
 
     app.showEntryEditModal('entry-b');

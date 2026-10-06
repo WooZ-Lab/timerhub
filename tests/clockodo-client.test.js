@@ -60,14 +60,14 @@ test('Clockodo client rounds entry timestamps to the nearest five minutes', () =
     const cases = [
         ['2026-10-05T12:35:00.000Z', '2026-10-05T12:35:00.000Z', 'exact boundary stays put'],
         ['2026-10-05T12:37:29.000Z', '2026-10-05T12:35:00.000Z', 'one second below the midpoint rounds down'],
-        ['2026-10-05T12:37:30.000Z', '2026-10-05T12:40:00.000Z', 'exactly 30 seconds rounds up'],
+        ['2026-10-05T12:37:30.000Z', '2026-10-05T12:35:00.000Z', 'exactly 30 seconds rounds down'],
         ['2026-10-05T12:37:31.000Z', '2026-10-05T12:40:00.000Z', 'one second above the midpoint rounds up'],
         ['2026-10-05T12:39:59.000Z', '2026-10-05T12:40:00.000Z', 'rounds up from just below the boundary'],
         ['2026-10-05T12:40:00.000Z', '2026-10-05T12:40:00.000Z', 'landing on a boundary stays put'],
         ['2026-10-05T12:42:29.000Z', '2026-10-05T12:40:00.000Z', 'rounds down from just below the boundary'],
-        ['2026-10-05T12:42:30.000Z', '2026-10-05T12:45:00.000Z', 'rounds up past the boundary midpoint'],
+        ['2026-10-05T12:42:30.000Z', '2026-10-05T12:40:00.000Z', 'rounds down at the exact boundary midpoint'],
         ['2026-10-05T12:58:30.000Z', '2026-10-05T13:00:00.000Z', 'rounds across an hour boundary'],
-        ['2026-10-05T23:57:30.000Z', '2026-10-06T00:00:00.000Z', 'rounds across midnight']
+        ['2026-10-05T23:57:30.000Z', '2026-10-05T23:55:00.000Z', 'rounds down at the midnight midpoint']
     ];
     for (const [input, expected, message] of cases) {
         assert.equal(iso(Client.roundToNearestFiveMinutes(Date.parse(input))), expected, message);
