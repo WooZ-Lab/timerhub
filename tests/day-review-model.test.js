@@ -114,13 +114,14 @@ function createTestApp(initialData = {}) {
     const elements = new Map();
     for (const id of [
         'reviewDateInput', 'reviewSummaryBar', 'reviewEntriesList', 'reviewSuspiciousBanner',
-        'activitiesGrid', 'timerRunningStatus',
+        'activitiesGrid', 'timerRunningStatus', 'logActivityFilter', 'logDateFilter',
         'entryEditDate', 'entryEditEndDate', 'entryEditStart', 'entryEditEnd', 'entryEditActivity',
         'entryEditProject', 'entryEditService', 'entryEditNotes', 'entryEditModalTitle',
         'entryEditDeleteBtn', 'entryEditSaveBtn', 'entryEditLockedNotice', 'entryConflictWarning', 'entryEditModal',
         'entryEditCustomerSelect', 'entryEditServiceSelect', 'entryEditClockodoHint', 'entryEditClockodoRetryBtn',
         'entryEditCustomerInput', 'entryEditCustomerList', 'entryEditServiceInput', 'entryEditServiceList',
-        'activityModal', 'modalTitle', 'activityName', 'modalSaveBtn', 'modalCancelBtn', 'modalCloseBtn',
+        'activityModal', 'modalTitle', 'activityName', 'activityNotes', 'modalSaveBtn', 'modalCancelBtn', 'modalCloseBtn',
+        'activityMenuModal', 'activityMenuTitle',
         'activityCustomerSelect', 'activityServiceSelect', 'activityClockodoHint', 'activityClockodoRetryBtn',
         'activityCustomerInput', 'activityCustomerList', 'activityServiceInput', 'activityServiceList',
         'syncConfirmEntriesList', 'syncConfirmDesc', 'syncConfirmSummary',
@@ -5248,4 +5249,97 @@ test('editing an activity loads a long name without truncation', () => {
     app.activities = [{ id: 'long-name', name: longName, color: '#ffffff', shape: 'circle', size: 'medium', archived: false }];
     app.showActivityModal('long-name');
     assert.equal(document.getElementById('activityName').value, longName);
+});
+
+test('activity notes are saved on the canonical activity field and survive a reload', async () => {
+    const { app, document, storageData } = createTestApp();
+    app.activities = [{ id: 'note-act', name: 'Weiß gemalert', color: '#ffffff', shape: 'circle', size: 'medium', position: 0, archived: false }];
+
+    app.showActivityModal('note-act');
+    assert.equal(document.getElementById('activityNotes').value, '');
+    document.getElementById('activityNotes').value = 'В зале';
+    await app.saveActivity();
+
+    assert.equal(storageData.activities.find(activity => activity.id === 'note-act').notes, 'В зале');
+    assert.equal(app.activities.find(activity => activity.id === 'note-act').notes, 'В зале');
+
+    app.showActivityModal('note-act');
+    assert.equal(document.getElementById('activityNotes').value, 'В зале', 'the existing Activity editor shows the same note');
+
+    const reloaded = createTestApp({ activities: storageData.activities });
+    await reloaded.app.loadActivities();
+    assert.equal(reloaded.app.activities.find(activity => activity.id === 'note-act').notes, 'В зале');
+    reloaded.app.showActivityModal('note-act');
+    assert.equal(reloaded.document.getElementById('activityNotes').value, 'В зале');
+});
+
+test('the long-press activity menu edit flow opens the same activity note', async () => {
+    const { app, document } = createTestApp();
+    app.activities = [{ id: 'menu-note', name: 'Weiß gemalert', notes: 'В зале', color: '#ffffff', shape: 'circle', size: 'medium', position: 0 }];
+
+    app.showActivityMenu('menu-note');
+    app.editActivity();
+    assert.equal(document.getElementById('activityName').value, 'Weiß gemalert');
+    assert.equal(document.getElementById('activityNotes').value, 'В зале');
+});
+
+test('editing other activity fields preserves the existing activity note', async () => {
+    const { app, document, storageData } = createTestApp();
+    app.activities = [{ id: 'keep-note', name: 'Paint', notes: 'Keep me', color: '#ffffff', shape: 'circle', size: 'medium', position: 0 }];
+
+    app.showActivityModal('keep-note');
+    assert.equal(document.getElementById('activityNotes').value, 'Keep me');
+    document.getElementById('activityName').value = 'Paint v2';
+    await app.saveActivity();
+
+    assert.equal(app.activities.find(activity => activity.id === 'keep-note').name, 'Paint v2');
+    assert.equal(storageData.activities.find(activity => activity.id === 'keep-note').notes, 'Keep me');
+});
+
+test('a newly created activity stores its note on creation', async () => {
+    const { app, document, storageData } = createTestApp();
+    app.showActivityModal();
+    document.getElementById('activityName').value = 'Weiß gemalert';
+    document.getElementById('activityNotes').value = 'В зале';
+    await app.saveActivity();
+
+    const stored = storageData.activities.find(activity => activity.name === 'Weiß gemalert');
+    assert.equal(stored.notes, 'В зале');
+    assert.equal(app.activities.find(activity => activity.name === 'Weiß gemalert').notes, 'В зале');
+});
+
+test('activity buttons show a subtle note indicator only when a note exists', () => {
+    const { app, document } = createTestApp();
+    app.activities = [
+        { id: 'noted', name: 'Weiß gemalert', notes: 'В зале', color: '#ffffff', shape: 'circle', size: 'medium', position: 0 },
+        { id: 'plain', name: 'Plain', color: '#ffffff', shape: 'circle', size: 'medium', position: 1 }
+    ];
+    app.renderMain();
+    const grid = document.getElementById('activitiesGrid');
+    const noted = grid.children.find(child => child.dataset?.activityId === 'noted');
+    const plain = grid.children.find(child => child.dataset?.activityId === 'plain');
+    assert.ok(noted, 'the noted activity renders');
+    assert.ok(plain, 'the plain activity renders');
+    assert.equal(noted.children.filter(child => child.className === 'btn-note-mark').length, 1);
+    assert.equal(plain.children.filter(child => child.className === 'btn-note-mark').length, 0);
+});
+
+test('idle activity buttons no longer render the activityStartHint instructional text', () => {
+    const { app, document, context } = createTestApp();
+    app.currentLanguage = 'ru';
+    app.activities = [{ id: 'hintless', name: 'Weiß gemalert', color: '#ffffff', shape: 'circle', size: 'medium', position: 0 }];
+    app.renderMain();
+    const grid = document.getElementById('activitiesGrid');
+    const button = grid.children.find(child => child.dataset?.activityId === 'hintless');
+    assert.ok(button, 'the idle activity renders');
+    assert.equal(button.children.some(child => child.className === 'btn-hint'), false, 'idle buttons no longer show a hint line');
+    assert.equal(
+        button.children.some(child => child.textContent === 'Нажмите, чтобы начать или переключить'),
+        false,
+        'the exact instructional text is not rendered'
+    );
+    const dictionaries = vm.runInContext('translations', context);
+    assert.equal(Object.hasOwn(dictionaries.en, 'activityStartHint'), false);
+    assert.equal(Object.hasOwn(dictionaries.de, 'activityStartHint'), false);
+    assert.equal(Object.hasOwn(dictionaries.ru, 'activityStartHint'), false);
 });

@@ -12,7 +12,7 @@ const translations = {
         timerRunning: 'Timer running',
         timerStatusRunning: 'Timer running: {activity} · {duration}',
         timerSaving: 'Saving timer…', timerSaveFailed: 'Could not save the timer. Check device storage and try again.',
-        activityStartHint: 'Tap to start or switch', activityStopHint: 'Tap to stop',
+        activityStopHint: 'Tap to stop',
         activityStartAria: 'Start or switch to {activity}', activityStopAria: 'Stop timing {activity}',
         activityCanvas: 'Activity canvas',
         activityResize: 'Resize {activity}', canvasLayoutSaveFailed: 'Could not save this activity position. Try again.',
@@ -69,7 +69,7 @@ const translations = {
         timerRunning: 'Timer läuft',
         timerStatusRunning: 'Timer läuft: {activity} · {duration}',
         timerSaving: 'Timer wird gespeichert…', timerSaveFailed: 'Timer konnte nicht gespeichert werden. Prüfe den Gerätespeicher und versuche es erneut.',
-        activityStartHint: 'Tippen zum Starten oder Wechseln', activityStopHint: 'Tippen zum Stoppen',
+        activityStopHint: 'Tippen zum Stoppen',
         activityStartAria: '{activity} starten oder dorthin wechseln', activityStopAria: 'Zeit für {activity} stoppen',
         activityCanvas: 'Aktivitätsfläche',
         activityResize: 'Größe von {activity} ändern', canvasLayoutSaveFailed: 'Position konnte nicht gespeichert werden. Bitte erneut versuchen.',
@@ -126,7 +126,7 @@ const translations = {
         timerRunning: 'Таймер запущен',
         timerStatusRunning: 'Таймер работает: {activity} · {duration}',
         timerSaving: 'Сохранение таймера…', timerSaveFailed: 'Не удалось сохранить таймер. Проверьте память устройства и попробуйте снова.',
-        activityStartHint: 'Нажмите, чтобы начать или переключить', activityStopHint: 'Нажмите, чтобы остановить',
+        activityStopHint: 'Нажмите, чтобы остановить',
         activityStartAria: 'Начать или переключиться на «{activity}»', activityStopAria: 'Остановить отсчёт для «{activity}»',
         activityCanvas: 'Поле занятий',
         activityResize: 'Изменить размер: {activity}', canvasLayoutSaveFailed: 'Не удалось сохранить расположение занятия. Попробуйте ещё раз.',
@@ -3030,6 +3030,13 @@ class TimerHubApp {
             btn.appendChild(colorMark);
             btn.appendChild(name);
 
+            if (activity.notes) {
+                const noteMark = document.createElement('span');
+                noteMark.className = 'btn-note-mark';
+                noteMark.setAttribute('aria-hidden', 'true');
+                btn.appendChild(noteMark);
+            }
+
             if (this.activeActivityId === activity.id) {
                 const state = document.createElement('span');
                 state.className = 'btn-state';
@@ -3051,11 +3058,6 @@ class TimerHubApp {
                 const hint = document.createElement('span');
                 hint.className = 'btn-hint';
                 hint.textContent = this.t('activityStopHint');
-                btn.appendChild(hint);
-            } else {
-                const hint = document.createElement('span');
-                hint.className = 'btn-hint';
-                hint.textContent = this.t('activityStartHint');
                 btn.appendChild(hint);
             }
 
@@ -4897,6 +4899,7 @@ class TimerHubApp {
             if (!activity) return;
             title.textContent = this.t('editActivity');
             document.getElementById('activityName').value = activity.name;
+            document.getElementById('activityNotes').value = activity.notes || '';
 
             // Select color
             document.querySelectorAll('.color-option').forEach(opt => opt.classList.remove('selected'));
@@ -4933,6 +4936,7 @@ class TimerHubApp {
         } else {
             title.textContent = this.t('createActivity');
             document.getElementById('activityName').value = '';
+            document.getElementById('activityNotes').value = '';
             document.querySelectorAll('.color-option').forEach(opt => opt.classList.remove('selected'));
             document.querySelectorAll('.color-option')[0]?.classList.add('selected');
             // Reset custom swatch back to its default "+" state
@@ -4999,6 +5003,7 @@ class TimerHubApp {
             this.showToast(this.t('pleaseEnterName'));
             return;
         }
+        const notes = document.getElementById('activityNotes')?.value.trim() || '';
 
         const selectedColor = document.querySelector('.color-option.selected');
         const selectedShape = document.querySelector('.shape-option.selected');
@@ -5019,6 +5024,7 @@ class TimerHubApp {
                 activity.color = color;
                 activity.shape = shape;
                 activity.size = size;
+                activity.notes = notes;
                 activity.customerId = assignment.customerId;
                 activity.serviceId = assignment.serviceId;
                 activity.customerName = assignment.customerName;
@@ -5034,6 +5040,7 @@ class TimerHubApp {
                 color: color,
                 shape: shape,
                 size: size,
+                notes: notes,
                 customerId: assignment.customerId,
                 serviceId: assignment.serviceId,
                 customerName: assignment.customerName,
