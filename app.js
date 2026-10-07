@@ -4846,6 +4846,10 @@ class TimerHubApp {
             const activity = this.activities.find(a => a.id === activityId);
 
             if (activity) {
+                // The activity note is a default template for new entries only;
+                // it is copied as a plain string snapshot so later activity
+                // edits never change an existing entry.
+                const activityNote = typeof activity.notes === 'string' ? activity.notes : '';
                 const entry = this.createTimeEntry({
                     id: this.generateId(),
                     activityId: activityId,
@@ -4855,7 +4859,7 @@ class TimerHubApp {
                     createdAt: now,
                     updatedAt: now,
                     source: 'timer',
-                    notes: '',
+                    notes: activityNote,
                     project: activity.project || '',
                     service: activity.service || '',
                     customerId: activity.customerId || '',

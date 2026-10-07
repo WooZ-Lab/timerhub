@@ -5343,3 +5343,79 @@ test('idle activity buttons no longer render the activityStartHint instructional
     assert.equal(Object.hasOwn(dictionaries.de, 'activityStartHint'), false);
     assert.equal(Object.hasOwn(dictionaries.ru, 'activityStartHint'), false);
 });
+
+function createActivityEntryNoteApp() {
+    const harness = createTestApp();
+    harness.app.activities = [
+        { id: 'note-act', name: 'Weiß gemalert', notes: 'В зале', color: '#ffffff', shape: 'circle', size: 'medium', position: 0 },
+        { id: 'plain-act', name: 'Plain', color: '#ffffff', shape: 'circle', size: 'medium', position: 1 }
+    ];
+    harness.app.cancelBackgroundAlarm = async () => {};
+    harness.app.scheduleBackgroundAlarm = async () => {};
+    harness.app.renderLog = () => {};
+    return harness;
+}
+
+test('starting an activity copies its note into the new time entry', async () => {
+    const { app, storageData } = createActivityEntryNoteApp();
+    await app.toggleActivity('note-act');
+    const entry = app.timeEntries.find(item => item.activityId === 'note-act');
+    assert.equal(entry.notes, 'В зале');
+    assert.equal(entry.endTimestamp, null);
+    assert.equal(storageData.timeEntries.find(item => item.id === entry.id).notes, 'В зале');
+});
+
+test('legacy activities without a notes field create an entry with an empty note', async () => {
+    const { app } = createActivityEntryNoteApp();
+    const legacy = app.activities.find(activity => activity.id === 'plain-act');
+    assert.equal(Object.hasOwn(legacy, 'notes'), false);
+    await app.toggleActivity('plain-act');
+    const entry = app.timeEntries.find(item => item.activityId === 'plain-act');
+    assert.equal(entry.notes, '');
+});
+
+test('switching activities snapshots each activity note and leaves the previous entry untouched', async () => {
+    const { app } = createActivityEntryNoteApp();
+    await app.toggleActivity('note-act');
+    await app.toggleActivity('plain-act');
+
+    const previous = app.timeEntries.find(item => item.activityId === 'note-act');
+    const current = app.timeEntries.find(item => item.activityId === 'plain-act');
+    assert.notEqual(previous.endTimestamp, null, 'the previous entry was stopped');
+    assert.equal(previous.notes, 'В зале', 'the previous entry keeps its note');
+    assert.equal(current.endTimestamp, null);
+    assert.equal(current.notes, '');
+});
+
+test('changing the activity note later does not change existing entries', async () => {
+    const { app, storageData } = createActivityEntryNoteApp();
+    await app.toggleActivity('note-act');
+    const firstEntry = app.timeEntries.find(item => item.activityId === 'note-act' && item.endTimestamp === null);
+    assert.equal(firstEntry.notes, 'В зале');
+
+    app.activities.find(activity => activity.id === 'note-act').notes = 'В коридоре';
+    assert.equal(firstEntry.notes, 'В зале', 'the entry keeps its string snapshot');
+    assert.equal(storageData.timeEntries.find(item => item.id === firstEntry.id).notes, 'В зале');
+
+    await app.toggleActivity('plain-act');
+    await app.toggleActivity('note-act');
+    const laterEntry = app.timeEntries
+        .filter(item => item.activityId === 'note-act' && item.endTimestamp === null)
+        .at(-1);
+    assert.equal(laterEntry.notes, 'В коридоре', 'only future entries receive the updated note');
+});
+
+test('editing an entry note in Day Review leaves the activity note untouched', async () => {
+    const { app, document } = createActivityEntryNoteApp();
+    await app.toggleActivity('note-act');
+    await app.toggleActivity('note-act');
+    const entry = app.timeEntries.find(item => item.activityId === 'note-act');
+    assert.equal(entry.notes, 'В зале');
+
+    app.showEntryEditModal(entry.id);
+    document.getElementById('entryEditNotes').value = 'Edited in Day Review';
+    await app.saveTimeEntry();
+
+    assert.equal(app.timeEntries.find(item => item.id === entry.id).notes, 'Edited in Day Review');
+    assert.equal(app.activities.find(activity => activity.id === 'note-act').notes, 'В зале');
+});
