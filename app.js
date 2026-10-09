@@ -436,6 +436,11 @@ const extendedTranslations = {
         collapseAllGroups: 'Collapse all', expandAllGroups: 'Expand all',
         duplicateGroup: 'Duplicate group', groupCopyName: '{name} (copy)',
         groupDuplicated: 'Group "{name}" duplicated',
+        editGroup: 'Edit group', resizeGroup: 'Resize collapsed group',
+        groupEditTitle: 'Edit group',
+        groupColorLabel: 'Group color', groupColorDefault: 'Default',
+        groupNameRequired: 'Enter a group name.',
+        groupEditSaveFailed: 'Could not save the group. Try again.',
         canvasToolbar: 'Canvas actions',
     },
     de: {
@@ -690,6 +695,11 @@ const extendedTranslations = {
         collapseAllGroups: 'Alle einklappen', expandAllGroups: 'Alle ausklappen',
         duplicateGroup: 'Gruppe duplizieren', groupCopyName: '{name} (Kopie)',
         groupDuplicated: 'Gruppe "{name}" dupliziert',
+        editGroup: 'Gruppe bearbeiten', resizeGroup: 'Eingeklappte Gruppe skalieren',
+        groupEditTitle: 'Gruppe bearbeiten',
+        groupColorLabel: 'Gruppenfarbe', groupColorDefault: 'Standard',
+        groupNameRequired: 'Bitte einen Gruppennamen eingeben.',
+        groupEditSaveFailed: 'Gruppe konnte nicht gespeichert werden. Bitte erneut versuchen.',
         canvasToolbar: 'Canvas-Aktionen',
     },
     ru: {
@@ -944,6 +954,11 @@ const extendedTranslations = {
         collapseAllGroups: 'Свернуть все', expandAllGroups: 'Развернуть все',
         duplicateGroup: 'Дублировать группу', groupCopyName: '{name} (копия)',
         groupDuplicated: 'Группа «{name}» дублирована',
+        editGroup: 'Редактировать группу', resizeGroup: 'Изменить размер свёрнутой группы',
+        groupEditTitle: 'Редактировать группу',
+        groupColorLabel: 'Цвет группы', groupColorDefault: 'По умолчанию',
+        groupNameRequired: 'Введите название группы.',
+        groupEditSaveFailed: 'Не удалось сохранить группу. Попробуйте ещё раз.',
         canvasToolbar: 'Действия на холсте',
     }
 };
@@ -973,6 +988,10 @@ const CANVAS_GROUP_PADDING = 20;
 const CANVAS_GROUP_HEADER = 36;
 const CANVAS_GROUP_COLLAPSED_WIDTH = 220;
 const CANVAS_GROUP_COLLAPSED_HEIGHT = 46;
+const CANVAS_GROUP_COLLAPSED_MIN_WIDTH = 160;
+const CANVAS_GROUP_COLLAPSED_MIN_HEIGHT = 46;
+const CANVAS_GROUP_COLLAPSED_MAX_WIDTH = 640;
+const CANVAS_GROUP_COLLAPSED_MAX_HEIGHT = 400;
 const CANVAS_GROUP_DUPLICATE_OFFSET = 48;
 // Deterministic, size-aware packing for imported groups: a shelf layout that
 // starts at the canvas origin, wraps at a fixed row width and leaves a full
@@ -1424,6 +1443,8 @@ class TimerHubApp {
         this.suppressActivityClick = null;
         this.editingActivityId = null;
         this.editingEntryId = null;
+        this.editingGroupId = null;
+        this.editingGroupColor = '';
         this.retryDiagnostic = null;
         this.deletedEntry = null;
         this.uiUpdateInterval = null;
@@ -1637,6 +1658,30 @@ class TimerHubApp {
                         y: this.clampCanvasCoordinate(group.y, 0, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY),
                         collapsed: group.collapsed === true
                     };
+                    // Persistent collapsed dimensions are independent of the
+                    // expanded content; older records fall back to the defaults.
+                    if (Number.isFinite(Number(group.collapsedWidth))) {
+                        normalized.collapsedWidth = this.clampCanvasCoordinate(
+                            group.collapsedWidth,
+                            CANVAS_GROUP_COLLAPSED_WIDTH,
+                            CANVAS_GROUP_COLLAPSED_MIN_WIDTH,
+                            CANVAS_GROUP_COLLAPSED_MAX_WIDTH
+                        );
+                    }
+                    if (Number.isFinite(Number(group.collapsedHeight))) {
+                        normalized.collapsedHeight = this.clampCanvasCoordinate(
+                            group.collapsedHeight,
+                            CANVAS_GROUP_COLLAPSED_HEIGHT,
+                            CANVAS_GROUP_COLLAPSED_MIN_HEIGHT,
+                            CANVAS_GROUP_COLLAPSED_MAX_HEIGHT
+                        );
+                    }
+                    if (typeof group.color === 'string' && /^#[0-9a-f]{6}$/i.test(group.color)) {
+                        normalized.color = group.color.toLowerCase();
+                    }
+                    if (typeof group.parentId === 'string' && group.parentId) {
+                        normalized.parentId = group.parentId;
+                    }
                     // Assignment provenance must survive a reload: replace-mode
                     // imports and later saves need it to stay intact.
                     if (typeof group.assignment === 'string' && group.assignment) {
@@ -1648,6 +1693,7 @@ class TimerHubApp {
                     return normalized;
                 })
             : [];
+        this.sanitizeGroupParents();
     }
 
     normalizeClockodoId(value) {
@@ -2108,6 +2154,18 @@ class TimerHubApp {
             const input = document.getElementById('groupNameInput');
             const group = await this.createGroupFromSelection(input?.value);
             if (group) this.closeGroupModal();
+        });
+        sel('groupEditModalCloseBtn')?.addEventListener('click', () => this.closeGroupEditModal());
+        sel('groupEditCancelBtn')?.addEventListener('click', () => this.closeGroupEditModal());
+        sel('groupEditSaveBtn')?.addEventListener('click', () => this.saveGroupEdit());
+        document.getElementById('groupEditNameInput')?.addEventListener('keydown', event => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                this.saveGroupEdit();
+            } else if (event.key === 'Escape') {
+                event.preventDefault();
+                this.closeGroupEditModal();
+            }
         });
 
         // Activity menu modal
@@ -3166,7 +3224,7 @@ class TimerHubApp {
         this.renderGroups(grid);
 
         this.activities.forEach((activity, index) => {
-            if (this.activityGroup(activity)?.collapsed) return;
+            if (!this.isActivityVisible(activity)) return;
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.className = `activity-btn activity-node ${activity.size || 'medium'}`;
@@ -3179,6 +3237,7 @@ class TimerHubApp {
             btn.dataset.activityId = activity.id;
             btn.disabled = Boolean(this.timerActionInProgress);
             const layout = this.getActivityCanvasLayout(activity, index);
+
             btn.style.left = `${layout.x}px`;
             btn.style.top = `${layout.y}px`;
             btn.style.width = `${layout.width}px`;
@@ -3284,13 +3343,23 @@ class TimerHubApp {
     }
 
     renderGroups(grid) {
-        for (const group of this.groups) {
-            const members = this.groupMembers(group);
-            if (!members.length) continue;
+        const index = this._canvasIndex;
+        // Ancestors first so nested containers stack above their parents.
+        const ordered = [...this.groups].sort((a, b) =>
+            (this.groupAncestors(a).length - this.groupAncestors(b).length)
+            || (this.groups.indexOf(a) - this.groups.indexOf(b)));
+        for (const group of ordered) {
+            if (!this.isGroupVisible(group)) continue;
+            const base = group.collapsed ? null : this.groupBaseBounds(group, index);
+            const hasContent = group.collapsed
+                ? Boolean(this.groupMembers(group, index).length || this.groupChildren(group, index).length)
+                : Boolean(base);
+            if (!hasContent) continue;
             const container = document.createElement('div');
             container.className = `group-container${group.collapsed ? ' is-collapsed' : ''}`;
             container.dataset.groupId = group.id;
-            container.style.zIndex = '0';
+            container.style.zIndex = String(-this.groupAncestors(group).length);
+            if (group.color) container.style.setProperty('--group-accent', group.color);
 
             const title = document.createElement('div');
             title.className = 'group-title';
@@ -3313,6 +3382,18 @@ class TimerHubApp {
             titleText.className = 'group-title-text';
             titleText.textContent = group.name;
 
+            const editButton = document.createElement('button');
+            editButton.type = 'button';
+            editButton.className = 'group-edit-btn';
+            editButton.dataset.groupId = group.id;
+            editButton.setAttribute('aria-label', this.t('editGroup'));
+            editButton.textContent = '✎';
+            editButton.addEventListener('pointerdown', event => event.stopPropagation());
+            editButton.addEventListener('click', event => {
+                event.stopPropagation();
+                this.openGroupEditModal(group.id);
+            });
+
             const duplicateButton = document.createElement('button');
             duplicateButton.type = 'button';
             duplicateButton.className = 'group-duplicate-btn';
@@ -3327,17 +3408,34 @@ class TimerHubApp {
 
             title.appendChild(collapseButton);
             title.appendChild(titleText);
+            title.appendChild(editButton);
             title.appendChild(duplicateButton);
             container.appendChild(title);
 
             if (group.collapsed) {
+                const width = this.groupCollapsedWidth(group);
+                const height = this.groupCollapsedHeight(group);
                 const offset = this.groupDisplayOffset(group.id);
                 container.style.left = `${group.x - CANVAS_GROUP_PADDING + offset.x}px`;
                 container.style.top = `${group.y - CANVAS_GROUP_HEADER + offset.y}px`;
-                container.style.width = `${CANVAS_GROUP_COLLAPSED_WIDTH}px`;
-                container.style.height = `${CANVAS_GROUP_COLLAPSED_HEIGHT}px`;
+                container.style.width = `${width}px`;
+                container.style.height = `${height}px`;
+                const resizeHandle = document.createElement('button');
+                resizeHandle.type = 'button';
+                resizeHandle.className = 'group-resize-handle';
+                resizeHandle.dataset.groupId = group.id;
+                resizeHandle.setAttribute('aria-label', this.t('resizeGroup'));
+                resizeHandle.title = this.t('resizeGroup');
+                resizeHandle.addEventListener('click', event => event.stopPropagation());
+                container.appendChild(resizeHandle);
             } else {
-                this.applyGroupGeometry(container, this.groupMemberBoxes(group));
+                const offset = this.groupDisplayOffset(group.id);
+                this.applyGroupBounds(container, {
+                    left: base.left + offset.x,
+                    top: base.top + offset.y,
+                    width: base.width,
+                    height: base.height
+                });
             }
 
             grid.appendChild(container);
@@ -3361,16 +3459,88 @@ class TimerHubApp {
         return { left, top, right, bottom, width: right - left, height: bottom - top };
     }
 
+    // Offset-free bounds of an expanded group: its direct activities plus every
+    // nested child container, recursively. Children are measured first so a
+    // parent always wraps its hierarchy.
+    groupBaseBounds(group, index = this._canvasIndex) {
+        const boxes = this.groupMemberBoxes(group, false).map(box => ({
+            x: box.x,
+            y: box.y,
+            width: box.width,
+            height: box.height
+        }));
+        for (const child of this.groupChildren(group, index)) {
+            const childBounds = child.collapsed
+                ? this.groupCollapsedBounds(child)
+                : this.groupBaseBounds(child, index);
+            if (!childBounds) continue;
+            boxes.push({
+                x: childBounds.left,
+                y: childBounds.top,
+                width: childBounds.width,
+                height: childBounds.height
+            });
+        }
+        if (!boxes.length) return null;
+        return this.groupContainerBounds(boxes);
+    }
+
+    applyGroupBounds(container, bounds) {
+        container.style.left = `${bounds.left}px`;
+        container.style.top = `${bounds.top}px`;
+        container.style.width = `${bounds.width}px`;
+        container.style.height = `${bounds.height}px`;
+    }
+
+    groupCollapsedWidth(group) {
+        return this.clampCanvasCoordinate(
+            group?.collapsedWidth,
+            CANVAS_GROUP_COLLAPSED_WIDTH,
+            CANVAS_GROUP_COLLAPSED_MIN_WIDTH,
+            CANVAS_GROUP_COLLAPSED_MAX_WIDTH
+        );
+    }
+
+    groupCollapsedHeight(group) {
+        return this.clampCanvasCoordinate(
+            group?.collapsedHeight,
+            CANVAS_GROUP_COLLAPSED_HEIGHT,
+            CANVAS_GROUP_COLLAPSED_MIN_HEIGHT,
+            CANVAS_GROUP_COLLAPSED_MAX_HEIGHT
+        );
+    }
+
+    resizeCollapsedGroup(group, width, height) {
+        if (!group) return null;
+        const nextWidth = this.clampCanvasCoordinate(
+            this.snapToCanvasGrid(this.clampCanvasCoordinate(width, this.groupCollapsedWidth(group), CANVAS_GROUP_COLLAPSED_MIN_WIDTH, CANVAS_GROUP_COLLAPSED_MAX_WIDTH)),
+            this.groupCollapsedWidth(group),
+            CANVAS_GROUP_COLLAPSED_MIN_WIDTH,
+            CANVAS_GROUP_COLLAPSED_MAX_WIDTH
+        );
+        const nextHeight = this.clampCanvasCoordinate(
+            this.snapToCanvasGrid(this.clampCanvasCoordinate(height, this.groupCollapsedHeight(group), CANVAS_GROUP_COLLAPSED_MIN_HEIGHT, CANVAS_GROUP_COLLAPSED_MAX_HEIGHT)),
+            this.groupCollapsedHeight(group),
+            CANVAS_GROUP_COLLAPSED_MIN_HEIGHT,
+            CANVAS_GROUP_COLLAPSED_MAX_HEIGHT
+        );
+        group.collapsedWidth = nextWidth;
+        group.collapsedHeight = nextHeight;
+        return group;
+    }
+
     groupCollapsedBounds(group) {
+        const width = this.groupCollapsedWidth(group);
+        const height = this.groupCollapsedHeight(group);
         const left = group.x - CANVAS_GROUP_PADDING;
         const top = group.y - CANVAS_GROUP_HEADER;
         return {
             left,
             top,
-            right: left + CANVAS_GROUP_COLLAPSED_WIDTH,
-            bottom: top + CANVAS_GROUP_COLLAPSED_HEIGHT,
-            width: CANVAS_GROUP_COLLAPSED_WIDTH,
-            height: CANVAS_GROUP_COLLAPSED_HEIGHT
+            right: left + width,
+            bottom: top + height,
+            width,
+            height
         };
     }
 
@@ -3427,16 +3597,17 @@ class TimerHubApp {
             if (!rank.has(id)) rank.set(id, index);
         });
         const priorityOf = group => rank.has(group.id) ? rank.get(group.id) : Number.MAX_SAFE_INTEGER;
-        // Measure every expanded group exactly once; collision resolution
-        // reuses the same boxes.
-        const expandedGroups = this.groups
+        // Only root groups participate in collision layout. Nested groups move
+        // with their root ancestor and inherit its temporary offset.
+        const index = this._canvasIndex;
+        const roots = this.groups.filter(group => !this.groupParent(group, index));
+        const expandedGroups = roots
             .filter(group => !group.collapsed)
-            .map(group => ({ group, boxes: this.groupMemberBoxes(group, false) }))
-            .filter(entry => entry.boxes.length)
+            .map(group => ({ group, bounds: this.groupBaseBounds(group, index) }))
+            .filter(entry => entry.bounds)
             .sort((a, b) => (priorityOf(a.group) - priorityOf(b.group)) || this.compareGroupLayoutOrder(a.group, b.group));
         const expandedObstacles = [];
-        for (const { group, boxes } of expandedGroups) {
-            const bounds = this.groupContainerBounds(boxes);
+        for (const { group, bounds } of expandedGroups) {
             const carry = this.expandedGroupCarry.get(group.id) || { x: 0, y: 0 };
             const { left, top } = this.resolveGroupCollision({
                 left: bounds.left + carry.x,
@@ -3448,26 +3619,53 @@ class TimerHubApp {
             }, expandedObstacles);
             expandedObstacles.push({ left, top, right: left + bounds.width, bottom: top + bounds.height });
             offsets.set(group.id, { x: left - bounds.left, y: top - bounds.top });
-            displayBounds.set(group.id, { left, top, right: left + bounds.width, bottom: top + bounds.height });
         }
-        // Collapsed groups are the temporary ones: they step aside for anchored
-        // expanded groups and return to their saved positions once nothing
-        // expanded overlaps them.
+        // Collapsed root groups are the temporary ones: they step aside for
+        // anchored expanded groups and return to their saved positions once
+        // nothing expanded overlaps them.
         const displacedCollapsed = [];
-        const collapsedGroups = this.groups
+        const collapsedGroups = roots
             .filter(group => group.collapsed)
-            .filter(group => this.groupMemberBoxes(group, false).length)
+            .filter(group => this.groupBaseBounds(group, index))
             .sort((a, b) => this.compareGroupLayoutOrder(a, b));
         for (const group of collapsedGroups) {
             const bounds = this.groupCollapsedBounds(group);
-            if (!expandedObstacles.some(other => this.rectanglesIntersect(bounds, other))) {
-                displayBounds.set(group.id, { left: bounds.left, top: bounds.top, right: bounds.right, bottom: bounds.bottom });
-                continue;
+            if (expandedObstacles.some(other => this.rectanglesIntersect(bounds, other))) {
+                const { left, top } = this.resolveGroupCollision(bounds, [...expandedObstacles, ...displacedCollapsed]);
+                displacedCollapsed.push({ left, top, right: left + bounds.width, bottom: top + bounds.height });
+                offsets.set(group.id, { x: left - bounds.left, y: top - bounds.top });
             }
-            const { left, top } = this.resolveGroupCollision(bounds, [...expandedObstacles, ...displacedCollapsed]);
-            displacedCollapsed.push({ left, top, right: left + bounds.width, bottom: top + bounds.height });
-            offsets.set(group.id, { x: left - bounds.left, y: top - bounds.top });
-            displayBounds.set(group.id, { left, top, right: left + bounds.width, bottom: top + bounds.height });
+        }
+        // Propagate the root offset to every descendant and publish the final
+        // display bounds used by hit testing and rendering.
+        for (const group of this.groups) {
+            let totalOffset = offsets.get(group.id) || { x: 0, y: 0 };
+            if (!offsets.has(group.id)) {
+                let node = group;
+                let guard = 0;
+                while (node?.parentId && guard < 200) {
+                    const parent = this.groupParent(node, index);
+                    if (!parent) break;
+                    const parentOffset = offsets.get(parent.id);
+                    if (parentOffset) {
+                        totalOffset = parentOffset;
+                        break;
+                    }
+                    node = parent;
+                    guard += 1;
+                }
+            }
+            if (totalOffset.x || totalOffset.y) offsets.set(group.id, totalOffset);
+            const base = group.collapsed ? this.groupCollapsedBounds(group) : this.groupBaseBounds(group, index);
+            if (!base) continue;
+            displayBounds.set(group.id, {
+                left: base.left + totalOffset.x,
+                top: base.top + totalOffset.y,
+                right: base.right + totalOffset.x,
+                bottom: base.bottom + totalOffset.y,
+                width: base.width,
+                height: base.height
+            });
         }
         this.groupDisplayBounds = displayBounds;
         return offsets;
@@ -3523,8 +3721,19 @@ class TimerHubApp {
             const offset = this.groupDisplayOffset(group.id);
             container.style.left = `${group.x - CANVAS_GROUP_PADDING + offset.x}px`;
             container.style.top = `${group.y - CANVAS_GROUP_HEADER + offset.y}px`;
-        } else if (boxes.length) {
-            this.applyGroupGeometry(container, boxes);
+            container.style.width = `${this.groupCollapsedWidth(group)}px`;
+            container.style.height = `${this.groupCollapsedHeight(group)}px`;
+        } else {
+            const base = this.groupBaseBounds(group);
+            if (base) {
+                const offset = this.groupDisplayOffset(group.id);
+                this.applyGroupBounds(container, {
+                    left: base.left + offset.x,
+                    top: base.top + offset.y,
+                    width: base.width,
+                    height: base.height
+                });
+            }
         }
     }
 
@@ -3563,6 +3772,72 @@ class TimerHubApp {
             if (!container) continue;
             container.classList.toggle('group-drop-target', group.id === groupId);
         }
+    }
+
+    // Find the visible group under the pointer that can become the new parent
+    // of the dragged group. The dragged group and all its descendants are
+    // excluded so a group can never be nested into itself.
+    groupNestTargetAt(clientX, clientY, excludeGroup) {
+        if (!excludeGroup) return null;
+        const viewport = document.getElementById('activityCanvasViewport');
+        if (!viewport || typeof viewport.getBoundingClientRect !== 'function') return null;
+        const rect = viewport.getBoundingClientRect();
+        const world = this.screenToWorld(clientX - rect.left, clientY - rect.top);
+        const excluded = new Set([excludeGroup.id, ...this.groupDescendantIds(excludeGroup.id)]);
+        let best = null;
+        for (let order = 0; order < this.groups.length; order += 1) {
+            const group = this.groups[order];
+            if (excluded.has(group.id)) continue;
+            if (!this.isGroupVisible(group)) continue;
+            const bounds = this.groupDisplayBounds.get(group.id);
+            if (!bounds) continue;
+            if (world.x < bounds.left || world.x > bounds.right || world.y < bounds.top || world.y > bounds.bottom) continue;
+            const area = Math.max(0, bounds.right - bounds.left) * Math.max(0, bounds.bottom - bounds.top);
+            if (!best || area < best.area || (area === best.area && order < best.order)) {
+                best = { group, area, order };
+            }
+        }
+        return best?.group || null;
+    }
+
+    setCanvasGroupNestTarget(groupId) {
+        const stage = document.getElementById('activitiesGrid');
+        if (!stage) return;
+        for (const group of this.groups) {
+            const container = stage.querySelector(
+                `.group-container[data-group-id="${CSS.escape(group.id)}"]`
+            );
+            if (!container) continue;
+            container.classList.toggle('group-nest-target', group.id === groupId);
+        }
+    }
+
+    // Move a group under a new parent (or back to the root level). Persistent
+    // coordinates are never rewritten here, so the drag position is kept.
+    async reparentGroup(group, parentId) {
+        if (!group) return false;
+        if (parentId) {
+            const parent = this.groups.find(item => item.id === parentId);
+            if (!parent || parent.id === group.id) return false;
+            if (this.groupDescendantIds(group.id).includes(parent.id)) return false;
+            group.parentId = parent.id;
+            if (parent.collapsed) {
+                this.captureExpandedGroupCarry(parent.id);
+                parent.collapsed = false;
+                this.expandedGroupOrder = [parent.id, ...this.expandedGroupOrder.filter(id => id !== parent.id)];
+                Promise.resolve(this.storage.saveGroup?.(parent)).catch(() => {});
+            }
+        } else {
+            delete group.parentId;
+        }
+        try {
+            await this.storage.saveGroup?.(group);
+        } catch {
+            this.showToast(this.t('groupCreateFailed'));
+            return false;
+        }
+        this.renderMain();
+        return true;
     }
 
     updateMoveDropTarget(gesture) {
@@ -3743,6 +4018,12 @@ class TimerHubApp {
             y: this.snapToCanvasGrid(group.y + CANVAS_GROUP_DUPLICATE_OFFSET),
             collapsed: false
         };
+        // Keep the duplicate in the same hierarchy branch and preserve the
+        // persistent presentation metadata.
+        if (group.parentId) duplicate.parentId = group.parentId;
+        if (group.color) duplicate.color = group.color;
+        if (Number.isFinite(Number(group.collapsedWidth))) duplicate.collapsedWidth = group.collapsedWidth;
+        if (Number.isFinite(Number(group.collapsedHeight))) duplicate.collapsedHeight = group.collapsedHeight;
         const now = Date.now();
         let position = Math.max(0, ...this.activities.map(activity => Number(activity.position) || 0));
         const derivedLayouts = this.deriveGroupRelativeLayouts(group);
@@ -3876,6 +4157,7 @@ class TimerHubApp {
         const groupsById = new Map();
         const positionsById = new Map();
         const activitiesByGroup = new Map();
+        const childrenByParent = new Map();
         for (let index = 0; index < this.groups.length; index += 1) {
             const group = this.groups[index];
             groupsById.set(group.id, group);
@@ -3892,7 +4174,92 @@ class TimerHubApp {
             }
             members.push(activity);
         }
-        return { groupsById, positionsById, activitiesByGroup };
+        for (const group of this.groups) {
+            if (!group.parentId || !groupsById.has(group.parentId)) continue;
+            let children = childrenByParent.get(group.parentId);
+            if (!children) {
+                children = [];
+                childrenByParent.set(group.parentId, children);
+            }
+            children.push(group);
+        }
+        return { groupsById, positionsById, activitiesByGroup, childrenByParent };
+    }
+
+    groupParent(group, index = this._canvasIndex) {
+        if (!group?.parentId) return null;
+        if (index) return index.groupsById.get(group.parentId) || null;
+        return this.groups.find(item => item.id === group.parentId) || null;
+    }
+
+    groupChildren(group, index = this._canvasIndex) {
+        if (!group) return [];
+        if (index) return index.childrenByParent?.get(group.id) || [];
+        return this.groups.filter(item => item.parentId === group.id);
+    }
+
+    groupAncestors(group) {
+        const ancestors = [];
+        const seen = new Set([group?.id]);
+        let current = group;
+        while (current?.parentId && !seen.has(current.parentId)) {
+            const parent = this.groups.find(item => item.id === current.parentId);
+            if (!parent) break;
+            seen.add(parent.id);
+            ancestors.push(parent);
+            current = parent;
+        }
+        return ancestors;
+    }
+
+    isGroupVisible(group) {
+        return !this.groupAncestors(group).some(ancestor => ancestor.collapsed);
+    }
+
+    isActivityVisible(activity) {
+        const group = this.activityGroup(activity);
+        if (!group) return true;
+        if (group.collapsed) return false;
+        return this.isGroupVisible(group);
+    }
+
+    groupDescendantIds(groupId) {
+        const descendants = [];
+        const seen = new Set([groupId]);
+        const queue = [groupId];
+        while (queue.length) {
+            const current = queue.shift();
+            for (const child of this.groups.filter(item => item.parentId === current)) {
+                if (seen.has(child.id)) continue;
+                seen.add(child.id);
+                descendants.push(child.id);
+                queue.push(child.id);
+            }
+        }
+        return descendants;
+    }
+
+    // Remove parents that no longer exist or that form a cycle. Keeps existing
+    // records compatible when a group was deleted outside the app.
+    sanitizeGroupParents() {
+        const byId = new Map(this.groups.map(group => [group.id, group]));
+        for (const group of this.groups) {
+            if (!group.parentId) continue;
+            if (!byId.has(group.parentId)) {
+                delete group.parentId;
+                continue;
+            }
+            const seen = new Set([group.id]);
+            let current = group.parentId;
+            while (current) {
+                if (seen.has(current)) {
+                    delete group.parentId;
+                    break;
+                }
+                seen.add(current);
+                current = byId.get(current)?.parentId || null;
+            }
+        }
     }
 
     groupMembers(group, index = this._canvasIndex) {
@@ -4168,8 +4535,7 @@ class TimerHubApp {
         for (const id of this.selectedActivityIds) {
             const activity = this.activities.find(item => item.id === id);
             if (!activity) continue;
-            const group = this.activityGroup(activity);
-            if (group?.collapsed) continue;
+            if (!this.isActivityVisible(activity)) continue;
             valid.add(id);
         }
         if (valid.size !== this.selectedActivityIds.size) this.setCanvasSelection(valid);
@@ -4190,6 +4556,88 @@ class TimerHubApp {
 
     closeGroupModal() {
         document.getElementById('groupModal')?.classList.remove('active');
+    }
+
+    hideGroupEditNameError() {
+        const error = document.getElementById('groupEditNameError');
+        if (!error) return;
+        error.textContent = '';
+        error.style.display = 'none';
+    }
+
+    showGroupEditNameError(message) {
+        const error = document.getElementById('groupEditNameError');
+        if (!error) return;
+        error.textContent = message;
+        error.style.display = '';
+    }
+
+    openGroupEditModal(groupId) {
+        const group = this.groups.find(item => item.id === groupId);
+        if (!group) return false;
+        this.editingGroupId = groupId;
+        this.editingGroupColor = typeof group.color === 'string' ? group.color : '';
+        const input = document.getElementById('groupEditNameInput');
+        if (input) input.value = group.name;
+        this.renderGroupColorOptions();
+        this.hideGroupEditNameError();
+        document.getElementById('groupEditModal')?.classList.add('active');
+        input?.focus?.();
+        return true;
+    }
+
+    closeGroupEditModal() {
+        this.editingGroupId = null;
+        this.editingGroupColor = '';
+        document.getElementById('groupEditModal')?.classList.remove('active');
+    }
+
+    renderGroupColorOptions() {
+        const container = document.getElementById('groupEditColorOptions');
+        if (!container) return;
+        container.replaceChildren();
+        const options = [''].concat(this.COLORS);
+        for (const color of options) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = `group-color-option${color === this.editingGroupColor ? ' is-selected' : ''}`;
+            button.dataset.color = color;
+            button.setAttribute('role', 'radio');
+            button.setAttribute('aria-checked', String(color === this.editingGroupColor));
+            button.setAttribute('aria-label', color || this.t('groupColorDefault'));
+            button.style.setProperty('--swatch-color', color || 'transparent');
+            button.addEventListener('click', () => {
+                this.editingGroupColor = color;
+                this.renderGroupColorOptions();
+            });
+            container.appendChild(button);
+        }
+    }
+
+    async saveGroupEdit() {
+        const group = this.groups.find(item => item.id === this.editingGroupId);
+        if (!group) {
+            this.closeGroupEditModal();
+            return false;
+        }
+        const input = document.getElementById('groupEditNameInput');
+        const name = String(input?.value ?? '').replace(/\s+/g, ' ').trim().slice(0, 120);
+        if (!name) {
+            this.showGroupEditNameError(this.t('groupNameRequired'));
+            return false;
+        }
+        group.name = name;
+        if (this.editingGroupColor) group.color = this.editingGroupColor;
+        else delete group.color;
+        try {
+            await this.storage.saveGroup?.(group);
+        } catch {
+            this.showGroupEditNameError(this.t('groupEditSaveFailed'));
+            return false;
+        }
+        this.closeGroupEditModal();
+        this.renderMain();
+        return true;
     }
 
     async createGroupFromSelection(name) {
@@ -4474,24 +4922,45 @@ class TimerHubApp {
             const activityId = resizeHandle?.dataset.activityId || activityButton?.dataset.activityId || null;
             const activity = activityId && this.activities.find(item => item.id === activityId);
             const mode = resizeHandle ? 'resize' : activityButton ? 'move' : 'pan';
+
+            if (activityButton) {
+            }
+
             const layout = activity
                 ? this.getActivityCanvasLayout(activity, this.activities.indexOf(activity))
                 : null;
 
             const groupTitle = event.target.closest?.('.group-title');
             const group = groupTitle && this.groups.find(item => item.id === groupTitle.dataset.groupId);
+            const groupResizeHandle = event.target.closest?.('.group-resize-handle');
+            const resizeGroup = groupResizeHandle
+                && this.groups.find(item => item.id === groupResizeHandle.dataset.groupId);
+            const gestureGroup = resizeGroup || group;
+            const groupMoveSnapshot = gestureGroup
+                ? new Map([gestureGroup.id, ...this.groupDescendantIds(gestureGroup.id)]
+                    .filter(id => this.groups.some(item => item.id === id))
+                    .map(id => {
+                        const item = this.groups.find(entry => entry.id === id);
+                        return [id, { x: item.x, y: item.y }];
+                    }))
+                : null;
 
             this.canvasGesture = {
                 pointerId: event.pointerId,
-                mode: group ? 'group-move' : mode,
+                mode: resizeGroup ? 'group-resize' : group ? 'group-move' : mode,
                 activityId,
                 activityButton,
                 resizeHandle,
-                groupId: group?.id || null,
-                group,
+                groupId: gestureGroup?.id || null,
+                group: gestureGroup || null,
                 groupTitle: group ? groupTitle : null,
-                groupStartX: group?.x,
-                groupStartY: group?.y,
+                groupResizeStart: resizeGroup
+                    ? { width: this.groupCollapsedWidth(resizeGroup), height: this.groupCollapsedHeight(resizeGroup) }
+                    : null,
+                groupMoveSnapshot,
+                nestTargetId: null,
+                groupStartX: gestureGroup?.x,
+                groupStartY: gestureGroup?.y,
                 dropTargetGroupId: null,
                 startX: event.clientX,
                 startY: event.clientY,
@@ -4504,7 +4973,7 @@ class TimerHubApp {
                 openedMenu: false
             };
 
-            this.canvasGesture.captureTarget = resizeHandle || activityButton || viewport;
+            this.canvasGesture.captureTarget = groupResizeHandle || resizeHandle || activityButton || viewport;
             try { this.canvasGesture.captureTarget.setPointerCapture(event.pointerId); } catch {}
 
             if (mode === 'move' && activity) {
@@ -4512,6 +4981,7 @@ class TimerHubApp {
                     const gesture = this.canvasGesture;
                     if (gesture?.pointerId !== event.pointerId || gesture.started) return;
                     gesture.openedMenu = true;
+
                     this.suppressActivityClick = { activityId, until: Date.now() + 150 };
                     this.showActivityMenu(activityId);
                 }, 550);
@@ -4574,12 +5044,45 @@ class TimerHubApp {
                 return;
             }
 
+            if (gesture.mode === 'group-resize') {
+                const worldDx = dx / this.canvasZoom;
+                const worldDy = dy / this.canvasZoom;
+                this.resizeCollapsedGroup(
+                    gesture.group,
+                    gesture.groupResizeStart.width + worldDx,
+                    gesture.groupResizeStart.height + worldDy
+                );
+                this.positionGroupVisuals(gesture.group);
+                return;
+            }
+
             if (gesture.mode === 'group-move') {
                 const worldDx = dx / this.canvasZoom;
                 const worldDy = dy / this.canvasZoom;
-                gesture.group.x = this.snapToCanvasGrid(gesture.groupStartX + worldDx);
-                gesture.group.y = this.snapToCanvasGrid(gesture.groupStartY + worldDy);
-                this.positionGroupVisuals(gesture.group);
+                const snapshot = gesture.groupMoveSnapshot;
+                const reference = snapshot?.get(gesture.group.id);
+                if (reference) {
+                    const snappedX = this.snapToCanvasGrid(reference.x + worldDx);
+                    const snappedY = this.snapToCanvasGrid(reference.y + worldDy);
+                    const moveX = snappedX - reference.x;
+                    const moveY = snappedY - reference.y;
+                    for (const [id, start] of snapshot) {
+                        const item = this.groups.find(entry => entry.id === id);
+                        if (!item) continue;
+                        item.x = start.x + moveX;
+                        item.y = start.y + moveY;
+                    }
+                    for (const id of snapshot.keys()) {
+                        const item = this.groups.find(entry => entry.id === id);
+                        if (item) this.positionGroupVisuals(item);
+                    }
+                }
+                const nestTarget = this.groupNestTargetAt(event.clientX, event.clientY, gesture.group);
+                const nestTargetId = nestTarget?.id || null;
+                if (nestTargetId !== gesture.nestTargetId) {
+                    gesture.nestTargetId = nestTargetId;
+                    this.setCanvasGroupNestTarget(nestTargetId);
+                }
                 return;
             }
 
@@ -4665,15 +5168,37 @@ class TimerHubApp {
             gesture.activityButton?.classList.remove('dragging');
             gesture.groupTitle?.classList.remove('dragging');
 
-            if (gesture.mode === 'group-move') {
+            if (gesture.mode === 'group-resize') {
                 if (gesture.started) {
                     Promise.resolve(this.storage.saveGroup?.(gesture.group)).catch(() => {
                         this.showToast(this.t('groupCreateFailed'));
                     });
-                    // The drag changed the intended persistent position; recompute
-                    // the temporary offsets for every remaining expanded group
-                    // without rebuilding the whole canvas.
                     this.refreshGroupLayout();
+                }
+                return;
+            }
+
+            if (gesture.mode === 'group-move') {
+                if (gesture.started) {
+                    const movedIds = [...(gesture.groupMoveSnapshot?.keys() || [])];
+                    for (const id of movedIds) {
+                        const item = this.groups.find(entry => entry.id === id);
+                        if (item) {
+                            Promise.resolve(this.storage.saveGroup?.(item)).catch(() => {
+                                this.showToast(this.t('groupCreateFailed'));
+                            });
+                        }
+                    }
+                    const targetId = gesture.nestTargetId || null;
+                    const parentNow = gesture.group.parentId || null;
+                    this.setCanvasGroupNestTarget(null);
+                    if (targetId !== parentNow) {
+                        this.reparentGroup(gesture.group, targetId);
+                    } else {
+                        // Positions changed: recompute temporary offsets without
+                        // rebuilding the whole canvas.
+                        this.refreshGroupLayout();
+                    }
                 }
                 return;
             }
@@ -4709,6 +5234,7 @@ class TimerHubApp {
                 );
 
                 if (button) {
+
                     const rawX = Number.parseFloat(button.style.left) || 0;
                     const rawY = Number.parseFloat(button.style.top) || 0;
                     const finalLayout = {
@@ -7470,10 +7996,11 @@ class TimerHubApp {
 
     currentLayoutObstacles() {
         const obstacles = [];
+        // Root group bounds already wrap their nested children.
         for (const group of this.groups) {
-            const boxes = this.groupMemberBoxes(group, false);
-            if (!boxes.length) continue;
-            const bounds = this.groupContainerBounds(boxes);
+            if (this.groupParent(group)) continue;
+            const bounds = this.groupBaseBounds(group);
+            if (!bounds) continue;
             obstacles.push(bounds);
             const offset = this.groupDisplayOffset(group.id);
             if (offset.x || offset.y) {

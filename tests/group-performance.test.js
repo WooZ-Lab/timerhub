@@ -107,7 +107,9 @@ function createTestApp(initialData = {}) {
         'importAssignmentBtn', 'assignmentImportModal', 'assignmentImportModalTitle', 'assignmentImportCloseBtn',
         'assignmentJsonInput', 'assignmentFileInput', 'assignmentChooseFileBtn', 'assignmentCopyPromptBtn',
         'assignmentValidateBtn', 'assignmentImportError', 'assignmentPreview', 'assignmentPreviewSummary',
-        'assignmentPreviewWarnings', 'assignmentPreviewList', 'assignmentImportCancelBtn', 'assignmentImportConfirmBtn'
+        'assignmentPreviewWarnings', 'assignmentPreviewList', 'assignmentImportCancelBtn', 'assignmentImportConfirmBtn',
+        'groupEditModal', 'groupEditModalTitle', 'groupEditModalCloseBtn', 'groupEditNameInput', 'groupEditNameError',
+        'groupEditColorOptions', 'groupEditCancelBtn', 'groupEditSaveBtn'
     ]) {
         elements.set(id, {
             id,
@@ -519,4 +521,59 @@ test('performance: render phase breakdown for 100 groups', async () => {
     reportTable('render phase breakdown', rows);
     console.info(`[perf] rendered ${containerCount} containers and ${buttonCount} activity buttons`);
     assert.ok(paintElapsed < 4000);
+});
+
+function buildNestedDataset(groupCount, activitiesPerGroup) {
+    const dataset = buildGroupDataset(groupCount, activitiesPerGroup);
+    // Every fourth group nests into the preceding root, giving realistic
+    // parent/child hierarchies at every scale.
+    for (let index = 1; index < dataset.groups.length; index += 4) {
+        const parent = dataset.groups[index - 1];
+        const child = dataset.groups[index];
+        child.parentId = parent.id;
+        child.x = parent.x + 40;
+        child.y = parent.y + 40;
+    }
+    return dataset;
+}
+
+test('performance: nested groups render, toggle and drag with the same budget', async () => {
+    const rows = [];
+    for (const groupCount of [10, 25, 50, 100]) {
+        const dataset = buildNestedDataset(groupCount, 8);
+        const harness = applyDataset(createGroupCanvasHarness(), dataset);
+        const { app } = harness;
+        const render = measure(`${groupCount} nested groups: first render`, () => app.renderMain());
+        assert.equal(app.groups.length, groupCount);
+        assert.equal(app.activities.length, groupCount * 8);
+
+        const parent = app.groups[0];
+        const collapseStart = performance.now();
+        await app.toggleGroupCollapsed(parent.id);
+        const collapseElapsed = performance.now() - collapseStart;
+        const expandStart = performance.now();
+        await app.toggleGroupCollapsed(parent.id);
+        const expandElapsed = performance.now() - expandStart;
+
+        const gesture = { activityId: dataset.activities[dataset.activities.length - 1].id, activityButton: null, dropTargetGroupId: null };
+        const drag = measure(`${groupCount} nested groups: 60 drag frames`, () => {
+            for (let frame = 0; frame < 60; frame += 1) {
+                gesture.activityButton = harness.buttons.find(button => button.dataset.activityId === gesture.activityId) || null;
+                app.updateMoveDropTarget(gesture);
+            }
+        });
+
+        for (const group of app.groups) {
+            for (const field of ['x', 'y']) {
+                assert.ok(Number.isFinite(Number(group[field])), 'group coordinates stay finite');
+            }
+        }
+        rows.push({ label: `${groupCount} nested groups: first render`, elapsed: render.elapsed });
+        rows.push({ label: `${groupCount} nested groups: parent collapse`, elapsed: collapseElapsed });
+        rows.push({ label: `${groupCount} nested groups: parent expand`, elapsed: expandElapsed });
+        rows.push({ label: `${groupCount} nested groups: 60 drag frames`, elapsed: drag.elapsed });
+        assert.ok(render.elapsed < 4000, `nested render under 4s (was ${formatMs(render.elapsed)})`);
+        assert.ok(drag.elapsed < 4000, `nested drag under 4s (was ${formatMs(drag.elapsed)})`);
+    }
+    reportTable('nested groups', rows);
 });

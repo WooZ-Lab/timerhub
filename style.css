@@ -2040,6 +2040,107 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     cursor:pointer; touch-action:manipulation;
 }
 .group-collapse-btn:hover, .group-duplicate-btn:hover { background:var(--brand-soft); }
+
+/* Group accent color (only applied when a color was explicitly chosen) */
+.group-container[style*="--group-accent"] {
+    border-color: color-mix(in srgb, var(--group-accent) 55%, var(--border-color));
+}
+.group-container[style*="--group-accent"]:not(.is-collapsed) {
+    background: color-mix(in srgb, var(--group-accent) 8%, transparent);
+}
+.group-container[style*="--group-accent"].is-collapsed {
+    background: color-mix(in srgb, var(--group-accent) 10%, var(--bg-secondary));
+}
+.group-container[style*="--group-accent"] .group-title {
+    color: color-mix(in srgb, var(--group-accent) 80%, var(--text-primary));
+}
+
+/* Group edit button shares the compact title-control styling */
+.group-edit-btn {
+    min-width: 32px;
+    min-height: 32px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--brand-strong);
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+.group-edit-btn:hover { background: var(--brand-soft); }
+
+/* Collapsed group resize handle: 44px hit area for touch, visual corner */
+.group-resize-handle {
+    position: absolute;
+    right: -14px;
+    bottom: -14px;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--brand-strong);
+    cursor: nwse-resize;
+    touch-action: none;
+    pointer-events: auto;
+}
+.group-resize-handle::after {
+    content: "";
+    width: 14px;
+    height: 14px;
+    border-right: 3px solid currentColor;
+    border-bottom: 3px solid currentColor;
+    border-radius: 0 0 3px 0;
+    filter: drop-shadow(0 1px 1px var(--bg-primary));
+}
+.group-resize-handle:hover,
+.group-resize-handle:focus-visible { background: var(--brand-soft); }
+
+/* Group edit color palette */
+.group-color-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.group-color-option {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    padding: 0;
+    border: 2px solid var(--border-color);
+    background: var(--swatch-color, transparent);
+    cursor: pointer;
+}
+.group-color-option.is-selected {
+    border-color: var(--brand);
+    box-shadow: 0 0 0 2px var(--brand-soft);
+}
+.group-color-option[data-color=""] {
+    background:
+        linear-gradient(135deg, transparent 45%, var(--danger, #e74c3c) 45%, var(--danger, #e74c3c) 55%, transparent 55%),
+        var(--bg-secondary);
+}
+
+/* Selected group highlight (multi-select / batch operations) */
+.group-container.is-selected {
+    outline: 3px solid var(--brand);
+    outline-offset: 3px;
+}
+
+/* Group nesting drop preview */
+.group-container.group-nest-target {
+    border-style: solid;
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 30%, transparent), var(--shadow-card);
+}
 .activity-resize-handle {
     position:absolute; z-index:2; width:44px; height:44px; padding:0; transform:translate(-50%,-50%);
     display:grid; place-items:center; border:0; border-radius:50%; background:transparent; color:var(--brand-strong);

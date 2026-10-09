@@ -625,6 +625,33 @@
             </div>
         </div>
 
+        <!-- Modal: Edit group name and color -->
+        <div id="groupEditModal" class="modal modal-centered" role="dialog" aria-modal="true" aria-labelledby="groupEditModalTitle">
+            <div class="modal-content modal-small">
+                <div class="modal-header">
+                    <h3 id="groupEditModalTitle" data-i18n="groupEditTitle">Edit group</h3>
+                    <button id="groupEditModalCloseBtn" class="modal-close" aria-label="Close" data-i18n-aria-label="close"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+                </div>
+
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="groupEditNameInput" data-i18n="groupName">Group name</label>
+                        <input type="text" id="groupEditNameInput" class="form-input" placeholder="e.g., Site A" data-i18n-placeholder="groupNamePlaceholder">
+                        <p id="groupEditNameError" class="form-error" role="alert" style="display:none;"></p>
+                    </div>
+                    <div class="form-group">
+                        <label data-i18n="groupColorLabel">Group color</label>
+                        <div id="groupEditColorOptions" class="group-color-options" role="radiogroup" aria-label="Group color"></div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button id="groupEditCancelBtn" class="btn-secondary" data-i18n="cancel">Cancel</button>
+                    <button id="groupEditSaveBtn" class="btn-primary" data-i18n="save">Save</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Modal: Import assignment from JSON -->
         <div id="assignmentImportModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="assignmentImportModalTitle">
             <div class="modal-content">
