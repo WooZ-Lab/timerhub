@@ -7,6 +7,7 @@ import vm from 'node:vm';
 const source = await readFile(new URL('../app.js', import.meta.url), 'utf8');
 const clockodoClientSource = await readFile(new URL('../clockodo-client.js', import.meta.url), 'utf8');
 const exchangeSource = await readFile(new URL('../exchange.js', import.meta.url), 'utf8');
+const assignmentSource = await readFile(new URL('../assignment.js', import.meta.url), 'utf8');
 
 function createTestApp(initialData = {}) {
     const storageData = {
@@ -43,6 +44,21 @@ function createTestApp(initialData = {}) {
         },
         async getSyncBatches() { return structuredClone(storageData.syncBatches); },
         async getGroups() { return structuredClone(storageData.groups); },
+        async applyAssignmentImport({ putGroups = [], putActivities = [], deleteGroupIds = [], deleteActivityIds = [], settings = {} } = {}) {
+            await Promise.resolve();
+            const nextGroups = structuredClone(storageData.groups).filter(group => !deleteGroupIds.includes(group.id));
+            const nextActivities = structuredClone(storageData.activities).filter(activity => !deleteActivityIds.includes(activity.id));
+            const nextSettings = structuredClone(storageData.settings);
+            putGroups.forEach(group => nextGroups.push(structuredClone(group)));
+            putActivities.forEach(activity => nextActivities.push(structuredClone(activity)));
+            const nextSettingsData = {};
+            for (const [key, value] of Object.entries(settings)) nextSettingsData[key] = structuredClone(value);
+            storageData.groups = nextGroups;
+            storageData.activities = nextActivities;
+            storageData.settings = nextSettings;
+            Object.assign(storageData.settings, nextSettingsData);
+            return true;
+        },
         async saveGroup(group) {
             const idx = storageData.groups.findIndex(item => item.id === group.id);
             if (idx >= 0) storageData.groups[idx] = structuredClone(group);
@@ -85,6 +101,7 @@ function createTestApp(initialData = {}) {
         async exportAll() {
             return structuredClone({
                 activities: storageData.activities,
+                groups: storageData.groups,
                 timeEntries: storageData.timeEntries,
                 syncBatches: storageData.syncBatches,
                 settings: Object.fromEntries(Object.entries(storageData.settings)
@@ -137,7 +154,11 @@ function createTestApp(initialData = {}) {
         'exchangePreviewWarnings', 'exchangePreviewList', 'exchangeDecryptBtn', 'exchangeImportBtn',
         'dayImportCloseBtn', 'dayImportCancelBtn', 'exchangeQrModal', 'exchangeQrCanvas',
         'exchangeQrCloseBtn', 'exchangeQrDoneBtn', 'exchangeScanModal', 'exchangeScanVideo', 'exchangeScanStatus',
-        'exchangeScanCloseBtn', 'exchangeScanDoneBtn'
+        'exchangeScanCloseBtn', 'exchangeScanDoneBtn',
+        'importAssignmentBtn', 'assignmentImportModal', 'assignmentImportModalTitle', 'assignmentImportCloseBtn',
+        'assignmentJsonInput', 'assignmentFileInput', 'assignmentChooseFileBtn', 'assignmentCopyPromptBtn',
+        'assignmentValidateBtn', 'assignmentImportError', 'assignmentPreview', 'assignmentPreviewSummary',
+        'assignmentPreviewWarnings', 'assignmentPreviewList', 'assignmentImportCancelBtn', 'assignmentImportConfirmBtn'
     ]) {
         elements.set(id, {
             id,
@@ -234,6 +255,7 @@ function createTestApp(initialData = {}) {
 
     vm.runInContext(clockodoClientSource, context, { filename: 'clockodo-client.js' });
     vm.runInContext(exchangeSource, context, { filename: 'exchange.js' });
+    vm.runInContext(assignmentSource, context, { filename: 'assignment.js' });
     vm.runInContext(source, context, { filename: 'app.js' });
     const app = vm.runInContext('new TimerHubApp()', context);
     app.storage = mockStorage;
@@ -5418,4 +5440,181 @@ test('editing an entry note in Day Review leaves the activity note untouched', a
 
     assert.equal(app.timeEntries.find(item => item.id === entry.id).notes, 'Edited in Day Review');
     assert.equal(app.activities.find(activity => activity.id === 'note-act').notes, 'В зале');
+});
+
+function makeAssignmentImportApp() {
+    const harness = createTestApp();
+    harness.app.cancelBackgroundAlarm = async () => {};
+    harness.app.scheduleBackgroundAlarm = async () => {};
+    return harness;
+}
+
+const sampleAssignment = {
+    format: 'timerhub-assignment',
+    version: 1,
+    name: 'Flower Street job',
+    groups: [
+        {
+            name: 'Flower Street',
+            activities: [{ name: 'Set up scaffold' }],
+            children: [
+                {
+                    name: '10',
+                    activities: [{ name: 'Weiß gemalert', notes: 'В зале', color: '#e74c3c', shape: 'square', size: 'large' }]
+                }
+            ]
+        }
+    ],
+    activities: [{ name: 'Load truck' }]
+};
+
+async function validateSample(harness, data = sampleAssignment) {
+    harness.document.getElementById('assignmentJsonInput').value = typeof data === 'string' ? data : JSON.stringify(data);
+    return harness.app.validateAssignmentJson();
+}
+
+test('a valid assignment previews and imports with correct parent-child relationships', async () => {
+    const harness = makeAssignmentImportApp();
+    const { app, document, storageData } = harness;
+    assert.equal(await validateSample(harness), true);
+    assert.equal(app.pendingAssignment.plan.groupCount, 2);
+    assert.equal(app.pendingAssignment.plan.activityCount, 3);
+    const previewHtml = document.getElementById('assignmentPreviewList').innerHTML;
+    assert.ok(previewHtml.includes('Flower Street'));
+    assert.ok(previewHtml.includes('10'), 'nested house groups appear in the preview');
+    assert.ok(previewHtml.includes('Weiß gemalert'));
+
+    assert.equal(await app.confirmAssignmentImport(), true);
+    assert.equal(app.groups.length, 2);
+    assert.equal(app.activities.length, 3);
+    assert.equal(storageData.groups.length, 2);
+    assert.equal(storageData.activities.length, 3);
+
+    const street = app.groups.find(group => group.name === 'Flower Street');
+    const house = app.groups.find(group => group.name === 'Flower Street · 10');
+    assert.ok(street && house);
+    const scaffold = app.activities.find(activity => activity.name === 'Set up scaffold');
+    const painted = app.activities.find(activity => activity.name === 'Weiß gemalert');
+    const truck = app.activities.find(activity => activity.name === 'Load truck');
+    assert.equal(scaffold.groupId, street.id);
+    assert.equal(painted.groupId, house.id);
+    assert.equal(Object.hasOwn(truck, 'groupId'), false);
+    assert.equal(painted.notes, 'В зале');
+    assert.equal(painted.color, '#e74c3c');
+    assert.equal(painted.shape, 'square');
+    assert.equal(painted.size, 'large');
+    assert.equal(street.assignment, 'Flower Street job');
+    assert.equal(painted.assignment, 'Flower Street job');
+});
+
+test('cancelling the assignment import leaves stored and in-memory data unchanged', async () => {
+    const harness = makeAssignmentImportApp();
+    const { app, storageData } = harness;
+    await validateSample(harness);
+    app.closeAssignmentImportModal();
+    assert.equal(app.pendingAssignment, null);
+    assert.equal(app.groups.length, 0);
+    assert.equal(app.activities.length, 0);
+    assert.equal(storageData.groups.length, 0);
+    assert.equal(storageData.activities.length, 0);
+});
+
+test('a failed atomic write leaves no partial hierarchy behind', async () => {
+    const harness = makeAssignmentImportApp();
+    const { app, document, storageData } = harness;
+    await validateSample(harness);
+    app.storage.applyAssignmentImport = async () => {
+        throw Object.assign(new Error('storage_write_failed'), { code: 'storage_write_failed' });
+    };
+    assert.equal(await app.confirmAssignmentImport(), false);
+    assert.equal(app.groups.length, 0);
+    assert.equal(app.activities.length, 0);
+    assert.equal(storageData.groups.length, 0);
+    assert.equal(storageData.activities.length, 0);
+    assert.equal(document.getElementById('assignmentImportError').style.display, '');
+});
+
+test('replace mode only replaces items from the same previous assignment', async () => {
+    const harness = makeAssignmentImportApp();
+    const { app, storageData } = harness;
+    app.groups = [
+        { id: 'old-group', name: 'Flower Street', x: 0, y: 0, collapsed: false, assignment: 'Flower Street job' },
+        { id: 'user-group', name: 'My own group', x: 0, y: 0, collapsed: false }
+    ];
+    app.activities = [
+        { id: 'old-activity', name: 'Old wall paint', groupId: 'old-group', assignment: 'Flower Street job', position: 0 },
+        { id: 'user-activity', name: 'My own activity', position: 1 }
+    ];
+    storageData.groups = structuredClone(app.groups);
+    storageData.activities = structuredClone(app.activities);
+
+    await validateSample(harness, { ...sampleAssignment, mode: 'replace' });
+    assert.equal(await app.confirmAssignmentImport(), true);
+
+    assert.equal(app.groups.some(group => group.id === 'old-group'), false);
+    assert.equal(app.activities.some(activity => activity.id === 'old-activity'), false);
+    assert.equal(app.groups.some(group => group.id === 'user-group'), true);
+    assert.equal(app.activities.some(activity => activity.id === 'user-activity'), true);
+    assert.equal(storageData.groups.some(group => group.id === 'old-group'), false);
+    assert.equal(storageData.activities.some(activity => activity.id === 'old-activity'), false);
+});
+
+test('repeat imports are flagged and require the explicit Import again action', async () => {
+    const harness = makeAssignmentImportApp();
+    const { app, document } = harness;
+    await validateSample(harness);
+    assert.equal(await app.confirmAssignmentImport(), true);
+
+    await validateSample(harness);
+    assert.equal(app.pendingAssignment.repeat, true);
+    assert.equal(document.getElementById('assignmentImportConfirmBtn').textContent, app.t('assignmentImportAgainBtn'));
+    assert.ok(document.getElementById('assignmentPreviewWarnings').innerHTML.includes(app.t('assignmentRepeatWarning')));
+    assert.equal(await app.confirmAssignmentImport(), true);
+    assert.equal(app.activities.length, 6, 'an explicitly confirmed repeat import is allowed');
+});
+
+test('invalid JSON and unexpected fields show localized errors and create nothing', async () => {
+    const harness = makeAssignmentImportApp();
+    const { app, document } = harness;
+    assert.equal(await validateSample(harness, '{broken'), false);
+    assert.equal(document.getElementById('assignmentImportError').textContent, app.t('assignmentInvalidJson'));
+    assert.equal(document.getElementById('assignmentImportConfirmBtn').style.display, 'none');
+
+    const withUnexpected = { ...sampleAssignment, secret: 'do-not-store' };
+    assert.equal(await validateSample(harness, withUnexpected), false);
+    assert.ok(document.getElementById('assignmentImportError').textContent.includes(app.t('assignmentUnexpectedProperty')));
+    assert.ok(document.getElementById('assignmentImportError').textContent.includes('secret'));
+    assert.equal(app.groups.length, 0);
+    assert.equal(app.activities.length, 0);
+});
+
+test('script-like names are escaped in the preview and stored as plain text', async () => {
+    const harness = makeAssignmentImportApp();
+    const { app, document, storageData } = harness;
+    const data = {
+        format: 'timerhub-assignment',
+        version: 1,
+        groups: [{ name: '<img src=x onerror=alert(1)>', activities: [{ name: '<script>alert(1)</script>' }] }]
+    };
+    assert.equal(await validateSample(harness, data), true);
+    const html = document.getElementById('assignmentPreviewList').innerHTML;
+    assert.equal(html.includes('<script>alert(1)</script>'), false);
+    assert.ok(html.includes('&lt;script&gt;'));
+    assert.equal(await app.confirmAssignmentImport(), true);
+    assert.equal(storageData.activities[0].name, '<script>alert(1)</script>');
+    assert.equal(storageData.groups[0].name, '<img src=x onerror=alert(1)>');
+});
+
+test('imported activities are preserved by backups and usable by the existing timer', async () => {
+    const harness = makeAssignmentImportApp();
+    const { app, storageData } = harness;
+    await validateSample(harness);
+    assert.equal(await app.confirmAssignmentImport(), true);
+    const backup = await app.storage.exportAll();
+    assert.ok(backup.activities.some(activity => activity.name === 'Weiß gemalert'));
+    assert.ok(backup.groups.some(group => group.name === 'Flower Street · 10'));
+    const painted = app.activities.find(activity => activity.name === 'Weiß gemalert');
+    await app.toggleActivity(painted.id);
+    assert.equal(painted.id, app.activeActivityId);
+    assert.equal(app.timeEntries[0].notes, 'В зале');
 });

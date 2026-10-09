@@ -1301,6 +1301,83 @@ input:-webkit-autofill:active {
     gap: 8px;
 }
 
+/* Work assignment JSON import */
+.assignment-json-input {
+    width: 100%;
+    min-height: 140px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px;
+    line-height: 1.45;
+    resize: vertical;
+}
+
+.assignment-import-tools {
+    margin-top: 8px;
+}
+
+.assignment-import-tools .action-btn {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.assignment-preview-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 10px;
+    max-height: 42vh;
+    overflow-y: auto;
+    padding: 8px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background-color: var(--bg-secondary);
+}
+
+.assignment-preview-row {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 5px 4px;
+    border-radius: var(--radius-sm);
+    overflow-wrap: anywhere;
+}
+
+.assignment-preview-row.is-excluded {
+    opacity: 0.55;
+    text-decoration: line-through;
+}
+
+.assignment-preview-kind {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-tertiary);
+    flex: 0 0 auto;
+}
+
+.assignment-preview-row small {
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+.assignment-preview-badge {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--warning-color);
+    border: 1px solid color-mix(in srgb, var(--warning-color) 40%, var(--border-color));
+    border-radius: 999px;
+    padding: 1px 7px;
+}
+
+@media (max-width: 600px) {
+    .assignment-import-tools {
+        grid-template-columns: 1fr;
+        flex-direction: column;
+    }
+}
+
 .exchange-actions {
     display: flex;
     gap: 8px;
