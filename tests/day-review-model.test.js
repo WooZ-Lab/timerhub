@@ -2291,7 +2291,7 @@ test('expanding overlapping groups applies temporary offsets without persisting 
     );
 });
 
-test('manually expanding a group resolves collisions with collapsed groups without moving saved positions', async () => {
+test('expanding a group keeps it anchored while collapsed neighbours step aside', async () => {
     const harness = createGroupCanvasHarness();
     const { app, containers } = harness;
     app.activities = [
@@ -2310,7 +2310,7 @@ test('manually expanding a group resolves collisions with collapsed groups witho
         first.left < second.left + second.width && second.left < first.left + first.width &&
         first.top < second.top + second.height && second.top < first.top + first.height;
     const boundsOf = groupId => {
-        const container = containers.find(item => item.dataset.groupId === groupId);
+        const container = containers.filter(item => item.dataset.groupId === groupId).at(-1);
         return {
             left: Number.parseFloat(container.style.left),
             top: Number.parseFloat(container.style.top),
@@ -2323,27 +2323,28 @@ test('manually expanding a group resolves collisions with collapsed groups witho
     assert.deepEqual({ ...app.groupDisplayOffset('manual-a') }, { x: 0, y: 0 }, 'collapsed groups stay at saved positions');
 
     await app.toggleGroupCollapsed('manual-a');
-    assert.deepEqual({ ...app.groupDisplayOffset('manual-a') }, { x: 0, y: 66 }, 'manual expansion resolves against the collapsed group');
+    assert.deepEqual({ ...app.groupDisplayOffset('manual-a') }, { x: 0, y: 0 }, 'the expanded group stays anchored at its position');
+    assert.notDeepEqual({ ...app.groupDisplayOffset('manual-b') }, { x: 0, y: 0 }, 'the collapsed neighbour steps aside');
+    assert.equal(overlaps(boundsOf('manual-a'), boundsOf('manual-b')), false, 'the expanded group is visually separated from the neighbour');
     assert.equal(app.groups[0].x, 100, 'saved x is unchanged');
     assert.equal(app.groups[0].y, 100, 'saved y is unchanged');
-    assert.deepEqual({ ...app.groupDisplayOffset('manual-b') }, { x: 0, y: 0 });
-    assert.equal(overlaps(boundsOf('manual-a'), boundsOf('manual-b')), false, 'expanded group is visually separated from the collapsed group');
-    assert.equal(containers.find(item => item.dataset.groupId === 'manual-b').style.left, '80px', 'collapsed group renders at its saved position');
 
     await app.toggleGroupCollapsed('manual-a');
-    assert.deepEqual({ ...app.groupDisplayOffset('manual-a') }, { x: 0, y: 0 }, 'collapsing restores the saved position');
+    assert.deepEqual({ ...app.groupDisplayOffset('manual-b') }, { x: 0, y: 0 }, 'collapsing restores the neighbour');
+    assert.deepEqual({ ...app.groupDisplayOffset('manual-a') }, { x: 0, y: 0 }, 'the collapsed group returns to its saved position');
+    assert.equal(boundsOf('manual-a').left, 80, 'collapsed group renders at its saved position');
     assert.equal(boundsOf('manual-a').top, 64);
 
     app.groups[1].x = 600;
     app.renderMain();
     await app.toggleGroupCollapsed('manual-a');
-    assert.deepEqual({ ...app.groupDisplayOffset('manual-a') }, { x: 0, y: 0 }, 're-expansion recalculates from the current saved positions');
+    assert.deepEqual({ ...app.groupDisplayOffset('manual-a') }, { x: 0, y: 0 }, 'the expanded group still stays anchored');
+    assert.deepEqual({ ...app.groupDisplayOffset('manual-b') }, { x: 0, y: 0 }, 'no displacement when nothing overlaps');
     assert.equal(app.groups[0].x, 100, 'saved positions are still untouched');
 
     app.activityLayouts.set('manual-a1', { activityId: 'manual-a1', x: 0, y: 0, width: 400, height: 160 });
     app.renderMain();
     assert.equal(boundsOf('manual-a').width, 440, 're-rendering uses the current member dimensions');
-    assert.deepEqual({ ...app.groupDisplayOffset('manual-a') }, { x: 0, y: 0 });
 });
 
 test('dragging an activity into a group reassigns membership without moving it', async () => {
@@ -5648,8 +5649,8 @@ test('imported groups anchor to their members and do not jump when collapsing', 
         const stored = storageData.layout.find(layout => layout.activityId === member.id);
         assert.ok(stored, 'each imported member stores a layout relative to its group');
         const absolute = app.getActivityCanvasLayout(member, 0);
-        assert.equal(stored.x, absolute.x - group.x);
-        assert.equal(stored.y, absolute.y - group.y);
+        assert.ok(Math.abs(stored.x - (absolute.x - group.x)) < 1e-9, 'stored x matches the absolute layout minus the anchor');
+        assert.ok(Math.abs(stored.y - (absolute.y - group.y)) < 1e-9, 'stored y matches the absolute layout minus the anchor');
     }
 
     const expanded = lastContainer(group.id);
@@ -5709,4 +5710,97 @@ test('repeated expand and collapse cycles keep imported group offsets and anchor
 
     assert.deepEqual(JSON.parse(JSON.stringify(offsets())), JSON.parse(JSON.stringify(firstOffsets)), 'neighbour displacement is recalculated without drift');
     assert.deepEqual(JSON.parse(JSON.stringify(anchors())), JSON.parse(JSON.stringify(firstAnchors)), 'saved coordinates are never written by expand/collapse');
+});
+
+test('three imported activities default to small and produce a compact group', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, containers } = harness;
+    harness.context.document.getElementById('assignmentJsonInput').value = JSON.stringify({
+        format: 'timerhub-assignment',
+        version: 1,
+        name: 'Small job',
+        groups: [{ name: 'House 10', activities: [{ name: 'A' }, { name: 'B' }, { name: 'C' }] }]
+    });
+    assert.equal(await app.validateAssignmentJson(), true);
+    assert.equal(await app.confirmAssignmentImport(), true);
+    app.renderMain();
+
+    const members = app.activities.filter(activity => activity.groupId);
+    assert.equal(members.length, 3);
+    for (const member of members) assert.equal(member.size, 'small');
+
+    const group = app.groups[0];
+    const layouts = members.map(member => app.getActivityCanvasLayout(member, 0));
+    const minX = Math.min(...layouts.map(layout => layout.x));
+    const minY = Math.min(...layouts.map(layout => layout.y));
+    const maxX = Math.max(...layouts.map(layout => layout.x + layout.width));
+    const maxY = Math.max(...layouts.map(layout => layout.y + layout.height));
+    const container = containers.filter(item => item.dataset.groupId === group.id).at(-1);
+    assert.equal(Number.parseFloat(container.style.width), (maxX - minX) + 40, 'width fits the contents plus padding');
+    assert.equal(Number.parseFloat(container.style.height), (maxY - minY) + 36 + 20, 'height fits the contents plus header and padding');
+    assert.equal(Number.parseFloat(container.style.left), minX - 20);
+    assert.equal(Number.parseFloat(container.style.top), minY - 36);
+    assert.ok(Number.parseFloat(container.style.width) <= 400, 'three small activities stay compact');
+});
+
+test('explicit assignment sizes are honored and existing user sizes are untouched', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app } = harness;
+    app.activities = [
+        { id: 'keep-big', name: 'Existing', position: 0, size: 'large', color: '#ffffff', shape: 'circle' }
+    ];
+    harness.context.document.getElementById('assignmentJsonInput').value = JSON.stringify({
+        format: 'timerhub-assignment',
+        version: 1,
+        name: 'Sizes',
+        groups: [{
+            name: 'Street',
+            activities: [{ name: 'Default' }, { name: 'Explicit medium', size: 'medium' }, { name: 'Explicit small', size: 'small' }]
+        }]
+    });
+    assert.equal(await app.validateAssignmentJson(), true);
+    assert.equal(await app.confirmAssignmentImport(), true);
+
+    assert.equal(app.activities.find(activity => activity.id === 'keep-big').size, 'large', 'existing user sizing is preserved');
+    assert.equal(app.activities.find(activity => activity.name === 'Default').size, 'small');
+    assert.equal(app.activities.find(activity => activity.name === 'Explicit medium').size, 'medium');
+    assert.equal(app.activities.find(activity => activity.name === 'Explicit small').size, 'small');
+});
+
+test('nested imported groups each fit their own contents', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, containers } = harness;
+    harness.context.document.getElementById('assignmentJsonInput').value = JSON.stringify({
+        format: 'timerhub-assignment',
+        version: 1,
+        name: 'Nested',
+        groups: [{
+            name: 'Street',
+            activities: [{ name: 'Set up scaffold' }],
+            children: [{
+                name: '10',
+                activities: [{ name: 'Paint walls' }, { name: 'Paint ceiling' }]
+            }]
+        }]
+    });
+    assert.equal(await app.validateAssignmentJson(), true);
+    assert.equal(await app.confirmAssignmentImport(), true);
+    app.renderMain();
+
+    for (const group of app.groups) {
+        const members = app.activities.filter(activity => activity.groupId === group.id);
+        assert.ok(members.length >= 1, `${group.name} has members`);
+        const layouts = members.map(member => app.getActivityCanvasLayout(member, 0));
+        const minX = Math.min(...layouts.map(layout => layout.x));
+        const minY = Math.min(...layouts.map(layout => layout.y));
+        const maxX = Math.max(...layouts.map(layout => layout.x + layout.width));
+        const maxY = Math.max(...layouts.map(layout => layout.y + layout.height));
+        const container = containers.filter(item => item.dataset.groupId === group.id).at(-1);
+        assert.equal(Number.parseFloat(container.style.width), (maxX - minX) + 40, `${group.name} width fits its own members`);
+        assert.equal(Number.parseFloat(container.style.height), (maxY - minY) + 36 + 20, `${group.name} height fits its own members`);
+    }
+    const street = app.groups.find(group => group.name === 'Street');
+    const house = app.groups.find(group => group.name === 'Street · 10');
+    assert.equal(app.activities.filter(activity => activity.groupId === street.id).length, 1);
+    assert.equal(app.activities.filter(activity => activity.groupId === house.id).length, 2);
 });

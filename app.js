@@ -3296,8 +3296,9 @@ class TimerHubApp {
             container.appendChild(title);
 
             if (group.collapsed) {
-                container.style.left = `${group.x - CANVAS_GROUP_PADDING}px`;
-                container.style.top = `${group.y - CANVAS_GROUP_HEADER}px`;
+                const offset = this.groupDisplayOffset(group.id);
+                container.style.left = `${group.x - CANVAS_GROUP_PADDING + offset.x}px`;
+                container.style.top = `${group.y - CANVAS_GROUP_HEADER + offset.y}px`;
                 container.style.width = `${CANVAS_GROUP_COLLAPSED_WIDTH}px`;
                 container.style.height = `${CANVAS_GROUP_COLLAPSED_HEIGHT}px`;
             } else {
@@ -3333,7 +3334,9 @@ class TimerHubApp {
             left,
             top,
             right: left + CANVAS_GROUP_COLLAPSED_WIDTH,
-            bottom: top + CANVAS_GROUP_COLLAPSED_HEIGHT
+            bottom: top + CANVAS_GROUP_COLLAPSED_HEIGHT,
+            width: CANVAS_GROUP_COLLAPSED_WIDTH,
+            height: CANVAS_GROUP_COLLAPSED_HEIGHT
         };
     }
 
@@ -3358,19 +3361,27 @@ class TimerHubApp {
 
     computeGroupDisplayOffsets() {
         const offsets = new Map();
-        const obstacles = [];
-        for (const group of this.groups) {
-            if (!this.groupMemberBoxes(group, false).length) continue;
-            if (group.collapsed) obstacles.push(this.groupCollapsedBounds(group));
-        }
-        const placed = [];
+        const expandedObstacles = [];
         for (const group of this.groups) {
             if (group.collapsed) continue;
             const boxes = this.groupMemberBoxes(group, false);
             if (!boxes.length) continue;
             const bounds = this.groupContainerBounds(boxes);
-            const { left, top } = this.resolveGroupCollision(bounds, [...obstacles, ...placed]);
-            placed.push({ left, top, right: left + bounds.width, bottom: top + bounds.height });
+            const { left, top } = this.resolveGroupCollision(bounds, expandedObstacles);
+            expandedObstacles.push({ left, top, right: left + bounds.width, bottom: top + bounds.height });
+            offsets.set(group.id, { x: left - bounds.left, y: top - bounds.top });
+        }
+        // Collapsed groups are the temporary ones: they step aside for anchored
+        // expanded groups and return to their saved positions once nothing
+        // expanded overlaps them.
+        const displacedCollapsed = [];
+        for (const group of this.groups) {
+            if (!group.collapsed) continue;
+            if (!this.groupMemberBoxes(group, false).length) continue;
+            const bounds = this.groupCollapsedBounds(group);
+            if (!expandedObstacles.some(other => this.rectanglesIntersect(bounds, other))) continue;
+            const { left, top } = this.resolveGroupCollision(bounds, [...expandedObstacles, ...displacedCollapsed]);
+            displacedCollapsed.push({ left, top, right: left + bounds.width, bottom: top + bounds.height });
             offsets.set(group.id, { x: left - bounds.left, y: top - bounds.top });
         }
         return offsets;
@@ -3410,8 +3421,9 @@ class TimerHubApp {
         if (!container) return;
         container.children[0]?.classList.add('dragging');
         if (group.collapsed) {
-            container.style.left = `${group.x - CANVAS_GROUP_PADDING}px`;
-            container.style.top = `${group.y - CANVAS_GROUP_HEADER}px`;
+            const offset = this.groupDisplayOffset(group.id);
+            container.style.left = `${group.x - CANVAS_GROUP_PADDING + offset.x}px`;
+            container.style.top = `${group.y - CANVAS_GROUP_HEADER + offset.y}px`;
         } else if (boxes.length) {
             this.applyGroupGeometry(container, boxes);
         }
@@ -7130,7 +7142,7 @@ class TimerHubApp {
             name: activity.name,
             color: activity.color || this.COLORS[position % this.COLORS.length],
             shape: activity.shape || 'circle',
-            size: activity.size || 'medium',
+            size: activity.size || 'small',
             notes: activity.notes || '',
             customerId: '',
             serviceId: '',
@@ -7168,16 +7180,19 @@ class TimerHubApp {
                 // staggered anchor.
                 const members = group.activities.map(activity =>
                     this.createImportedActivity(activity, null, position++, now, assignmentName));
-                const memberLayouts = members.map(member => this.getActivityCanvasLayout(member, 0));
+                // Reuse the existing default placement rules with a per-group
+                // index so small groups stay compact, then normalize the member
+                // layouts to the group's top-left. The group anchor stays at the
+                // import grid position, so expanding and collapsing never moves it.
+                const memberLayouts = members.map((member, memberIndex) =>
+                    this.getActivityCanvasLayout({ ...member, position: memberIndex }, 0));
+                const minX = memberLayouts.length ? Math.min(...memberLayouts.map(layout => layout.x)) : 0;
+                const minY = memberLayouts.length ? Math.min(...memberLayouts.map(layout => layout.y)) : 0;
                 const groupRecord = {
                     id: this.generateId(),
                     name: group.name,
-                    x: memberLayouts.length
-                        ? this.snapToCanvasGrid(Math.min(...memberLayouts.map(layout => layout.x)))
-                        : this.snapToCanvasGrid(24 + (index % 4) * 520),
-                    y: memberLayouts.length
-                        ? this.snapToCanvasGrid(Math.min(...memberLayouts.map(layout => layout.y)))
-                        : this.snapToCanvasGrid(24 + Math.floor(index / 4) * 420),
+                    x: this.snapToCanvasGrid(24 + (index % 4) * 520),
+                    y: this.snapToCanvasGrid(24 + Math.floor(index / 4) * 420),
                     collapsed: group.collapsed === true,
                     assignment: assignmentName,
                     importedAt: now
@@ -7188,8 +7203,8 @@ class TimerHubApp {
                     createdActivities.push(member);
                     createdLayouts.push({
                         activityId: member.id,
-                        x: memberLayouts[memberIndex].x - groupRecord.x,
-                        y: memberLayouts[memberIndex].y - groupRecord.y,
+                        x: memberLayouts[memberIndex].x - minX,
+                        y: memberLayouts[memberIndex].y - minY,
                         width: memberLayouts[memberIndex].width,
                         height: memberLayouts[memberIndex].height
                     });

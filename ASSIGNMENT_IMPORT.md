@@ -22,7 +22,7 @@ Flower Street · 10
 Flower Street · 12
 ```
 
-All activities of a nested group are placed into that flattened group. Activities listed directly on a parent group stay in the parent group. Top-level activities are created without a group. Group positions and activity colors/sizes use the same defaults as manually created items.
+All activities of a nested group are placed into that flattened group. Activities listed directly on a parent group stay in the parent group. Top-level activities are created without a group. Imported activities default to the smallest supported size so small assignments stay compact; an explicit `size` in the JSON is honored, and existing user-created activities keep their sizes. Group bounds are computed from the actual member boxes with the usual padding and header.
 
 ## Schema (version 1)
 
