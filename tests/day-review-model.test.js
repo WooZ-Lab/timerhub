@@ -5952,3 +5952,380 @@ test('nested flattened groups follow the same anchoring rule', async () => {
     await app.toggleGroupCollapsed('nest-h');
     assert.deepEqual({ ...app.groupDisplayOffset('nest-s') }, { x: 0, y: 0 }, 'collapsing restores the street neighbour');
 });
+
+function assignmentWithGroups(counts) {
+    return {
+        format: 'timerhub-assignment',
+        version: 1,
+        name: 'Layout job',
+        groups: counts.map((count, index) => ({
+            name: `Group ${index + 1}`,
+            activities: Array.from({ length: count }, (unused, activityIndex) => ({ name: `G${index + 1}A${activityIndex}` }))
+        }))
+    };
+}
+
+async function importGroupsIntoCanvas(harness, counts) {
+    const { app, context } = harness;
+    context.document.getElementById('assignmentJsonInput').value = JSON.stringify(assignmentWithGroups(counts));
+    assert.equal(await app.validateAssignmentJson(), true, 'the assignment validates');
+    assert.equal(await app.confirmAssignmentImport(), true, 'the assignment imports');
+    app.renderMain();
+}
+
+function makeLegacyGroupActivities(count = 12) {
+    const now = Date.now();
+    return Array.from({ length: count }, (unused, index) => ({
+        id: `legacy-${index}`,
+        name: `Legacy ${index}`,
+        color: '#18794e',
+        shape: 'circle',
+        size: 'small',
+        position: 400 + index,
+        archived: false,
+        createdAt: now,
+        updatedAt: now,
+        assignment: 'Old job',
+        importedAt: now,
+        groupId: 'legacy-group'
+    }));
+}
+
+test('size-aware import placement keeps imported group boxes from overlapping', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app } = harness;
+    await importGroupsIntoCanvas(harness, [4, 6, 12, 20]);
+
+    const geometries = app.groups.map(group => ({
+        id: group.id,
+        ...groupGeometry(harness.containers, group.id)
+    }));
+    for (const geometry of geometries) {
+        assert.ok(Number.isFinite(geometry.left) && Number.isFinite(geometry.top), 'positions are finite');
+        assert.ok(geometry.width > 0 && geometry.height > 0, 'containers have real dimensions');
+        assert.ok(geometry.left >= 0 && geometry.top >= 0, 'imported groups start inside the canvas');
+        assert.deepEqual({ ...app.groupDisplayOffset(geometry.id) }, { x: 0, y: 0 }, 'a packed group stays at its saved anchor');
+    }
+    for (let first = 0; first < geometries.length; first += 1) {
+        for (let second = first + 1; second < geometries.length; second += 1) {
+            assert.equal(
+                groupOverlaps(geometries[first], geometries[second]),
+                false,
+                `imported groups ${first} and ${second} must not overlap`
+            );
+        }
+    }
+});
+
+test('newly imported groups render at their saved anchors', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app } = harness;
+    await importGroupsIntoCanvas(harness, [6, 12]);
+    for (const group of app.groups) {
+        const geometry = groupGeometry(harness.containers, group.id);
+        assert.deepEqual({ ...app.groupDisplayOffset(group.id) }, { x: 0, y: 0 });
+        assert.equal(geometry.left, group.x - 20, 'the expanded container starts at the saved anchor');
+        assert.equal(geometry.top, group.y - 36);
+    }
+});
+
+test('expanding and collapsing an imported group keeps its displayed position', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, containers } = harness;
+    await importGroupsIntoCanvas(harness, [12, 12, 12]);
+    const group = app.groups[1];
+    const expanded = groupGeometry(containers, group.id);
+
+    await app.toggleGroupCollapsed(group.id);
+    app.renderMain();
+    const collapsed = groupGeometry(containers, group.id);
+    assert.equal(collapsed.left, expanded.left, 'collapsing does not move the group horizontally');
+    assert.equal(collapsed.top, expanded.top, 'collapsing does not move the group vertically');
+    assert.deepEqual({ ...app.groupDisplayOffset(group.id) }, { x: 0, y: 0 });
+
+    await app.toggleGroupCollapsed(group.id);
+    app.renderMain();
+    const reexpanded = groupGeometry(containers, group.id);
+    assert.equal(reexpanded.left, expanded.left);
+    assert.equal(reexpanded.top, expanded.top);
+    assert.deepEqual({ ...app.groupDisplayOffset(group.id) }, { x: 0, y: 0 });
+});
+
+test('expanding one imported group does not move unrelated imported groups', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, containers } = harness;
+    await importGroupsIntoCanvas(harness, [12, 12, 12, 12]);
+    const before = new Map(app.groups.map(group => [group.id, groupGeometry(containers, group.id)]));
+    const target = app.groups[2];
+
+    await app.toggleGroupCollapsed(target.id);
+    app.renderMain();
+    for (const group of app.groups) {
+        if (group.id === target.id) continue;
+        assert.deepEqual(groupGeometry(containers, group.id), before.get(group.id), 'unrelated groups stay in place');
+    }
+
+    await app.toggleGroupCollapsed(target.id);
+    app.renderMain();
+    for (const group of app.groups) {
+        assert.deepEqual(groupGeometry(containers, group.id), before.get(group.id), 'every group returns to its layout');
+    }
+});
+
+test('collision offsets do not depend on incidental group list order', () => {
+    const harness = createGroupCanvasHarness();
+    const { app } = harness;
+    app.activities = ['a', 'b', 'c'].map((suffix, index) => ({
+        id: `order-${suffix}`,
+        name: suffix.toUpperCase(),
+        position: index,
+        groupId: `order-group-${suffix}`,
+        size: 'medium'
+    }));
+    app.activityLayouts = new Map(app.activities.map(activity => [
+        activity.id,
+        { activityId: activity.id, x: 0, y: 0, width: 200, height: 120 }
+    ]));
+    app.groups = ['a', 'b', 'c'].map((suffix, index) => ({
+        id: `order-group-${suffix}`,
+        name: suffix.toUpperCase(),
+        x: 100 + index * 80,
+        y: 100,
+        collapsed: false
+    }));
+    app.renderMain();
+    const offsets = new Map(app.groups.map(group => [group.id, { ...app.groupDisplayOffset(group.id) }]));
+
+    app.groups = [...app.groups].reverse();
+    app.renderMain();
+    for (const group of app.groups) {
+        assert.deepEqual({ ...app.groupDisplayOffset(group.id) }, offsets.get(group.id), 'offsets stay stable when the array order changes');
+    }
+});
+
+test('reloading imported groups in a different storage order keeps their positions', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, storageData, containers } = harness;
+    await importGroupsIntoCanvas(harness, [12, 12, 12, 12]);
+    const before = new Map(app.groups.map(group => [group.id, groupGeometry(containers, group.id)]));
+
+    storageData.groups = [...storageData.groups].reverse();
+    await app.loadGroups();
+    app.renderMain();
+
+    assert.equal(app.groups.length, before.size, 'no groups are lost on reload');
+    for (const group of app.groups) {
+        assert.deepEqual(groupGeometry(containers, group.id), before.get(group.id), 'reload order does not move imported groups');
+        assert.deepEqual({ ...app.groupDisplayOffset(group.id) }, { x: 0, y: 0 });
+    }
+});
+
+test('legacy groups without member layouts are migrated once and keep their activities', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, storageData } = harness;
+    app.groups = [{ id: 'legacy-group', name: 'Legacy', x: 320, y: 224, collapsed: false, assignment: 'Old job', importedAt: 1 }];
+    app.activities = makeLegacyGroupActivities(12);
+    app.activityLayouts = new Map();
+    storageData.activities = structuredClone(app.activities);
+    storageData.groups = structuredClone(app.groups);
+    storageData.layout = [];
+    let writes = 0;
+    app.storage.saveLayout = async layout => {
+        writes += 1;
+        const index = storageData.layout.findIndex(item => item.activityId === layout.activityId);
+        if (index >= 0) storageData.layout[index] = structuredClone(layout);
+        else storageData.layout.push(structuredClone(layout));
+        return layout;
+    };
+
+    assert.equal(await app.migrateMissingGroupLayouts(), 12, 'every missing member layout is derived');
+    assert.equal(writes, 12);
+    assert.equal(app.activities.length, 12, 'activities are preserved');
+    assert.equal(app.groups.length, 1, 'groups are preserved');
+    for (const activity of app.activities) {
+        const layout = app.activityLayouts.get(activity.id);
+        assert.ok(layout, `a layout exists for ${activity.id}`);
+        for (const field of ['x', 'y', 'width', 'height']) {
+            assert.ok(Number.isFinite(Number(layout[field])), `${field} is finite`);
+        }
+    }
+    const positions = new Set(app.activities.map(activity => `${app.activityLayouts.get(activity.id).x},${app.activityLayouts.get(activity.id).y}`));
+    assert.equal(positions.size, 12, 'migrated legacy members do not stack');
+
+    assert.equal(await app.migrateMissingGroupLayouts(), 0, 'migration is idempotent');
+    assert.equal(writes, 12, 'no repeated migration writes');
+    assert.equal(storageData.layout.length, 12, 'no duplicate layout records');
+
+    app.renderMain();
+    const geometry = groupGeometry(harness.containers, 'legacy-group');
+    const layouts = app.activities.map(activity => app.getActivityCanvasLayout(activity, 0));
+    const bounds = app.groupContainerBounds(layouts);
+    assert.equal(geometry.left, bounds.left, 'the migrated group renders around its saved anchor');
+    assert.equal(geometry.top, bounds.top);
+});
+
+test('legacy migration keeps valid layouts and does not duplicate records', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, storageData } = harness;
+    const activities = makeLegacyGroupActivities(6);
+    const validLayout = { activityId: 'legacy-0', x: 16, y: 16, width: 220, height: 120 };
+    app.groups = [{ id: 'legacy-group', name: 'Legacy', x: 320, y: 224, collapsed: false }];
+    app.activities = activities;
+    app.activityLayouts = new Map([[validLayout.activityId, { ...validLayout }]]);
+    storageData.activities = structuredClone(activities);
+    storageData.groups = structuredClone(app.groups);
+    storageData.layout = [{ ...validLayout }];
+
+    assert.equal(await app.migrateMissingGroupLayouts(), 5, 'only the missing members are migrated');
+    assert.deepEqual({ ...app.activityLayouts.get('legacy-0') }, validLayout, 'a valid layout is never reset');
+    assert.equal(storageData.layout.filter(item => item.activityId === 'legacy-0').length, 1, 'no duplicate record');
+    const ids = storageData.layout.map(item => item.activityId);
+    assert.equal(new Set(ids).size, ids.length, 'layout records stay unique');
+    assert.equal(await app.migrateMissingGroupLayouts(), 0, 'the migration does not run twice');
+});
+
+test('duplicating a legacy group gives every member a distinct relative position', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, storageData } = harness;
+    app.groups = [{ id: 'legacy-group', name: 'Legacy', x: 320, y: 224, collapsed: false }];
+    app.activities = makeLegacyGroupActivities(12);
+    app.activityLayouts = new Map();
+    storageData.activities = structuredClone(app.activities);
+    storageData.groups = structuredClone(app.groups);
+    storageData.layout = [];
+
+    const duplicate = await app.duplicateGroup('legacy-group');
+    assert.ok(duplicate, 'the duplicate is created');
+    const copies = app.activities.filter(activity => activity.groupId === duplicate.id);
+    assert.equal(copies.length, 12, 'every member is copied');
+    const positions = new Set();
+    for (const copy of copies) {
+        const layout = app.activityLayouts.get(copy.id);
+        assert.ok(layout, 'a copy layout exists');
+        assert.ok(Number.isFinite(layout.x) && Number.isFinite(layout.y));
+        positions.add(`${layout.x},${layout.y}`);
+        assert.ok(storageData.layout.some(item => item.activityId === copy.id), 'the copy layout is persisted');
+    }
+    assert.equal(positions.size, 12, 'copied members do not stack on one position');
+});
+
+test('replace-mode imports recognize a previous assignment after a reload', async () => {
+    const harness = makeAssignmentImportApp();
+    const { app, document } = harness;
+    assert.equal(await validateSample(harness), true);
+    assert.equal(await app.confirmAssignmentImport(), true);
+    assert.equal(app.groups.length, 2);
+
+    app.groups = [];
+    app.activities = [];
+    app.activityLayouts = new Map();
+    await app.loadActivities();
+    await app.loadGroups();
+    assert.equal(app.groups.length, 2, 'groups reload from storage');
+    for (const group of app.groups) {
+        assert.equal(group.assignment, 'Flower Street job', 'assignment metadata survives loading');
+        assert.ok(Number.isFinite(Number(group.importedAt)));
+    }
+
+    document.getElementById('assignmentJsonInput').value = JSON.stringify({ ...sampleAssignment, mode: 'replace' });
+    assert.equal(await app.validateAssignmentJson(), true);
+    assert.equal(app.pendingAssignment.replaceTargets.groups.length, 2, 'the previous import is recognized');
+    assert.equal(app.pendingAssignment.replaceTargets.activities.length, 3);
+    assert.equal(await app.confirmAssignmentImport(), true);
+    assert.equal(app.groups.length, 2, 'replace removes the previous import before adding the new one');
+});
+
+test('repeated expand and collapse of imported groups never accumulates offsets', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app } = harness;
+    await importGroupsIntoCanvas(harness, [12, 6, 20]);
+    const stored = app.groups.map(group => ({ id: group.id, x: group.x, y: group.y }));
+    for (let cycle = 0; cycle < 3; cycle += 1) {
+        for (const group of [...app.groups]) {
+            await app.toggleGroupCollapsed(group.id);
+            app.renderMain();
+        }
+        for (const group of [...app.groups]) {
+            await app.toggleGroupCollapsed(group.id);
+            app.renderMain();
+        }
+    }
+    for (const group of app.groups) {
+        const original = stored.find(item => item.id === group.id);
+        assert.equal(group.x, original.x, 'saved anchor never moves');
+        assert.equal(group.y, original.y);
+        assert.deepEqual({ ...app.groupDisplayOffset(group.id) }, { x: 0, y: 0 }, 'no residual offset after many toggles');
+    }
+    assert.equal(new Set(app.groups.map(group => group.id)).size, app.groups.length, 'no duplicate groups appear');
+});
+
+test('a second import is placed beside existing groups instead of on top of them', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, containers } = harness;
+    await importGroupsIntoCanvas(harness, [12, 12]);
+    const first = new Map(app.groups.map(group => [group.id, groupGeometry(containers, group.id)]));
+
+    const secondAssignment = {
+        format: 'timerhub-assignment',
+        version: 1,
+        name: 'Second job',
+        groups: [{ name: 'Second', activities: Array.from({ length: 12 }, (unused, index) => ({ name: `S${index}` })) }]
+    };
+    harness.context.document.getElementById('assignmentJsonInput').value = JSON.stringify(secondAssignment);
+    assert.equal(await app.validateAssignmentJson(), true);
+    assert.equal(await app.confirmAssignmentImport(), true);
+    app.renderMain();
+
+    const imported = app.groups.find(group => group.name === 'Second');
+    assert.ok(imported, 'the second import exists');
+    const importedGeometry = groupGeometry(containers, imported.id);
+    for (const geometry of first.values()) {
+        assert.equal(groupOverlaps(importedGeometry, geometry), false, 'the new import avoids existing groups');
+    }
+    assert.deepEqual({ ...app.groupDisplayOffset(imported.id) }, { x: 0, y: 0 });
+    for (const [id, geometry] of first) {
+        assert.deepEqual(groupGeometry(containers, id), geometry, 'existing groups keep their positions');
+    }
+});
+
+test('manually created groups remain draggable and expandable', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, containers, pointer } = harness;
+    app.activities = [
+        { id: 'manual-new-1', name: 'M1', position: 0, size: 'small' },
+        { id: 'manual-new-2', name: 'M2', position: 1, size: 'small' },
+        { id: 'manual-new-3', name: 'M3', position: 2, size: 'small' }
+    ];
+    app.activityLayouts = new Map([
+        ['manual-new-1', { activityId: 'manual-new-1', x: 400, y: 300, width: 220, height: 120 }],
+        ['manual-new-2', { activityId: 'manual-new-2', x: 700, y: 300, width: 220, height: 120 }],
+        ['manual-new-3', { activityId: 'manual-new-3', x: 400, y: 500, width: 220, height: 120 }]
+    ]);
+    app.setCanvasSelection(['manual-new-1', 'manual-new-2', 'manual-new-3']);
+    const group = await app.createGroupFromSelection('Crew');
+    assert.ok(group, 'the manual group is created');
+    app.renderMain();
+    assert.deepEqual({ ...app.groupDisplayOffset(group.id) }, { x: 0, y: 0 });
+
+    const before = groupGeometry(containers, group.id);
+    const title = containers.filter(item => item.dataset.groupId === group.id).at(-1).children[0];
+    pointer('pointerdown', title, 100, 100);
+    pointer('pointermove', title, 148, 116);
+    pointer('pointerup', title, 148, 116);
+    assert.equal(group.x, 448, 'the manual group follows the pointer on the shared grid');
+    assert.equal(group.y, 320);
+    const moved = groupGeometry(containers, group.id);
+    assert.equal(moved.left, before.left + 48, 'members follow the dragged group');
+    assert.equal(moved.top, before.top + 16);
+
+    await app.toggleGroupCollapsed(group.id);
+    app.renderMain();
+    assert.equal(groupGeometry(containers, group.id).left, group.x - 20, 'the collapsed group sits at its anchor');
+    assert.deepEqual({ ...app.groupDisplayOffset(group.id) }, { x: 0, y: 0 });
+    await app.toggleGroupCollapsed(group.id);
+    app.renderMain();
+    const expanded = groupGeometry(containers, group.id);
+    assert.equal(expanded.left, moved.left, 'the group re-expands where it was dragged to');
+    assert.equal(expanded.top, moved.top);
+    assert.deepEqual({ ...app.groupDisplayOffset(group.id) }, { x: 0, y: 0 });
+});

@@ -974,6 +974,12 @@ const CANVAS_GROUP_HEADER = 36;
 const CANVAS_GROUP_COLLAPSED_WIDTH = 220;
 const CANVAS_GROUP_COLLAPSED_HEIGHT = 46;
 const CANVAS_GROUP_DUPLICATE_OFFSET = 48;
+// Deterministic, size-aware packing for imported groups: a shelf layout that
+// starts at the canvas origin, wraps at a fixed row width and leaves a full
+// grid-cell-plus gap between the measured group boxes.
+const CANVAS_IMPORT_ORIGIN = 24;
+const CANVAS_IMPORT_GAP = 48;
+const CANVAS_IMPORT_ROW_WIDTH = 4096;
 
 // ============================================================================
 // STORAGE REPOSITORY
@@ -1539,6 +1545,7 @@ class TimerHubApp {
             await this.refreshClockodoConfigurationStatus();
             await this.loadActivities();
             await this.loadGroups();
+            await this.migrateMissingGroupLayouts();
             await this.loadTimeEntries();
             this.applyTranslations();
             this.setupUI();
@@ -1614,13 +1621,24 @@ class TimerHubApp {
         this.groups = Array.isArray(groups)
             ? groups
                 .filter(group => group && typeof group === 'object')
-                .map(group => ({
-                    id: String(group.id || this.generateId()),
-                    name: String(group.name || ''),
-                    x: this.clampCanvasCoordinate(group.x, 0, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY),
-                    y: this.clampCanvasCoordinate(group.y, 0, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY),
-                    collapsed: group.collapsed === true
-                }))
+                .map(group => {
+                    const normalized = {
+                        id: String(group.id || this.generateId()),
+                        name: String(group.name || ''),
+                        x: this.clampCanvasCoordinate(group.x, 0, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY),
+                        y: this.clampCanvasCoordinate(group.y, 0, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY),
+                        collapsed: group.collapsed === true
+                    };
+                    // Assignment provenance must survive a reload: replace-mode
+                    // imports and later saves need it to stay intact.
+                    if (typeof group.assignment === 'string' && group.assignment) {
+                        normalized.assignment = group.assignment;
+                    }
+                    if (Number.isFinite(Number(group.importedAt))) {
+                        normalized.importedAt = Number(group.importedAt);
+                    }
+                    return normalized;
+                })
             : [];
     }
 
@@ -3360,12 +3378,33 @@ class TimerHubApp {
         return { left, top };
     }
 
+    // Stable layout order: saved anchor top-to-bottom, then left-to-right, with
+    // the id as a deterministic tiebreaker. This keeps collision resolution
+    // independent of IndexedDB getAll() order and of incidental array order.
+    compareGroupLayoutOrder(first, second) {
+        const firstY = Number(first?.y);
+        const secondY = Number(second?.y);
+        if (Number.isFinite(firstY) && Number.isFinite(secondY) && firstY !== secondY) {
+            return firstY - secondY;
+        }
+        const firstX = Number(first?.x);
+        const secondX = Number(second?.x);
+        if (Number.isFinite(firstX) && Number.isFinite(secondX) && firstX !== secondX) {
+            return firstX - secondX;
+        }
+        return String(first?.id || '').localeCompare(String(second?.id || ''));
+    }
+
+    sortedGroupsForLayout() {
+        return [...this.groups].sort((first, second) => this.compareGroupLayoutOrder(first, second));
+    }
+
     computeGroupDisplayOffsets() {
         const offsets = new Map();
         // Expansion priority: the group the user most recently expanded keeps
         // its saved anchor (offset {0,0}); every other group it overlaps steps
         // aside temporarily. Without an explicit expansion the order falls back
-        // to the stable group list order.
+        // to the stable saved-anchor order.
         const rank = new Map();
         this.expandedGroupOrder.forEach((id, index) => {
             if (!rank.has(id)) rank.set(id, index);
@@ -3373,7 +3412,7 @@ class TimerHubApp {
         const priorityOf = group => rank.has(group.id) ? rank.get(group.id) : Number.MAX_SAFE_INTEGER;
         const expandedGroups = this.groups
             .filter(group => !group.collapsed && this.groupMemberBoxes(group, false).length)
-            .sort((a, b) => (priorityOf(a) - priorityOf(b)) || (this.groups.indexOf(a) - this.groups.indexOf(b)));
+            .sort((a, b) => (priorityOf(a) - priorityOf(b)) || this.compareGroupLayoutOrder(a, b));
         const expandedObstacles = [];
         for (const group of expandedGroups) {
             const boxes = this.groupMemberBoxes(group, false);
@@ -3386,9 +3425,10 @@ class TimerHubApp {
         // expanded groups and return to their saved positions once nothing
         // expanded overlaps them.
         const displacedCollapsed = [];
-        for (const group of this.groups) {
-            if (!group.collapsed) continue;
-            if (!this.groupMemberBoxes(group, false).length) continue;
+        const collapsedGroups = this.groups
+            .filter(group => group.collapsed && this.groupMemberBoxes(group, false).length)
+            .sort((a, b) => this.compareGroupLayoutOrder(a, b));
+        for (const group of collapsedGroups) {
             const bounds = this.groupCollapsedBounds(group);
             if (!expandedObstacles.some(other => this.rectanglesIntersect(bounds, other))) continue;
             const { left, top } = this.resolveGroupCollision(bounds, [...expandedObstacles, ...displacedCollapsed]);
@@ -3598,7 +3638,7 @@ class TimerHubApp {
     async setAllGroupsCollapsed(collapsed) {
         if (!this.groups.length) return false;
         for (const group of this.groups) group.collapsed = collapsed;
-        this.expandedGroupOrder = collapsed ? [] : this.groups.map(group => group.id);
+        this.expandedGroupOrder = collapsed ? [] : this.sortedGroupsForLayout().map(group => group.id);
         for (const group of this.groups) {
             try {
                 await this.storage.saveGroup?.(group);
@@ -3632,6 +3672,7 @@ class TimerHubApp {
         };
         const now = Date.now();
         let position = Math.max(0, ...this.activities.map(activity => Number(activity.position) || 0));
+        const derivedLayouts = this.deriveGroupRelativeLayouts(group);
         const copies = members.map(activity => {
             const { id, groupId: _groupId, ...rest } = activity;
             const copy = {
@@ -3643,9 +3684,21 @@ class TimerHubApp {
                 updatedAt: now
             };
             const saved = this.activityLayouts.get(activity.id);
-            const layout = saved
-                ? { ...saved, activityId: copy.id }
-                : { activityId: copy.id, x: 0, y: 0, width: 260, height: 150 };
+            let layout;
+            if (this.isCompleteLayout(saved)) {
+                layout = { ...saved, activityId: copy.id };
+            } else {
+                // Legacy members without a usable relative layout get a fresh
+                // group-relative position instead of all stacking at {0,0}.
+                const derived = derivedLayouts.get(activity.id) || {
+                    activityId: activity.id,
+                    x: 0,
+                    y: 0,
+                    width: 260,
+                    height: 150
+                };
+                layout = { ...derived, activityId: copy.id };
+            }
             return { copy, layout };
         });
         this.groups.push(duplicate);
@@ -3677,7 +3730,16 @@ class TimerHubApp {
         const group = this.activityGroup(activity);
         const sizeDefaults = { small: [220, 120], medium: [260, 150], large: [320, 190] };
         const [defaultWidth, defaultHeight] = sizeDefaults[activity.size] || sizeDefaults.medium;
-        const order = Number.isFinite(Number(activity.position)) ? Number(activity.position) : index;
+        // Only members without a stored position need the generated fallback.
+        // That fallback is relative to the group and ordered by the member's
+        // place inside the group; using the global activity order would scatter
+        // legacy members far away from the saved anchor.
+        let order = Number.isFinite(Number(activity.position)) ? Number(activity.position) : index;
+        if (!Number.isFinite(Number(saved?.x)) || !Number.isFinite(Number(saved?.y))) {
+            order = group
+                ? Math.max(0, this.activities.filter(member => member.groupId === group.id).indexOf(activity))
+                : (Number.isFinite(Number(activity.position)) ? Number(activity.position) : index);
+        }
         const angle = order * 2.399963229728653;
         const radius = 82 * Math.sqrt(Math.max(0, order));
         const layout = {
@@ -3713,6 +3775,14 @@ class TimerHubApp {
         return this.groups.find(group => group.id === activity.groupId) || null;
     }
 
+    isCompleteLayout(layout) {
+        return Boolean(layout)
+            && Number.isFinite(Number(layout.x))
+            && Number.isFinite(Number(layout.y))
+            && Number.isFinite(Number(layout.width))
+            && Number.isFinite(Number(layout.height));
+    }
+
     clampCanvasCoordinate(value, fallback, min, max) {
         const number = Number(value);
         return Number.isFinite(number) ? Math.max(min, Math.min(max, number)) : fallback;
@@ -3723,6 +3793,107 @@ class TimerHubApp {
         return Number.isFinite(number)
             ? Math.round(number / CANVAS_GRID_SIZE) * CANVAS_GRID_SIZE
             : 0;
+    }
+
+    // Derive compact group-relative positions for members that have no usable
+    // layout yet. Valid layouts are fixed obstacles. The result is a
+    // deterministic cell grid anchored at the group origin, so the repair is
+    // stable, fast and idempotent.
+    deriveGroupRelativeLayouts(group) {
+        const derived = new Map();
+        const members = this.activities.filter(activity => activity.groupId === group.id);
+        if (!members.length) return derived;
+        const fixed = [];
+        const missing = [];
+        for (const member of members) {
+            const saved = this.activityLayouts.get(member.id);
+            if (this.isCompleteLayout(saved)) {
+                fixed.push({
+                    x: Number(saved.x),
+                    y: Number(saved.y),
+                    width: this.clampCanvasCoordinate(saved.width, 260, 160, 640),
+                    height: this.clampCanvasCoordinate(saved.height, 150, 110, 520)
+                });
+                continue;
+            }
+            const layout = this.getActivityCanvasLayout(member, this.activities.indexOf(member), false);
+            missing.push({
+                member,
+                width: this.clampCanvasCoordinate(layout.width, 260, 160, 640),
+                height: this.clampCanvasCoordinate(layout.height, 150, 110, 520)
+            });
+        }
+        if (!missing.length) return derived;
+        let maxWidth = CANVAS_GROUP_COLLAPSED_WIDTH;
+        let maxHeight = CANVAS_GROUP_COLLAPSED_HEIGHT;
+        for (const box of fixed) {
+            maxWidth = Math.max(maxWidth, box.width);
+            maxHeight = Math.max(maxHeight, box.height);
+        }
+        for (const entry of missing) {
+            maxWidth = Math.max(maxWidth, entry.width);
+            maxHeight = Math.max(maxHeight, entry.height);
+        }
+        const cellWidth = maxWidth + CANVAS_IMPORT_GAP * 2;
+        const cellHeight = maxHeight + CANVAS_IMPORT_GAP * 2;
+        const occupied = new Set();
+        const markCells = (x, y, width, height) => {
+            const firstColumn = Math.floor(x / cellWidth);
+            const lastColumn = Math.floor((x + width) / cellWidth);
+            const firstRow = Math.floor(y / cellHeight);
+            const lastRow = Math.floor((y + height) / cellHeight);
+            for (let row = firstRow; row <= lastRow; row += 1) {
+                for (let column = firstColumn; column <= lastColumn; column += 1) {
+                    occupied.add(`${row}:${column}`);
+                }
+            }
+        };
+        for (const box of fixed) markCells(box.x, box.y, box.width, box.height);
+        const columns = Math.max(1, Math.ceil(Math.sqrt(missing.length + fixed.length)));
+        let cell = 0;
+        for (const entry of missing) {
+            while (true) {
+                const row = Math.floor(cell / columns);
+                const column = cell % columns;
+                cell += 1;
+                const key = `${row}:${column}`;
+                if (occupied.has(key)) continue;
+                occupied.add(key);
+                derived.set(entry.member.id, {
+                    activityId: entry.member.id,
+                    x: column * cellWidth,
+                    y: row * cellHeight,
+                    width: entry.width,
+                    height: entry.height
+                });
+                break;
+            }
+        }
+        return derived;
+    }
+
+    // Repair groups whose members predate group-relative layout records. Valid
+    // layouts are never touched; once a derived record is written it is
+    // complete, so a later call leaves it alone.
+    async migrateMissingGroupLayouts() {
+        if (!this.groups.length || !this.activities.length) return 0;
+        const pending = [];
+        for (const group of this.groups) {
+            const derived = this.deriveGroupRelativeLayouts(group);
+            for (const [activityId, layout] of derived) {
+                this.activityLayouts.set(activityId, layout);
+                pending.push(layout);
+            }
+        }
+        for (const layout of pending) {
+            try {
+                await this.storage.saveLayout?.(layout);
+            } catch {
+                // The in-memory layout is repaired for this session; the next
+                // start detects the still-missing record and retries.
+            }
+        }
+        return pending.length;
     }
 
     magneticActivityOthers(excludeId) {
@@ -7155,6 +7326,91 @@ class TimerHubApp {
         return true;
     }
 
+    measureGroupContainer(relativeBoxes) {
+        if (!relativeBoxes.length) return { width: 0, height: 0 };
+        const bounds = this.groupContainerBounds(relativeBoxes);
+        return { width: bounds.width, height: bounds.height };
+    }
+
+    currentLayoutObstacles() {
+        const obstacles = [];
+        for (const group of this.groups) {
+            const boxes = this.groupMemberBoxes(group, false);
+            if (!boxes.length) continue;
+            const bounds = this.groupContainerBounds(boxes);
+            obstacles.push(bounds);
+            const offset = this.groupDisplayOffset(group.id);
+            if (offset.x || offset.y) {
+                obstacles.push({
+                    left: bounds.left + offset.x,
+                    top: bounds.top + offset.y,
+                    right: bounds.right + offset.x,
+                    bottom: bounds.bottom + offset.y,
+                    width: bounds.width,
+                    height: bounds.height
+                });
+            }
+        }
+        for (const activity of this.activities) {
+            if (activity.groupId) continue;
+            const layout = this.getActivityCanvasLayout(activity, this.activities.indexOf(activity), false);
+            obstacles.push({
+                left: layout.x,
+                top: layout.y,
+                right: layout.x + layout.width,
+                bottom: layout.y + layout.height,
+                width: layout.width,
+                height: layout.height
+            });
+        }
+        return obstacles;
+    }
+
+    createImportPacking(obstacles = []) {
+        return {
+            left: CANVAS_IMPORT_ORIGIN,
+            top: CANVAS_IMPORT_ORIGIN,
+            rowHeight: 0,
+            obstacles
+        };
+    }
+
+    placeNextImportedGroup(packing, dimensions) {
+        const width = Number.isFinite(dimensions.width) ? Math.max(0, dimensions.width) : 0;
+        const height = Number.isFinite(dimensions.height) ? Math.max(0, dimensions.height) : 0;
+        if (packing.left > CANVAS_IMPORT_ORIGIN && packing.left + width > CANVAS_IMPORT_ORIGIN + CANVAS_IMPORT_ROW_WIDTH) {
+            packing.left = CANVAS_IMPORT_ORIGIN;
+            packing.top += packing.rowHeight + CANVAS_IMPORT_GAP;
+            packing.rowHeight = 0;
+        }
+        const anchorX = this.snapToCanvasGrid(packing.left + CANVAS_GROUP_PADDING);
+        const anchorY = this.snapToCanvasGrid(packing.top + CANVAS_GROUP_HEADER);
+        const free = this.resolveGroupCollision({
+            left: anchorX - CANVAS_GROUP_PADDING,
+            top: anchorY - CANVAS_GROUP_HEADER,
+            right: anchorX - CANVAS_GROUP_PADDING + width,
+            bottom: anchorY - CANVAS_GROUP_HEADER + height,
+            width,
+            height
+        }, packing.obstacles);
+        const placed = {
+            x: free.left + CANVAS_GROUP_PADDING,
+            y: free.top + CANVAS_GROUP_HEADER
+        };
+        const bounds = {
+            left: placed.x - CANVAS_GROUP_PADDING,
+            top: placed.y - CANVAS_GROUP_HEADER,
+            right: placed.x - CANVAS_GROUP_PADDING + width,
+            bottom: placed.y - CANVAS_GROUP_HEADER + height,
+            width,
+            height
+        };
+        packing.obstacles.push(bounds);
+        packing.left = bounds.right + CANVAS_IMPORT_GAP;
+        packing.rowHeight = Math.max(packing.rowHeight, height);
+        return placed;
+    }
+
     createImportedActivity(activity, groupId, position, now, assignmentName) {
         const record = {
             id: this.generateId(),
@@ -7190,28 +7446,34 @@ class TimerHubApp {
             const createdGroups = [];
             const createdActivities = [];
             const createdLayouts = [];
+            const packing = this.createImportPacking(this.currentLayoutObstacles());
             let position = this.activities.length;
-            plan.groups.forEach((group, index) => {
-                // Compute member layouts first, then anchor the group to their
-                // bounding box and store each member layout relative to the
-                // group, exactly like manually created groups. This keeps
-                // collapse/expand stable instead of jumping to an arbitrary
-                // staggered anchor.
+            plan.groups.forEach(group => {
+                // Compute member layouts first with the per-group placement
+                // rules, then measure the real container box and let the
+                // size-aware packing place the anchor. Members are stored
+                // relative to the anchor, exactly like manually created groups.
                 const members = group.activities.map(activity =>
                     this.createImportedActivity(activity, null, position++, now, assignmentName));
-                // Reuse the existing default placement rules with a per-group
-                // index so small groups stay compact, then normalize the member
-                // layouts to the group's top-left. The group anchor stays at the
-                // import grid position, so expanding and collapsing never moves it.
                 const memberLayouts = members.map((member, memberIndex) =>
                     this.getActivityCanvasLayout({ ...member, position: memberIndex }, 0));
                 const minX = memberLayouts.length ? Math.min(...memberLayouts.map(layout => layout.x)) : 0;
                 const minY = memberLayouts.length ? Math.min(...memberLayouts.map(layout => layout.y)) : 0;
+                const relativeBoxes = memberLayouts.map((layout, memberIndex) => ({
+                    x: layout.x - minX,
+                    y: layout.y - minY,
+                    width: layout.width,
+                    height: layout.height
+                }));
+                const anchor = this.placeNextImportedGroup(
+                    packing,
+                    this.measureGroupContainer(relativeBoxes)
+                );
                 const groupRecord = {
                     id: this.generateId(),
                     name: group.name,
-                    x: this.snapToCanvasGrid(24 + (index % 4) * 520),
-                    y: this.snapToCanvasGrid(24 + Math.floor(index / 4) * 420),
+                    x: anchor.x,
+                    y: anchor.y,
                     collapsed: group.collapsed === true,
                     assignment: assignmentName,
                     importedAt: now
@@ -7473,6 +7735,7 @@ class TimerHubApp {
             this.cancelPendingRestore();
             await this.loadActivities();
             await this.loadGroups();
+            await this.migrateMissingGroupLayouts();
             await this.loadTimeEntries();
             this.renderAll();
             await this.refreshAutomaticBackupStatus();
