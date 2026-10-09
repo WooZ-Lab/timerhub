@@ -72,6 +72,9 @@ function createTestApp(initialData = {}) {
             else storageData.groups.push(structuredClone(group));
             return group;
         },
+        async deleteGroup(id) {
+            storageData.groups = storageData.groups.filter(group => group.id !== id);
+        },
         async getLayout() { return structuredClone(storageData.layout); },
         async saveLayout(layout) {
             const idx = storageData.layout.findIndex(item => item.activityId === layout.activityId);
@@ -167,7 +170,9 @@ function createTestApp(initialData = {}) {
         'assignmentValidateBtn', 'assignmentImportError', 'assignmentPreview', 'assignmentPreviewSummary',
         'assignmentPreviewWarnings', 'assignmentPreviewList', 'assignmentImportCancelBtn', 'assignmentImportConfirmBtn',
         'groupEditModal', 'groupEditModalTitle', 'groupEditModalCloseBtn', 'groupEditNameInput', 'groupEditNameError',
-        'groupEditColorOptions', 'groupEditCancelBtn', 'groupEditSaveBtn'
+        'groupEditColorOptions', 'groupEditCancelBtn', 'groupEditSaveBtn',
+        'createGroupFromGroupsBtn', 'deleteGroupsBtn', 'groupDeleteModal', 'groupDeleteModalTitle',
+        'groupDeleteModalCloseBtn', 'groupDeleteSummary', 'groupDeleteCancelBtn', 'groupDeleteConfirmBtn'
     ]) {
         elements.set(id, {
             id,
@@ -448,9 +453,9 @@ function createGroupCanvasHarness() {
     app.toggleActivity = async () => {};
     app.setupActivityCanvasInteractions();
 
-    const pointer = (type, target, x, y) => viewport.handlers.get(type)?.({
+    const pointer = (type, target, x, y, modifiers = {}) => viewport.handlers.get(type)?.({
         isPrimary: true, pointerType: 'mouse', button: 0, pointerId: 1,
-        clientX: x, clientY: y, target, type, preventDefault() {}
+        clientX: x, clientY: y, target, type, preventDefault() {}, ...modifiers
     });
 
     return {
@@ -6731,4 +6736,212 @@ test('legacy groups with missing or cyclic parents are sanitized on load', async
     const c = app.groups.find(item => item.id === 'san-c');
     const cycleBroken = (b.parentId === undefined) !== (c.parentId === undefined);
     assert.ok(cycleBroken || (b.parentId === undefined && c.parentId === undefined), 'cycles are broken');
+});
+
+test('clicking a group title selects it and modifier clicks build a multi-selection', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, containers, pointer } = harness;
+    app.activities = [
+        { id: 'gs-a1', name: 'A1', position: 0, groupId: 'gs-a', size: 'medium' },
+        { id: 'gs-b1', name: 'B1', position: 1, groupId: 'gs-b', size: 'medium' },
+        { id: 'gs-c1', name: 'C1', position: 2, groupId: 'gs-c', size: 'medium' }
+    ];
+    app.activityLayouts = new Map([
+        ['gs-a1', { activityId: 'gs-a1', x: 0, y: 0, width: 200, height: 120 }],
+        ['gs-b1', { activityId: 'gs-b1', x: 0, y: 0, width: 200, height: 120 }],
+        ['gs-c1', { activityId: 'gs-c1', x: 0, y: 0, width: 200, height: 120 }]
+    ]);
+    app.groups = [
+        { id: 'gs-a', name: 'A', x: 100, y: 100, collapsed: false },
+        { id: 'gs-b', name: 'B', x: 500, y: 100, collapsed: false },
+        { id: 'gs-c', name: 'C', x: 900, y: 100, collapsed: false }
+    ];
+    app.renderMain();
+    const titleOf = id => containers.filter(item => item.dataset.groupId === id).at(-1).children[0];
+
+    pointer('pointerdown', titleOf('gs-a'), 100, 80);
+    pointer('pointerup', titleOf('gs-a'), 100, 80);
+    assert.deepEqual([...app.selectedGroupIds], ['gs-a'], 'a plain click selects one group');
+
+    pointer('pointerdown', titleOf('gs-b'), 500, 80, { ctrlKey: true });
+    pointer('pointerup', titleOf('gs-b'), 500, 80, { ctrlKey: true });
+    assert.ok(app.selectedGroupIds.has('gs-a') && app.selectedGroupIds.has('gs-b'), 'ctrl-click adds to the selection');
+
+    pointer('pointerdown', titleOf('gs-b'), 500, 80, { ctrlKey: true });
+    pointer('pointerup', titleOf('gs-b'), 500, 80, { ctrlKey: true });
+    assert.equal(app.selectedGroupIds.has('gs-b'), false, 'ctrl-click toggles a group off');
+
+    pointer('pointerdown', titleOf('gs-c'), 900, 80);
+    pointer('pointerup', titleOf('gs-c'), 900, 80);
+    assert.deepEqual([...app.selectedGroupIds], ['gs-c'], 'a plain click replaces the selection');
+
+    app.renderMain();
+    const selectedContainer = containers.filter(item => item.dataset.groupId === 'gs-c').at(-1);
+    const unselectedContainer = containers.filter(item => item.dataset.groupId === 'gs-a').at(-1);
+    assert.ok(selectedContainer.classList.contains('is-selected'), 'the selected group is highlighted');
+    assert.equal(unselectedContainer.classList.contains('is-selected'), false);
+
+    app.handleGlobalKeydown({ key: 'Escape', target: { tagName: 'DIV' } });
+    assert.equal(app.selectedGroupIds.size, 0, 'escape clears the group selection');
+});
+
+test('a selection rectangle selects groups and activities together', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, viewport } = harness;
+    app.activities = [
+        { id: 'rs-a1', name: 'A1', position: 0, groupId: 'rs-a', size: 'medium' },
+        { id: 'rs-b1', name: 'B1', position: 1, groupId: 'rs-b', size: 'medium' }
+    ];
+    app.activityLayouts = new Map([
+        ['rs-a1', { activityId: 'rs-a1', x: 0, y: 0, width: 200, height: 120 }],
+        ['rs-b1', { activityId: 'rs-b1', x: 0, y: 0, width: 200, height: 120 }]
+    ]);
+    app.groups = [
+        { id: 'rs-a', name: 'A', x: 100, y: 100, collapsed: false },
+        { id: 'rs-b', name: 'B', x: 900, y: 100, collapsed: false }
+    ];
+    app.renderMain();
+
+    const gesture = { startX: 0, startY: 0, lastX: 0, lastY: 0 };
+    app.beginCanvasSelection(gesture, viewport);
+    app.updateCanvasSelection(gesture, 700, 700);
+    app.finishCanvasSelection(gesture);
+    assert.deepEqual([...app.selectedGroupIds], ['rs-a'], 'the rectangle selects the covered group');
+    assert.deepEqual([...app.selectedActivityIds], ['rs-a1'], 'the rectangle selects the covered activity');
+});
+
+test('dragging one selected group moves every selected group and its descendants', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, containers, pointer, storageData } = harness;
+    app.activities = [
+        { id: 'bm-a1', name: 'A1', position: 0, groupId: 'bm-a', size: 'medium' },
+        { id: 'bm-b1', name: 'B1', position: 1, groupId: 'bm-b', size: 'medium' },
+        { id: 'bm-b2', name: 'B2', position: 2, groupId: 'bm-b2', size: 'medium' }
+    ];
+    app.activityLayouts = new Map([
+        ['bm-a1', { activityId: 'bm-a1', x: 0, y: 0, width: 200, height: 120 }],
+        ['bm-b1', { activityId: 'bm-b1', x: 0, y: 0, width: 200, height: 120 }],
+        ['bm-b2', { activityId: 'bm-b2', x: 0, y: 0, width: 200, height: 120 }]
+    ]);
+    app.groups = [
+        { id: 'bm-a', name: 'A', x: 200, y: 200, collapsed: false },
+        { id: 'bm-b', name: 'B', x: 600, y: 200, collapsed: false },
+        { id: 'bm-b2', name: 'B2', x: 640, y: 240, collapsed: false, parentId: 'bm-b' }
+    ];
+    storageData.groups = structuredClone(app.groups);
+    app.renderMain();
+    const groupA = app.groups.find(item => item.id === 'bm-a');
+    const groupB = app.groups.find(item => item.id === 'bm-b');
+    const nested = app.groups.find(item => item.id === 'bm-b2');
+    const relative = { x: nested.x - groupB.x, y: nested.y - groupB.y };
+    app.setGroupSelection(['bm-a', 'bm-b']);
+
+    const title = containers.filter(item => item.dataset.groupId === 'bm-a').at(-1).children[0];
+    pointer('pointerdown', title, 200, 180);
+    pointer('pointermove', title, 256, 236);
+    pointer('pointerup', title, 256, 236);
+
+    assert.equal(groupA.x, 256, 'the dragged group moved');
+    assert.equal(groupA.y, 256);
+    assert.equal(groupB.x, 656, 'the other selected group moved by the same delta');
+    assert.equal(groupB.y, 256);
+    assert.equal(nested.x - groupB.x, relative.x, 'the nested descendant follows its parent');
+    assert.equal(nested.y - groupB.y, relative.y);
+    assert.ok(storageData.groups.some(item => item.id === 'bm-a' && item.x === 256), 'every moved group is persisted');
+    assert.ok(storageData.groups.some(item => item.id === 'bm-b' && item.x === 656));
+});
+
+test('the explicit action wraps selected groups in a new parent group', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, storageData } = harness;
+    app.activities = [
+        { id: 'wa-a1', name: 'A1', position: 0, groupId: 'wa-a', size: 'medium' },
+        { id: 'wa-b1', name: 'B1', position: 1, groupId: 'wa-b', size: 'medium' }
+    ];
+    app.activityLayouts = new Map([
+        ['wa-a1', { activityId: 'wa-a1', x: 0, y: 0, width: 200, height: 120 }],
+        ['wa-b1', { activityId: 'wa-b1', x: 0, y: 0, width: 200, height: 120 }]
+    ]);
+    app.groups = [
+        { id: 'wa-a', name: 'A', x: 100, y: 100, collapsed: false },
+        { id: 'wa-b', name: 'B', x: 500, y: 100, collapsed: false }
+    ];
+    storageData.groups = structuredClone(app.groups);
+    app.renderMain();
+    app.setGroupSelection(['wa-a', 'wa-b']);
+    const wrapper = await app.createGroupFromSelectedGroups();
+    assert.ok(wrapper, 'a wrapper group is created');
+    assert.equal(app.groups.find(item => item.id === 'wa-a').parentId, wrapper.id);
+    assert.equal(app.groups.find(item => item.id === 'wa-b').parentId, wrapper.id);
+    assert.equal(wrapper.parentId, undefined, 'the wrapper sits at the root level');
+    assert.deepEqual([...app.selectedGroupIds], [wrapper.id], 'the wrapper becomes the selection');
+    const bounds = app.groupBaseBounds(wrapper);
+    const boundsA = app.groupBaseBounds(app.groups.find(item => item.id === 'wa-a'));
+    const boundsB = app.groupBaseBounds(app.groups.find(item => item.id === 'wa-b'));
+    assert.ok(bounds.left <= boundsA.left && bounds.right >= boundsB.right, 'the wrapper covers every child');
+    assert.ok(storageData.groups.some(item => item.id === wrapper.id), 'the wrapper is persisted');
+});
+
+test('deleting selected groups keeps member activities and lifts nested groups', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, context, storageData } = harness;
+    const document = context.document;
+    app.activities = [
+        { id: 'del-r1', name: 'R1', position: 0, groupId: 'del-root', size: 'medium' },
+        { id: 'del-c1', name: 'C1', position: 1, groupId: 'del-child', size: 'medium' }
+    ];
+    app.activityLayouts = new Map([
+        ['del-r1', { activityId: 'del-r1', x: 0, y: 0, width: 200, height: 120 }],
+        ['del-c1', { activityId: 'del-c1', x: 0, y: 0, width: 200, height: 120 }]
+    ]);
+    app.groups = [
+        { id: 'del-root', name: 'Root', x: 100, y: 100, collapsed: false },
+        { id: 'del-child', name: 'Child', x: 140, y: 140, collapsed: false, parentId: 'del-root' }
+    ];
+    storageData.groups = structuredClone(app.groups);
+    storageData.activities = structuredClone(app.activities);
+    app.renderMain();
+    app.setGroupSelection(['del-root']);
+
+    assert.equal(app.openGroupDeleteModal(), true, 'the confirmation dialog opens');
+    assert.ok(document.getElementById('groupDeleteSummary').textContent.includes('1'), 'the summary reports the deletion');
+    assert.equal(await app.deleteSelectedGroups(), true);
+
+    assert.equal(app.groups.some(item => item.id === 'del-root'), false, 'the group is deleted');
+    assert.equal(app.groups.find(item => item.id === 'del-child').parentId, undefined, 'the nested group moves up one level');
+    const rootActivity = app.activities.find(item => item.id === 'del-r1');
+    assert.equal(rootActivity.groupId, undefined, 'the member activity is ungrouped');
+    assert.equal(app.activityLayouts.get('del-r1').x, 100, 'the ungrouped activity keeps its absolute position');
+    assert.equal(app.activityLayouts.get('del-r1').y, 100);
+    assert.equal(app.activities.find(item => item.id === 'del-c1').groupId, 'del-child', 'nested members stay in their group');
+    assert.equal(app.groups.length, 1, 'only the selected group is removed');
+    assert.equal(storageData.groups.some(item => item.id === 'del-root'), false, 'the deletion is persisted');
+    assert.equal(storageData.activities.find(item => item.id === 'del-r1').groupId, undefined);
+    assert.equal(storageData.layout.find(item => item.activityId === 'del-r1').x, 100, 'the converted layout is persisted');
+    assert.ok(storageData.groups.find(item => item.id === 'del-child').parentId === undefined, 'the lifted parent is persisted');
+});
+
+test('canceling the delete confirmation changes nothing and keyboard delete opens it', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, context, storageData } = harness;
+    const document = context.document;
+    app.activities = [{ id: 'kd-a1', name: 'A1', position: 0, groupId: 'kd-a', size: 'medium' }];
+    app.activityLayouts = new Map([
+        ['kd-a1', { activityId: 'kd-a1', x: 0, y: 0, width: 200, height: 120 }]
+    ]);
+    app.groups = [{ id: 'kd-a', name: 'A', x: 100, y: 100, collapsed: false }];
+    storageData.groups = structuredClone(app.groups);
+    app.renderMain();
+    const storedBefore = JSON.stringify(storageData.groups);
+
+    app.setGroupSelection(['kd-a']);
+    app.openGroupDeleteModal();
+    app.closeGroupDeleteModal();
+    assert.equal(app.groups.length, 1, 'cancel keeps the group');
+    assert.equal(JSON.stringify(storageData.groups), storedBefore, 'cancel writes nothing');
+
+    app.handleGlobalKeydown({ key: 'Delete', target: { tagName: 'DIV' }, preventDefault() {} });
+    assert.ok(document.getElementById('groupDeleteSummary').textContent.length > 0, 'keyboard delete opens the confirmation');
+    app.handleGlobalKeydown({ key: 'Escape', target: { tagName: 'DIV' } });
+    assert.equal(app.selectedGroupIds.size, 0);
 });

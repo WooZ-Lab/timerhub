@@ -46,6 +46,8 @@
                 <button id="addActivityBtn" class="canvas-tool-btn" aria-label="Add new activity" data-i18n-aria-label="addActivity">+</button>
                 <button id="groupToggleAllBtn" class="canvas-tool-btn" aria-label="Collapse all groups" data-i18n-aria-label="collapseAllGroups" hidden>↕</button>
                 <button id="createGroupBtn" class="canvas-tool-btn" aria-label="Create group from selection" data-i18n-aria-label="createGroupFromSelection" hidden>▣</button>
+                <button id="createGroupFromGroupsBtn" class="canvas-tool-btn" aria-label="Group selected groups" data-i18n-aria-label="groupSelectedGroups" hidden>▤</button>
+                <button id="deleteGroupsBtn" class="canvas-tool-btn" aria-label="Delete selected groups" data-i18n-aria-label="deleteSelectedGroups" hidden>🗑</button>
             </div>
             <div class="canvas-viewport" id="activityCanvasViewport" role="region" aria-label="Activity canvas" data-i18n-aria-label="activityCanvas">
                 <div class="activities-grid" id="activitiesGrid">
@@ -648,6 +650,24 @@
                 <div class="modal-footer">
                     <button id="groupEditCancelBtn" class="btn-secondary" data-i18n="cancel">Cancel</button>
                     <button id="groupEditSaveBtn" class="btn-primary" data-i18n="save">Save</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: Delete selected groups -->
+        <div id="groupDeleteModal" class="modal modal-centered" role="dialog" aria-modal="true" aria-labelledby="groupDeleteModalTitle">
+            <div class="modal-content modal-small">
+                <div class="modal-header">
+                    <h3 id="groupDeleteModalTitle" data-i18n="deleteGroupsTitle">Delete groups</h3>
+                    <button id="groupDeleteModalCloseBtn" class="modal-close" aria-label="Close" data-i18n-aria-label="close"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+                </div>
+                <div class="modal-body">
+                    <p id="groupDeleteSummary"></p>
+                    <p data-i18n="deleteGroupsNotice">Member activities are kept as ungrouped canvas items. Nested groups move up one level.</p>
+                </div>
+                <div class="modal-footer">
+                    <button id="groupDeleteCancelBtn" class="btn-secondary" data-i18n="cancel">Cancel</button>
+                    <button id="groupDeleteConfirmBtn" class="btn-danger" data-i18n="delete">Delete</button>
                 </div>
             </div>
         </div>

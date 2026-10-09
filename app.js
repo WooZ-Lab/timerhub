@@ -437,6 +437,14 @@ const extendedTranslations = {
         duplicateGroup: 'Duplicate group', groupCopyName: '{name} (copy)',
         groupDuplicated: 'Group "{name}" duplicated',
         editGroup: 'Edit group', resizeGroup: 'Resize collapsed group',
+        groupSelectedGroups: 'Group selected groups',
+        groupSelectedGroupsCount: 'Group {count} groups',
+        deleteSelectedGroups: 'Delete selected groups',
+        deleteGroupsTitle: 'Delete groups',
+        deleteGroupsNotice: 'Member activities are kept as ungrouped canvas items. Nested groups move up one level.',
+        deleteGroupsSummary: '{groups} group(s) will be deleted. {activities} member activity(ies) stay on the canvas and {children} nested group(s) move up one level.',
+        groupDeleteFailed: 'Could not delete the groups. Try again.',
+        groupDeleted: 'Groups deleted',
         groupEditTitle: 'Edit group',
         groupColorLabel: 'Group color', groupColorDefault: 'Default',
         groupNameRequired: 'Enter a group name.',
@@ -696,6 +704,14 @@ const extendedTranslations = {
         duplicateGroup: 'Gruppe duplizieren', groupCopyName: '{name} (Kopie)',
         groupDuplicated: 'Gruppe "{name}" dupliziert',
         editGroup: 'Gruppe bearbeiten', resizeGroup: 'Eingeklappte Gruppe skalieren',
+        groupSelectedGroups: 'Ausgewählte Gruppen gruppieren',
+        groupSelectedGroupsCount: '{count} Gruppen gruppieren',
+        deleteSelectedGroups: 'Ausgewählte Gruppen löschen',
+        deleteGroupsTitle: 'Gruppen löschen',
+        deleteGroupsNotice: 'Mitgliedsaktivitäten bleiben als ungruppierte Elemente auf dem Canvas. Verschachtelte Gruppen rücken eine Ebene nach oben.',
+        deleteGroupsSummary: '{groups} Gruppe(n) werden gelöscht. {activities} Mitgliedsaktivität(en) bleiben auf dem Canvas und {children} verschachtelte Gruppe(n) rücken eine Ebene nach oben.',
+        groupDeleteFailed: 'Gruppen konnten nicht gelöscht werden. Bitte erneut versuchen.',
+        groupDeleted: 'Gruppen gelöscht',
         groupEditTitle: 'Gruppe bearbeiten',
         groupColorLabel: 'Gruppenfarbe', groupColorDefault: 'Standard',
         groupNameRequired: 'Bitte einen Gruppennamen eingeben.',
@@ -955,6 +971,14 @@ const extendedTranslations = {
         duplicateGroup: 'Дублировать группу', groupCopyName: '{name} (копия)',
         groupDuplicated: 'Группа «{name}» дублирована',
         editGroup: 'Редактировать группу', resizeGroup: 'Изменить размер свёрнутой группы',
+        groupSelectedGroups: 'Сгруппировать выбранные группы',
+        groupSelectedGroupsCount: 'Сгруппировать группы ({count})',
+        deleteSelectedGroups: 'Удалить выбранные группы',
+        deleteGroupsTitle: 'Удалить группы',
+        deleteGroupsNotice: 'Занятия участников останутся на холсте без группы. Вложенные группы поднимутся на уровень выше.',
+        deleteGroupsSummary: 'Будет удалено групп: {groups}. Занятий останется на холсте: {activities}, вложенных групп поднимется: {children}.',
+        groupDeleteFailed: 'Не удалось удалить группы. Попробуйте ещё раз.',
+        groupDeleted: 'Группы удалены',
         groupEditTitle: 'Редактировать группу',
         groupColorLabel: 'Цвет группы', groupColorDefault: 'По умолчанию',
         groupNameRequired: 'Введите название группы.',
@@ -1275,6 +1299,10 @@ class StorageRepository {
         return this.persistMutation(['groups'], tx => { tx.objectStore('groups').put(group); });
     }
 
+    async deleteGroup(id) {
+        return this.persistMutation(['groups'], tx => { tx.objectStore('groups').delete(id); });
+    }
+
     // Atomic work-assignment import: groups, activities, layouts and the import
     // ledger are written in one IndexedDB transaction so a failure cannot leave
     // a partially created hierarchy.
@@ -1430,6 +1458,7 @@ class TimerHubApp {
         this.canvasGesture = null;
         this.canvasSelectionElement = null;
         this.selectedActivityIds = new Set();
+        this.selectedGroupIds = new Set();
         this.groupDisplayOffsets = new Map();
         this.expandedGroupOrder = [];
         // Transient positions where expanded groups were last seen, captured
@@ -2158,6 +2187,12 @@ class TimerHubApp {
         sel('groupEditModalCloseBtn')?.addEventListener('click', () => this.closeGroupEditModal());
         sel('groupEditCancelBtn')?.addEventListener('click', () => this.closeGroupEditModal());
         sel('groupEditSaveBtn')?.addEventListener('click', () => this.saveGroupEdit());
+        sel('createGroupFromGroupsBtn')?.addEventListener('click', () => this.createGroupFromSelectedGroups());
+        sel('deleteGroupsBtn')?.addEventListener('click', () => this.openGroupDeleteModal());
+        sel('groupDeleteModalCloseBtn')?.addEventListener('click', () => this.closeGroupDeleteModal());
+        sel('groupDeleteCancelBtn')?.addEventListener('click', () => this.closeGroupDeleteModal());
+        sel('groupDeleteConfirmBtn')?.addEventListener('click', () => this.deleteSelectedGroups());
+        document.addEventListener?.('keydown', event => this.handleGlobalKeydown(event));
         document.getElementById('groupEditNameInput')?.addEventListener('keydown', event => {
             if (event.key === 'Enter') {
                 event.preventDefault();
@@ -3356,7 +3391,7 @@ class TimerHubApp {
                 : Boolean(base);
             if (!hasContent) continue;
             const container = document.createElement('div');
-            container.className = `group-container${group.collapsed ? ' is-collapsed' : ''}`;
+            container.className = `group-container${group.collapsed ? ' is-collapsed' : ''}${this.selectedGroupIds?.has(group.id) ? ' is-selected' : ''}`;
             container.dataset.groupId = group.id;
             container.style.zIndex = String(-this.groupAncestors(group).length);
             if (group.color) container.style.setProperty('--group-accent', group.color);
@@ -3836,6 +3871,46 @@ class TimerHubApp {
             this.showToast(this.t('groupCreateFailed'));
             return false;
         }
+        this.renderMain();
+        return true;
+    }
+
+    reparentCandidatesForGesture(gesture) {
+        if (!gesture?.group) return [];
+        if (gesture.groupMoveSnapshot && gesture.groupMoveSnapshot.size > 1
+            && this.selectedGroupIds?.has(gesture.group.id)) {
+            return this.selectedTopLevelGroups();
+        }
+        return [gesture.group];
+    }
+
+    // Batch nesting/detaching for a multi-group drag (or a single group). The
+    // whole selection is written once and the canvas is rendered once.
+    async reparentGroups(groups, parentId) {
+        const unique = [...new Map(groups.filter(Boolean).map(group => [group.id, group])).values()];
+        if (!unique.length) return false;
+        const parent = parentId ? this.groups.find(group => group.id === parentId) : null;
+        if (parentId && !parent) return false;
+        for (const group of unique) {
+            if (parentId && (parentId === group.id || this.groupDescendantIds(group.id).includes(parentId))) {
+                continue;
+            }
+            if (parentId) group.parentId = parentId;
+            else delete group.parentId;
+        }
+        if (parent && parent.collapsed) {
+            this.captureExpandedGroupCarry(parent.id);
+            parent.collapsed = false;
+            this.expandedGroupOrder = [parent.id, ...this.expandedGroupOrder.filter(id => id !== parent.id)];
+        }
+        try {
+            if (parent) await this.storage.saveGroup?.(parent);
+            for (const group of unique) await this.storage.saveGroup?.(group);
+        } catch {
+            this.showToast(this.t('groupCreateFailed'));
+            return false;
+        }
+        if (parentId) this.setGroupSelection(unique.map(group => group.id));
         this.renderMain();
         return true;
     }
@@ -4509,6 +4584,203 @@ class TimerHubApp {
             toggleAll.title = label;
             toggleAll.dataset.action = anyExpanded ? 'collapse' : 'expand';
         }
+        const selectedGroups = this.selectedGroupIds?.size || 0;
+        const groupIntoParent = document.getElementById('createGroupFromGroupsBtn');
+        if (groupIntoParent) {
+            const label = this.t('groupSelectedGroupsCount', { count: selectedGroups });
+            groupIntoParent.hidden = selectedGroups === 0;
+            groupIntoParent.setAttribute('aria-label', label);
+            groupIntoParent.title = label;
+        }
+        const deleteGroups = document.getElementById('deleteGroupsBtn');
+        if (deleteGroups) {
+            const label = this.t('deleteSelectedGroups');
+            deleteGroups.hidden = selectedGroups === 0;
+            deleteGroups.setAttribute('aria-label', label);
+            deleteGroups.title = label;
+        }
+    }
+
+    selectedTopLevelGroups() {
+        return this.groups
+            .filter(group => this.selectedGroupIds?.has(group.id))
+            .filter(group => !this.groupAncestors(group).some(ancestor => this.selectedGroupIds.has(ancestor.id)));
+    }
+
+    setGroupSelection(ids) {
+        const next = new Set([...(ids || [])].filter(id => this.groups.some(group => group.id === id)));
+        this.selectedGroupIds = next;
+        const stage = document.getElementById('activitiesGrid');
+        if (stage) {
+            for (const group of this.groups) {
+                const container = stage.querySelector(
+                    `.group-container[data-group-id="${CSS.escape(group.id)}"]`
+                );
+                if (!container) continue;
+                container.classList.toggle('is-selected', next.has(group.id));
+            }
+        }
+        this.updateCanvasGroupAction();
+        return next;
+    }
+
+    toggleGroupSelection(groupId, additive = false) {
+        if (!additive) {
+            this.setGroupSelection([groupId]);
+            return;
+        }
+        const next = new Set(this.selectedGroupIds);
+        if (next.has(groupId)) next.delete(groupId);
+        else next.add(groupId);
+        this.setGroupSelection(next);
+    }
+
+    clearGroupSelection() {
+        if (!this.selectedGroupIds?.size) return;
+        this.setGroupSelection([]);
+    }
+
+    async createGroupFromSelectedGroups() {
+        const selected = this.selectedTopLevelGroups();
+        if (!selected.length) return null;
+        const boundsList = selected
+            .map(group => group.collapsed ? this.groupCollapsedBounds(group) : this.groupBaseBounds(group))
+            .filter(Boolean);
+        if (!boundsList.length) return null;
+        const minX = Math.min(...boundsList.map(bounds => bounds.left));
+        const minY = Math.min(...boundsList.map(bounds => bounds.top));
+        const parents = new Set(selected.map(group => group.parentId || null));
+        const parentId = parents.size === 1 ? [...parents][0] : null;
+        const parent = parentId ? this.groups.find(group => group.id === parentId) : null;
+        const group = {
+            id: this.generateId(),
+            name: this.t('groupDefaultName', { number: this.groups.length + 1 }),
+            x: this.snapToCanvasGrid(minX + CANVAS_GROUP_PADDING),
+            y: this.snapToCanvasGrid(minY + CANVAS_GROUP_HEADER),
+            collapsed: false
+        };
+        if (parentId && parent) group.parentId = parentId;
+        this.groups.push(group);
+        const previousParents = selected.map(child => ({ child, parentId: child.parentId }));
+        for (const child of selected) child.parentId = group.id;
+        this.expandedGroupOrder = [group.id, ...this.expandedGroupOrder.filter(id => id !== group.id)];
+        try {
+            await this.storage.saveGroup?.(group);
+            for (const child of selected) await this.storage.saveGroup?.(child);
+        } catch {
+            this.groups = this.groups.filter(item => item.id !== group.id);
+            for (const entry of previousParents) {
+                if (entry.parentId) entry.child.parentId = entry.parentId;
+                else delete entry.child.parentId;
+            }
+            this.showToast(this.t('groupCreateFailed'));
+            return null;
+        }
+        this.setGroupSelection([group.id]);
+        this.renderMain();
+        this.showToast(this.t('groupCreated', { name: group.name }));
+        return group;
+    }
+
+    groupDeletionPlan() {
+        const selected = this.selectedTopLevelGroups();
+        const deleting = new Set(selected.map(group => group.id));
+        const activities = [];
+        const liftedGroups = [];
+        for (const group of selected) {
+            activities.push(...this.groupMembers(group));
+            for (const child of this.groupChildren(group)) {
+                if (!deleting.has(child.id)) liftedGroups.push(child);
+            }
+        }
+        return { groups: selected, activities, liftedGroups };
+    }
+
+    openGroupDeleteModal() {
+        const plan = this.groupDeletionPlan();
+        if (!plan.groups.length) return false;
+        const summary = document.getElementById('groupDeleteSummary');
+        if (summary) {
+            summary.textContent = this.t('deleteGroupsSummary', {
+                groups: plan.groups.length,
+                activities: plan.activities.length,
+                children: plan.liftedGroups.length
+            });
+        }
+        document.getElementById('groupDeleteModal')?.classList.add('active');
+        return true;
+    }
+
+    closeGroupDeleteModal() {
+        document.getElementById('groupDeleteModal')?.classList.remove('active');
+    }
+
+    async deleteSelectedGroups() {
+        const plan = this.groupDeletionPlan();
+        if (!plan.groups.length) return false;
+        const deleting = new Set(plan.groups.map(group => group.id));
+        const ungrouped = [];
+        this.closeGroupDeleteModal();
+        try {
+            for (const group of plan.groups) {
+                for (const activity of this.groupMembers(group)) {
+                    const stored = this.activityLayouts.get(activity.id);
+                    const fallback = this.getActivityCanvasLayout(activity, this.activityIndexOf(activity), false);
+                    const absolute = stored && Number.isFinite(Number(stored.x)) && Number.isFinite(Number(stored.y))
+                        ? { x: group.x + Number(stored.x), y: group.y + Number(stored.y), width: stored.width, height: stored.height }
+                        : { x: fallback.x, y: fallback.y, width: fallback.width, height: fallback.height };
+                    delete activity.groupId;
+                    const layout = {
+                        activityId: activity.id,
+                        x: absolute.x,
+                        y: absolute.y,
+                        width: absolute.width,
+                        height: absolute.height
+                    };
+                    this.activityLayouts.set(activity.id, layout);
+                    ungrouped.push({ activity, layout });
+                }
+                for (const child of this.groupChildren(group)) {
+                    if (deleting.has(child.id)) continue;
+                    let nextParentId = group.parentId;
+                    while (nextParentId && deleting.has(nextParentId)) {
+                        nextParentId = this.groups.find(item => item.id === nextParentId)?.parentId;
+                    }
+                    if (nextParentId) child.parentId = nextParentId;
+                    else delete child.parentId;
+                    await this.storage.saveGroup?.(child);
+                }
+            }
+            for (const { activity, layout } of ungrouped) {
+                await this.storage.saveActivity(activity);
+                await this.storage.saveLayout(layout);
+            }
+            for (const group of plan.groups) {
+                await this.storage.deleteGroup?.(group.id);
+            }
+        } catch {
+            this.showToast(this.t('groupDeleteFailed'));
+            return false;
+        }
+        this.groups = this.groups.filter(group => !deleting.has(group.id));
+        this.selectedGroupIds = new Set();
+        this.renderMain();
+        this.showToast(this.t('groupDeleted'));
+        return true;
+    }
+
+    handleGlobalKeydown(event) {
+        if (!event?.key) return;
+        const tag = event.target?.tagName?.toLowerCase?.();
+        if (tag === 'input' || tag === 'textarea' || event.target?.isContentEditable) return;
+        if (event.key === 'Escape') {
+            this.clearGroupSelection();
+            return;
+        }
+        if ((event.key === 'Delete' || event.key === 'Backspace') && this.selectedGroupIds?.size) {
+            if (typeof event.preventDefault === 'function') event.preventDefault();
+            this.openGroupDeleteModal();
+        }
     }
 
     syncCanvasToolbarLayout() {
@@ -4712,7 +4984,27 @@ class TimerHubApp {
                 }
             }
         }
+        // Groups are selected from their cached display bounds, converted from
+        // world coordinates to client coordinates with the current pan/zoom.
+        const viewport = document.getElementById('activityCanvasViewport');
+        const viewportRect = typeof viewport?.getBoundingClientRect === 'function'
+            ? viewport.getBoundingClientRect()
+            : { left: 0, top: 0 };
+        const selectedGroups = [];
+        for (const group of this.groups) {
+            if (!this.isGroupVisible(group)) continue;
+            const display = this.groupDisplayBounds.get(group.id);
+            if (!display) continue;
+            const clientBounds = {
+                left: viewportRect.left + this.canvasPan.x + display.left * this.canvasZoom,
+                top: viewportRect.top + this.canvasPan.y + display.top * this.canvasZoom,
+                right: viewportRect.left + this.canvasPan.x + display.right * this.canvasZoom,
+                bottom: viewportRect.top + this.canvasPan.y + display.bottom * this.canvasZoom
+            };
+            if (this.rectanglesIntersect(bounds, clientBounds)) selectedGroups.push(group.id);
+        }
         this.setCanvasSelection(selected);
+        this.setGroupSelection(selectedGroups);
         this.hideCanvasSelectionRect();
     }
 
@@ -4936,8 +5228,20 @@ class TimerHubApp {
             const resizeGroup = groupResizeHandle
                 && this.groups.find(item => item.id === groupResizeHandle.dataset.groupId);
             const gestureGroup = resizeGroup || group;
-            const groupMoveSnapshot = gestureGroup
-                ? new Map([gestureGroup.id, ...this.groupDescendantIds(gestureGroup.id)]
+            const additiveGroupSelection = Boolean(event.ctrlKey || event.metaKey || event.shiftKey);
+            const selectedGroups = this.selectedGroupIds || new Set();
+            if (group && !selectedGroups.has(group.id) && selectedGroups.size && !additiveGroupSelection) this.clearGroupSelection();
+            if (!gestureGroup && !activityButton && !resizeHandle && selectedGroups.size) this.clearGroupSelection();
+            const movingGroups = group && selectedGroups.has(group.id) && selectedGroups.size > 1
+                ? this.selectedTopLevelGroups()
+                : gestureGroup ? [gestureGroup] : [];
+            const moveIds = new Set();
+            for (const item of movingGroups) {
+                moveIds.add(item.id);
+                for (const id of this.groupDescendantIds(item.id)) moveIds.add(id);
+            }
+            const groupMoveSnapshot = moveIds.size
+                ? new Map([...moveIds]
                     .filter(id => this.groups.some(item => item.id === id))
                     .map(id => {
                         const item = this.groups.find(entry => entry.id === id);
@@ -4958,6 +5262,7 @@ class TimerHubApp {
                     ? { width: this.groupCollapsedWidth(resizeGroup), height: this.groupCollapsedHeight(resizeGroup) }
                     : null,
                 groupMoveSnapshot,
+                groupSelectionAdditive: additiveGroupSelection,
                 nestTargetId: null,
                 groupStartX: gestureGroup?.x,
                 groupStartY: gestureGroup?.y,
@@ -5190,15 +5495,18 @@ class TimerHubApp {
                         }
                     }
                     const targetId = gesture.nestTargetId || null;
-                    const parentNow = gesture.group.parentId || null;
                     this.setCanvasGroupNestTarget(null);
-                    if (targetId !== parentNow) {
-                        this.reparentGroup(gesture.group, targetId);
+                    const groups = this.reparentCandidatesForGesture(gesture);
+                    const needsReparent = groups.some(group => (group.parentId || null) !== targetId);
+                    if (needsReparent) {
+                        this.reparentGroups(groups, targetId);
                     } else {
                         // Positions changed: recompute temporary offsets without
                         // rebuilding the whole canvas.
                         this.refreshGroupLayout();
                     }
+                } else if (gesture.group) {
+                    this.toggleGroupSelection(gesture.group.id, gesture.groupSelectionAdditive);
                 }
                 return;
             }

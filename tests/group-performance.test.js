@@ -61,6 +61,9 @@ function createTestApp(initialData = {}) {
             else storageData.groups.push(structuredClone(group));
             return group;
         },
+        async deleteGroup(id) {
+            storageData.groups = storageData.groups.filter(group => group.id !== id);
+        },
         async getLayout() { return structuredClone(storageData.layout); },
         async saveLayout(layout) {
             writes.layout += 1;
@@ -109,7 +112,9 @@ function createTestApp(initialData = {}) {
         'assignmentValidateBtn', 'assignmentImportError', 'assignmentPreview', 'assignmentPreviewSummary',
         'assignmentPreviewWarnings', 'assignmentPreviewList', 'assignmentImportCancelBtn', 'assignmentImportConfirmBtn',
         'groupEditModal', 'groupEditModalTitle', 'groupEditModalCloseBtn', 'groupEditNameInput', 'groupEditNameError',
-        'groupEditColorOptions', 'groupEditCancelBtn', 'groupEditSaveBtn'
+        'groupEditColorOptions', 'groupEditCancelBtn', 'groupEditSaveBtn',
+        'createGroupFromGroupsBtn', 'deleteGroupsBtn', 'groupDeleteModal', 'groupDeleteModalTitle',
+        'groupDeleteModalCloseBtn', 'groupDeleteSummary', 'groupDeleteCancelBtn', 'groupDeleteConfirmBtn'
     ]) {
         elements.set(id, {
             id,
@@ -299,9 +304,9 @@ function createGroupCanvasHarness(initialData = {}) {
     app.toggleActivity = async () => {};
     app.setupActivityCanvasInteractions();
 
-    const pointer = (type, target, x, y) => viewport.handlers.get(type)?.({
+    const pointer = (type, target, x, y, modifiers = {}) => viewport.handlers.get(type)?.({
         isPrimary: true, pointerType: 'mouse', button: 0, pointerId: 1,
-        clientX: x, clientY: y, target, type, preventDefault() {}
+        clientX: x, clientY: y, target, type, preventDefault() {}, ...modifiers
     });
 
     return {
