@@ -1250,18 +1250,21 @@ class StorageRepository {
         return this.persistMutation(['groups'], tx => { tx.objectStore('groups').put(group); });
     }
 
-    // Atomic work-assignment import: groups, activities and the import ledger
-    // are written in one IndexedDB transaction so a failure cannot leave a
-    // partially created hierarchy.
-    async applyAssignmentImport({ putGroups = [], putActivities = [], deleteGroupIds = [], deleteActivityIds = [], settings = {} } = {}) {
-        return this.persistMutation(['groups', 'activities', 'settings'], tx => {
+    // Atomic work-assignment import: groups, activities, layouts and the import
+    // ledger are written in one IndexedDB transaction so a failure cannot leave
+    // a partially created hierarchy.
+    async applyAssignmentImport({ putGroups = [], putActivities = [], putLayouts = [], deleteGroupIds = [], deleteActivityIds = [], deleteLayoutIds = [], settings = {} } = {}) {
+        return this.persistMutation(['groups', 'activities', 'layout', 'settings'], tx => {
             const groupStore = tx.objectStore('groups');
             const activityStore = tx.objectStore('activities');
+            const layoutStore = tx.objectStore('layout');
             const settingsStore = tx.objectStore('settings');
+            deleteLayoutIds.forEach(id => layoutStore.delete(id));
             deleteGroupIds.forEach(id => groupStore.delete(id));
             deleteActivityIds.forEach(id => activityStore.delete(id));
             putGroups.forEach(group => groupStore.put(group));
             putActivities.forEach(activity => activityStore.put(activity));
+            putLayouts.forEach(layout => layoutStore.put(layout));
             if (settings && typeof settings === 'object') {
                 for (const [key, value] of Object.entries(settings)) settingsStore.put({ key, value });
             }
@@ -7155,21 +7158,42 @@ class TimerHubApp {
             const assignmentName = plan.assignmentName;
             const createdGroups = [];
             const createdActivities = [];
+            const createdLayouts = [];
             let position = this.activities.length;
             plan.groups.forEach((group, index) => {
+                // Compute member layouts first, then anchor the group to their
+                // bounding box and store each member layout relative to the
+                // group, exactly like manually created groups. This keeps
+                // collapse/expand stable instead of jumping to an arbitrary
+                // staggered anchor.
+                const members = group.activities.map(activity =>
+                    this.createImportedActivity(activity, null, position++, now, assignmentName));
+                const memberLayouts = members.map(member => this.getActivityCanvasLayout(member, 0));
                 const groupRecord = {
                     id: this.generateId(),
                     name: group.name,
-                    x: this.snapToCanvasGrid(24 + (index % 4) * 520),
-                    y: this.snapToCanvasGrid(24 + Math.floor(index / 4) * 420),
+                    x: memberLayouts.length
+                        ? this.snapToCanvasGrid(Math.min(...memberLayouts.map(layout => layout.x)))
+                        : this.snapToCanvasGrid(24 + (index % 4) * 520),
+                    y: memberLayouts.length
+                        ? this.snapToCanvasGrid(Math.min(...memberLayouts.map(layout => layout.y)))
+                        : this.snapToCanvasGrid(24 + Math.floor(index / 4) * 420),
                     collapsed: group.collapsed === true,
                     assignment: assignmentName,
                     importedAt: now
                 };
                 createdGroups.push(groupRecord);
-                for (const activity of group.activities) {
-                    createdActivities.push(this.createImportedActivity(activity, groupRecord.id, position++, now, assignmentName));
-                }
+                members.forEach((member, memberIndex) => {
+                    member.groupId = groupRecord.id;
+                    createdActivities.push(member);
+                    createdLayouts.push({
+                        activityId: member.id,
+                        x: memberLayouts[memberIndex].x - groupRecord.x,
+                        y: memberLayouts[memberIndex].y - groupRecord.y,
+                        width: memberLayouts[memberIndex].width,
+                        height: memberLayouts[memberIndex].height
+                    });
+                });
             });
             for (const activity of plan.topLevelActivities) {
                 createdActivities.push(this.createImportedActivity(activity, null, position++, now, assignmentName));
@@ -7180,14 +7204,18 @@ class TimerHubApp {
             await this.storage.applyAssignmentImport({
                 putGroups: createdGroups,
                 putActivities: createdActivities,
+                putLayouts: createdLayouts,
                 deleteGroupIds: state.replaceTargets.groups.map(group => group.id),
                 deleteActivityIds: state.replaceTargets.activities.map(activity => activity.id),
+                deleteLayoutIds: state.replaceTargets.activities.map(activity => activity.id),
                 settings: { assignmentImports: ledger.slice(-50) }
             });
             const removedGroups = new Set(state.replaceTargets.groups.map(group => group.id));
             const removedActivities = new Set(state.replaceTargets.activities.map(activity => activity.id));
             this.groups = this.groups.filter(group => !removedGroups.has(group.id)).concat(createdGroups);
             this.activities = this.activities.filter(activity => !removedActivities.has(activity.id)).concat(createdActivities);
+            createdLayouts.forEach(layout => this.activityLayouts.set(layout.activityId, layout));
+            state.replaceTargets.activities.forEach(activity => this.activityLayouts.delete(activity.id));
             this.closeAssignmentImportModal();
             this.renderMain();
             this.showToast(this.t('assignmentImported', { groups: createdGroups.length, activities: createdActivities.length }));

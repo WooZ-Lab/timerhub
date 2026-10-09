@@ -44,17 +44,24 @@ function createTestApp(initialData = {}) {
         },
         async getSyncBatches() { return structuredClone(storageData.syncBatches); },
         async getGroups() { return structuredClone(storageData.groups); },
-        async applyAssignmentImport({ putGroups = [], putActivities = [], deleteGroupIds = [], deleteActivityIds = [], settings = {} } = {}) {
+        async applyAssignmentImport({ putGroups = [], putActivities = [], putLayouts = [], deleteGroupIds = [], deleteActivityIds = [], deleteLayoutIds = [], settings = {} } = {}) {
             await Promise.resolve();
             const nextGroups = structuredClone(storageData.groups).filter(group => !deleteGroupIds.includes(group.id));
             const nextActivities = structuredClone(storageData.activities).filter(activity => !deleteActivityIds.includes(activity.id));
+            const nextLayouts = structuredClone(storageData.layout).filter(layout => !deleteLayoutIds.includes(layout.activityId));
             const nextSettings = structuredClone(storageData.settings);
             putGroups.forEach(group => nextGroups.push(structuredClone(group)));
             putActivities.forEach(activity => nextActivities.push(structuredClone(activity)));
+            putLayouts.forEach(layout => {
+                const index = nextLayouts.findIndex(item => item.activityId === layout.activityId);
+                if (index >= 0) nextLayouts[index] = structuredClone(layout);
+                else nextLayouts.push(structuredClone(layout));
+            });
             const nextSettingsData = {};
             for (const [key, value] of Object.entries(settings)) nextSettingsData[key] = structuredClone(value);
             storageData.groups = nextGroups;
             storageData.activities = nextActivities;
+            storageData.layout = nextLayouts;
             storageData.settings = nextSettings;
             Object.assign(storageData.settings, nextSettingsData);
             return true;
@@ -5617,4 +5624,89 @@ test('imported activities are preserved by backups and usable by the existing ti
     await app.toggleActivity(painted.id);
     assert.equal(painted.id, app.activeActivityId);
     assert.equal(app.timeEntries[0].notes, 'В зале');
+});
+
+test('imported groups anchor to their members and do not jump when collapsing', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, containers, storageData } = harness;
+    const many = Array.from({ length: 12 }, (unused, index) => ({ name: `Work ${index}` }));
+    harness.context.document.getElementById('assignmentJsonInput').value = JSON.stringify({
+        format: 'timerhub-assignment', version: 1, name: 'Job', groups: [{ name: 'Imported', activities: many }]
+    });
+    assert.equal(await app.validateAssignmentJson(), true);
+    assert.equal(await app.confirmAssignmentImport(), true);
+    app.renderMain();
+    const lastContainer = groupId => containers.filter(container => container.dataset.groupId === groupId).at(-1);
+
+    const group = app.groups.find(item => item.name === 'Imported');
+    const members = app.activities.filter(activity => activity.groupId === group.id);
+    assert.equal(members.length, 12);
+    const memberLayouts = members.map(member => app.getActivityCanvasLayout(member, 0));
+    assert.equal(group.x, app.snapToCanvasGrid(Math.min(...memberLayouts.map(layout => layout.x))));
+    assert.equal(group.y, app.snapToCanvasGrid(Math.min(...memberLayouts.map(layout => layout.y))));
+    for (const member of members) {
+        const stored = storageData.layout.find(layout => layout.activityId === member.id);
+        assert.ok(stored, 'each imported member stores a layout relative to its group');
+        const absolute = app.getActivityCanvasLayout(member, 0);
+        assert.equal(stored.x, absolute.x - group.x);
+        assert.equal(stored.y, absolute.y - group.y);
+    }
+
+    const expanded = lastContainer(group.id);
+    const expandedLeft = Number.parseFloat(expanded.style.left);
+    const expandedTop = Number.parseFloat(expanded.style.top);
+
+    await app.toggleGroupCollapsed(group.id);
+    app.renderMain();
+    const collapsed = lastContainer(group.id);
+    assert.ok(
+        Math.abs(Number.parseFloat(collapsed.style.left) - expandedLeft) <= 16 + 20,
+        'horizontal anchor jump stays within the grid snap and padding'
+    );
+    assert.ok(
+        Math.abs(Number.parseFloat(collapsed.style.top) - expandedTop) <= 16 + 36,
+        'vertical anchor jump stays within the grid snap and header'
+    );
+
+    await app.toggleGroupCollapsed(group.id);
+    app.renderMain();
+    const reExpanded = lastContainer(group.id);
+    assert.equal(Number.parseFloat(reExpanded.style.left), expandedLeft, 're-expanding restores the same layout');
+    assert.equal(Number.parseFloat(reExpanded.style.top), expandedTop);
+    assert.deepEqual(JSON.parse(JSON.stringify(app.groups.map(item => [item.x, item.y]))), [[group.x, group.y]], 'the saved anchor never changes');
+});
+
+test('repeated expand and collapse cycles keep imported group offsets and anchors stable', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app } = harness;
+    const groups = [];
+    for (let street = 0; street < 4; street += 1) {
+        const children = [];
+        for (let house = 0; house < 3; house += 1) {
+            const activities = Array.from({ length: 6 }, (unused, index) => ({ name: `Work ${street}-${house}-${index}` }));
+            children.push({ name: `House ${house + 1}`, activities });
+        }
+        groups.push({ name: `Street ${street + 1}`, children });
+    }
+    harness.context.document.getElementById('assignmentJsonInput').value = JSON.stringify({
+        format: 'timerhub-assignment', version: 1, name: 'Big job', groups
+    });
+    assert.equal(await app.validateAssignmentJson(), true);
+    assert.equal(await app.confirmAssignmentImport(), true);
+    app.renderMain();
+
+    const offsets = () => Object.fromEntries(app.groups.map(group => [group.id, { ...app.groupDisplayOffset(group.id) }]));
+    const anchors = () => app.groups.map(group => [group.x, group.y]);
+    const firstOffsets = offsets();
+    const firstAnchors = anchors();
+
+    for (let cycle = 0; cycle < 3; cycle += 1) {
+        for (const group of [...app.groups]) await app.toggleGroupCollapsed(group.id);
+        app.renderMain();
+        for (const group of [...app.groups]) await app.toggleGroupCollapsed(group.id);
+        app.renderMain();
+    }
+
+    assert.deepEqual(JSON.parse(JSON.stringify(offsets())), JSON.parse(JSON.stringify(firstOffsets)), 'neighbour displacement is recalculated without drift');
+    assert.deepEqual(JSON.parse(JSON.stringify(anchors())), JSON.parse(JSON.stringify(firstAnchors)), 'saved coordinates are never written by expand/collapse');
 });
