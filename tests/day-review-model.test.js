@@ -5847,14 +5847,23 @@ function createTwoGroupAnchorHarness(anchorX = 100, anchorY = 100) {
     return harness;
 }
 
-test('expanding an overlapping group anchors the newly expanded group', async () => {
+test('expanding an overlapping group grows it in place and leaves the neighbour anchored', async () => {
     const harness = createTwoGroupAnchorHarness();
     const { app, containers } = harness;
     app.renderMain();
 
+    const displayedBefore = { ...app.groupDisplayOffset('anchor-b') };
     await app.toggleGroupCollapsed('anchor-b');
-    assert.deepEqual({ ...app.groupDisplayOffset('anchor-b') }, { x: 0, y: 0 }, 'the newly expanded group stays anchored');
-    assert.notDeepEqual({ ...app.groupDisplayOffset('anchor-a') }, { x: 0, y: 0 }, 'the earlier expanded neighbour steps aside');
+    assert.deepEqual(
+        { ...app.groupDisplayOffset('anchor-b') },
+        displayedBefore,
+        'the newly expanded group grows where it was displayed'
+    );
+    assert.deepEqual(
+        { ...app.groupDisplayOffset('anchor-a') },
+        { x: 0, y: 0 },
+        'the neighbour that no longer collides stays anchored'
+    );
     assert.equal(groupOverlaps(groupGeometry(containers, 'anchor-a'), groupGeometry(containers, 'anchor-b')), false);
     assert.deepEqual(JSON.parse(JSON.stringify(app.groups.map(group => [group.x, group.y]))), [[100, 100], [100, 100]], 'saved anchors are untouched');
 
@@ -5862,7 +5871,7 @@ test('expanding an overlapping group anchors the newly expanded group', async ()
     assert.deepEqual({ ...app.groupDisplayOffset('anchor-a') }, { x: 0, y: 0 }, 'collapsing restores the neighbour');
 });
 
-test('sequential expansions always anchor the most recently expanded group', async () => {
+test('sequential expansions grow each group where it is displayed', async () => {
     const harness = createGroupCanvasHarness();
     const { app } = harness;
     app.activities = [
@@ -5882,34 +5891,45 @@ test('sequential expansions always anchor the most recently expanded group', asy
     ];
     app.renderMain();
 
+    const displayedA = { ...app.groupDisplayOffset('seq-a') };
     await app.toggleGroupCollapsed('seq-a');
-    assert.deepEqual({ ...app.groupDisplayOffset('seq-a') }, { x: 0, y: 0 }, 'A anchors when expanded first');
+    assert.deepEqual({ ...app.groupDisplayOffset('seq-a') }, displayedA, 'A grows where it was displayed');
+
+    const displayedB = { ...app.groupDisplayOffset('seq-b') };
     await app.toggleGroupCollapsed('seq-b');
-    assert.deepEqual({ ...app.groupDisplayOffset('seq-b') }, { x: 0, y: 0 }, 'B anchors when expanded second');
+    assert.deepEqual({ ...app.groupDisplayOffset('seq-b') }, displayedB, 'B grows where it was displayed');
+
+    const displayedC = { ...app.groupDisplayOffset('seq-c') };
     await app.toggleGroupCollapsed('seq-c');
-    assert.deepEqual({ ...app.groupDisplayOffset('seq-c') }, { x: 0, y: 0 }, 'C anchors when expanded third');
+    assert.deepEqual({ ...app.groupDisplayOffset('seq-c') }, displayedC, 'C grows where it was displayed');
     assert.deepEqual(JSON.parse(JSON.stringify(app.groups.map(group => [group.x, group.y]))), [[100, 100], [100, 100], [100, 100]]);
 });
 
-test('expanded groups keep their anchor near every canvas edge', async () => {
+test('expanded groups keep their displayed position near every canvas edge', async () => {
     const anchors = [[16, 16], [16, 2000], [3200, 16], [3200, 1980]];
     for (const [x, y] of anchors) {
         const harness = createTwoGroupAnchorHarness(x, y);
         const { app } = harness;
         app.renderMain();
+        const displayed = { ...app.groupDisplayOffset('anchor-b') };
         await app.toggleGroupCollapsed('anchor-b');
         assert.deepEqual(
             { ...app.groupDisplayOffset('anchor-b') },
-            { x: 0, y: 0 },
-            `the expanded group stays anchored at ${x},${y}`
+            displayed,
+            `the expanded group stays where it was displayed at ${x},${y}`
         );
         assert.deepEqual(
             JSON.parse(JSON.stringify(app.groups.map(group => [group.x, group.y]))),
             [[x, y], [x, y]],
             `saved anchors are untouched at ${x},${y}`
         );
-        assert.equal(groupGeometry(harness.containers, 'anchor-b').left, x - 20, 'the expanded container starts at the saved anchor');
-        assert.equal(groupGeometry(harness.containers, 'anchor-b').top, y - 36);
+        assert.equal(
+            groupGeometry(harness.containers, 'anchor-b').left,
+            x - 20 + displayed.x,
+            'the expanded container starts at the displayed anchor'
+        );
+        assert.equal(groupGeometry(harness.containers, 'anchor-b').top, y - 36 + displayed.y);
+        assert.equal(groupGeometry(harness.containers, 'anchor-a').left, x - 20, 'the neighbour stays at its saved anchor');
     }
 });
 
@@ -5927,7 +5947,7 @@ test('collapsing does not snap a neighbour back over user changes made while exp
     assert.equal(groupGeometry(harness.containers, 'anchor-a').left, 680, 'the user move is preserved after collapse');
 });
 
-test('nested flattened groups follow the same anchoring rule', async () => {
+test('nested flattened groups grow in place like every other group', async () => {
     const harness = createGroupCanvasHarness();
     const { app } = harness;
     app.activities = [
@@ -5944,9 +5964,10 @@ test('nested flattened groups follow the same anchoring rule', async () => {
     ];
     app.renderMain();
 
+    const displayed = { ...app.groupDisplayOffset('nest-h') };
     await app.toggleGroupCollapsed('nest-h');
-    assert.deepEqual({ ...app.groupDisplayOffset('nest-h') }, { x: 0, y: 0 }, 'the nested house anchors where it expands');
-    assert.notDeepEqual({ ...app.groupDisplayOffset('nest-s') }, { x: 0, y: 0 }, 'the street neighbour steps aside');
+    assert.deepEqual({ ...app.groupDisplayOffset('nest-h') }, displayed, 'the nested house grows where it was displayed');
+    assert.deepEqual({ ...app.groupDisplayOffset('nest-s') }, { x: 0, y: 0 }, 'the street neighbour stays anchored');
     assert.deepEqual(JSON.parse(JSON.stringify(app.groups.map(group => [group.x, group.y]))), [[200, 200], [200, 200]]);
 
     await app.toggleGroupCollapsed('nest-h');

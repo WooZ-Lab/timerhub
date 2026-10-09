@@ -1413,6 +1413,14 @@ class TimerHubApp {
         this.selectedActivityIds = new Set();
         this.groupDisplayOffsets = new Map();
         this.expandedGroupOrder = [];
+        // Transient positions where expanded groups were last seen, captured
+        // when a collapsed group is expanded so it grows in place. Never
+        // persisted; cleared on collapse.
+        this.expandedGroupCarry = new Map();
+        // Final world-space bounds of every rendered group, refreshed whenever
+        // the display offsets are recomputed. Used by hit testing so pointer
+        // handlers never need repeated DOM measurements.
+        this.groupDisplayBounds = new Map();
         this.suppressActivityClick = null;
         this.editingActivityId = null;
         this.editingEntryId = null;
@@ -3134,6 +3142,10 @@ class TimerHubApp {
         grid.replaceChildren();
         this.canvasZIndex = 1;
         this.applyCanvasTransform(grid);
+        // Fresh index for the whole render; removed afterwards so direct calls
+        // from other code always fall back to a consistent lookup.
+        this._canvasIndex = this.buildCanvasIndex();
+        this._baseLayoutCache = new Map();
         this.groupDisplayOffsets = this.computeGroupDisplayOffsets();
 
         if (!this.activities.length) {
@@ -3146,6 +3158,8 @@ class TimerHubApp {
             empty.append(title, message);
             grid.appendChild(empty);
             this.populateActivityFilter();
+            this._canvasIndex = null;
+            this._baseLayoutCache = null;
             return;
         }
 
@@ -3265,11 +3279,13 @@ class TimerHubApp {
         });
 
         this.populateActivityFilter();
+        this._canvasIndex = null;
+        this._baseLayoutCache = null;
     }
 
     renderGroups(grid) {
         for (const group of this.groups) {
-            const members = this.activities.filter(activity => activity.groupId === group.id);
+            const members = this.groupMembers(group);
             if (!members.length) continue;
             const container = document.createElement('div');
             container.className = `group-container${group.collapsed ? ' is-collapsed' : ''}`;
@@ -3329,9 +3345,8 @@ class TimerHubApp {
     }
 
     groupMemberBoxes(group, includeDisplayOffset = true) {
-        return this.activities
-            .filter(activity => activity.groupId === group.id)
-            .map(activity => this.getActivityCanvasLayout(activity, this.activities.indexOf(activity), includeDisplayOffset));
+        return this.groupMembers(group)
+            .map(activity => this.getActivityCanvasLayout(activity, this.activityIndexOf(activity), includeDisplayOffset));
     }
 
     groupDisplayOffset(groupId) {
@@ -3401,41 +3416,75 @@ class TimerHubApp {
 
     computeGroupDisplayOffsets() {
         const offsets = new Map();
+        const displayBounds = new Map();
         // Expansion priority: the group the user most recently expanded keeps
-        // its saved anchor (offset {0,0}); every other group it overlaps steps
-        // aside temporarily. Without an explicit expansion the order falls back
-        // to the stable saved-anchor order.
+        // the position where it was displayed when collapsed; every other group
+        // it overlaps steps aside temporarily. Without an explicit expansion the
+        // order falls back to the stable saved-anchor order. The carry is a
+        // transient display offset and is never written to persistent state.
         const rank = new Map();
         this.expandedGroupOrder.forEach((id, index) => {
             if (!rank.has(id)) rank.set(id, index);
         });
         const priorityOf = group => rank.has(group.id) ? rank.get(group.id) : Number.MAX_SAFE_INTEGER;
+        // Measure every expanded group exactly once; collision resolution
+        // reuses the same boxes.
         const expandedGroups = this.groups
-            .filter(group => !group.collapsed && this.groupMemberBoxes(group, false).length)
-            .sort((a, b) => (priorityOf(a) - priorityOf(b)) || this.compareGroupLayoutOrder(a, b));
+            .filter(group => !group.collapsed)
+            .map(group => ({ group, boxes: this.groupMemberBoxes(group, false) }))
+            .filter(entry => entry.boxes.length)
+            .sort((a, b) => (priorityOf(a.group) - priorityOf(b.group)) || this.compareGroupLayoutOrder(a.group, b.group));
         const expandedObstacles = [];
-        for (const group of expandedGroups) {
-            const boxes = this.groupMemberBoxes(group, false);
+        for (const { group, boxes } of expandedGroups) {
             const bounds = this.groupContainerBounds(boxes);
-            const { left, top } = this.resolveGroupCollision(bounds, expandedObstacles);
+            const carry = this.expandedGroupCarry.get(group.id) || { x: 0, y: 0 };
+            const { left, top } = this.resolveGroupCollision({
+                left: bounds.left + carry.x,
+                top: bounds.top + carry.y,
+                right: bounds.right + carry.x,
+                bottom: bounds.bottom + carry.y,
+                width: bounds.width,
+                height: bounds.height
+            }, expandedObstacles);
             expandedObstacles.push({ left, top, right: left + bounds.width, bottom: top + bounds.height });
             offsets.set(group.id, { x: left - bounds.left, y: top - bounds.top });
+            displayBounds.set(group.id, { left, top, right: left + bounds.width, bottom: top + bounds.height });
         }
         // Collapsed groups are the temporary ones: they step aside for anchored
         // expanded groups and return to their saved positions once nothing
         // expanded overlaps them.
         const displacedCollapsed = [];
         const collapsedGroups = this.groups
-            .filter(group => group.collapsed && this.groupMemberBoxes(group, false).length)
+            .filter(group => group.collapsed)
+            .filter(group => this.groupMemberBoxes(group, false).length)
             .sort((a, b) => this.compareGroupLayoutOrder(a, b));
         for (const group of collapsedGroups) {
             const bounds = this.groupCollapsedBounds(group);
-            if (!expandedObstacles.some(other => this.rectanglesIntersect(bounds, other))) continue;
+            if (!expandedObstacles.some(other => this.rectanglesIntersect(bounds, other))) {
+                displayBounds.set(group.id, { left: bounds.left, top: bounds.top, right: bounds.right, bottom: bounds.bottom });
+                continue;
+            }
             const { left, top } = this.resolveGroupCollision(bounds, [...expandedObstacles, ...displacedCollapsed]);
             displacedCollapsed.push({ left, top, right: left + bounds.width, bottom: top + bounds.height });
             offsets.set(group.id, { x: left - bounds.left, y: top - bounds.top });
+            displayBounds.set(group.id, { left, top, right: left + bounds.width, bottom: top + bounds.height });
         }
+        this.groupDisplayBounds = displayBounds;
         return offsets;
+    }
+
+    // Recompute the transient collision offsets and update the existing DOM
+    // nodes in place. Used for actions that only move groups (drag end, resize)
+    // so they do not pay for a full canvas rebuild.
+    refreshGroupLayout() {
+        this._canvasIndex = this.buildCanvasIndex();
+        this._baseLayoutCache = new Map();
+        this.groupDisplayOffsets = this.computeGroupDisplayOffsets();
+        for (const group of this.groups) {
+            this.positionGroupVisuals(group);
+        }
+        this._canvasIndex = null;
+        this._baseLayoutCache = null;
     }
 
     applyGroupGeometry(container, boxes) {
@@ -3453,9 +3502,8 @@ class TimerHubApp {
         const stage = document.getElementById('activitiesGrid');
         if (!stage) return;
         const boxes = [];
-        for (const activity of this.activities) {
-            if (activity.groupId !== group.id) continue;
-            const layout = this.getActivityCanvasLayout(activity, this.activities.indexOf(activity));
+        for (const activity of this.groupMembers(group)) {
+            const layout = this.getActivityCanvasLayout(activity, this.activityIndexOf(activity));
             const button = stage.querySelector(
                 `.activity-btn[data-activity-id="${CSS.escape(activity.id)}"]`
             );
@@ -3487,22 +3535,22 @@ class TimerHubApp {
     }
 
     groupDropTargetAt(clientX, clientY) {
-        const stage = document.getElementById('activitiesGrid');
-        if (!stage) return null;
-        const matches = [];
-        for (const group of this.groups) {
-            if (!this.activities.some(activity => activity.groupId === group.id)) continue;
-            const container = stage.querySelector(
-                `.group-container[data-group-id="${CSS.escape(group.id)}"]`
-            );
-            if (!container || typeof container.getBoundingClientRect !== 'function') continue;
-            const box = container.getBoundingClientRect();
-            if (clientX < box.left || clientX > box.right || clientY < box.top || clientY > box.bottom) continue;
-            matches.push({ group, area: Math.max(0, box.width) * Math.max(0, box.height) });
+        const viewport = document.getElementById('activityCanvasViewport');
+        if (!viewport || typeof viewport.getBoundingClientRect !== 'function') return null;
+        const rect = viewport.getBoundingClientRect();
+        const world = this.screenToWorld(clientX - rect.left, clientY - rect.top);
+        let best = null;
+        for (let order = 0; order < this.groups.length; order += 1) {
+            const group = this.groups[order];
+            const bounds = this.groupDisplayBounds.get(group.id);
+            if (!bounds) continue;
+            if (world.x < bounds.left || world.x > bounds.right || world.y < bounds.top || world.y > bounds.bottom) continue;
+            const area = Math.max(0, bounds.right - bounds.left) * Math.max(0, bounds.bottom - bounds.top);
+            if (!best || area < best.area || (area === best.area && order < best.order)) {
+                best = { group, area, order };
+            }
         }
-        if (!matches.length) return null;
-        matches.sort((a, b) => (a.area - b.area) || (this.groups.indexOf(a.group) - this.groups.indexOf(b.group)));
-        return matches[0].group;
+        return best?.group || null;
     }
 
     setCanvasDropTarget(groupId) {
@@ -3616,13 +3664,27 @@ class TimerHubApp {
         return stored;
     }
 
+    // Capture the position a group is currently displayed at, so expanding it
+    // grows in place instead of jumping back to its saved anchor. The carry is
+    // transient display state only.
+    captureExpandedGroupCarry(groupId) {
+        const offset = this.groupDisplayOffset(groupId);
+        if (offset.x || offset.y) {
+            this.expandedGroupCarry.set(groupId, { x: offset.x, y: offset.y });
+        } else {
+            this.expandedGroupCarry.delete(groupId);
+        }
+    }
+
     async toggleGroupCollapsed(groupId) {
         const group = this.groups.find(item => item.id === groupId);
         if (!group) return null;
         group.collapsed = !group.collapsed;
         if (group.collapsed) {
             this.expandedGroupOrder = this.expandedGroupOrder.filter(id => id !== group.id);
+            this.expandedGroupCarry.delete(group.id);
         } else {
+            this.captureExpandedGroupCarry(group.id);
             this.expandedGroupOrder = [group.id, ...this.expandedGroupOrder.filter(id => id !== group.id)];
         }
         try {
@@ -3637,8 +3699,19 @@ class TimerHubApp {
 
     async setAllGroupsCollapsed(collapsed) {
         if (!this.groups.length) return false;
+        const previousOffsets = new Map(this.groups.map(group => [group.id, { ...this.groupDisplayOffset(group.id) }]));
         for (const group of this.groups) group.collapsed = collapsed;
-        this.expandedGroupOrder = collapsed ? [] : this.sortedGroupsForLayout().map(group => group.id);
+        if (collapsed) {
+            this.expandedGroupOrder = [];
+            this.expandedGroupCarry.clear();
+        } else {
+            this.expandedGroupOrder = this.sortedGroupsForLayout().map(group => group.id);
+            this.expandedGroupCarry.clear();
+            for (const group of this.groups) {
+                const offset = previousOffsets.get(group.id);
+                if (offset && (offset.x || offset.y)) this.expandedGroupCarry.set(group.id, { ...offset });
+            }
+        }
         for (const group of this.groups) {
             try {
                 await this.storage.saveGroup?.(group);
@@ -3726,6 +3799,20 @@ class TimerHubApp {
     }
 
     getActivityCanvasLayout(activity, index, includeDisplayOffset = true) {
+        const cached = this._baseLayoutCache?.get(activity.id);
+        if (cached) {
+            const layout = { x: cached.x, y: cached.y, width: cached.width, height: cached.height };
+            if (cached.groupId) {
+                layout.x += cached.groupX;
+                layout.y += cached.groupY;
+                if (includeDisplayOffset) {
+                    const offset = this.groupDisplayOffset(cached.groupId);
+                    layout.x += offset.x;
+                    layout.y += offset.y;
+                }
+            }
+            return layout;
+        }
         const saved = this.activityLayouts.get(activity.id);
         const group = this.activityGroup(activity);
         const sizeDefaults = { small: [220, 120], medium: [260, 150], large: [320, 190] };
@@ -3737,12 +3824,12 @@ class TimerHubApp {
         let order = Number.isFinite(Number(activity.position)) ? Number(activity.position) : index;
         if (!Number.isFinite(Number(saved?.x)) || !Number.isFinite(Number(saved?.y))) {
             order = group
-                ? Math.max(0, this.activities.filter(member => member.groupId === group.id).indexOf(activity))
+                ? Math.max(0, this.groupMembers(group).indexOf(activity))
                 : (Number.isFinite(Number(activity.position)) ? Number(activity.position) : index);
         }
         const angle = order * 2.399963229728653;
         const radius = 82 * Math.sqrt(Math.max(0, order));
-        const layout = {
+        const base = {
             x: this.clampCanvasCoordinate(
                 saved?.x,
                 24 + radius * (1 + Math.cos(angle)),
@@ -3756,13 +3843,18 @@ class TimerHubApp {
                 group ? 10000 : 1600
             ),
             width: this.clampCanvasCoordinate(saved?.width, defaultWidth, 160, 640),
-            height: this.clampCanvasCoordinate(saved?.height, defaultHeight, 110, 520)
+            height: this.clampCanvasCoordinate(saved?.height, defaultHeight, 110, 520),
+            groupId: group ? group.id : null,
+            groupX: group ? group.x : 0,
+            groupY: group ? group.y : 0
         };
-        if (group) {
-            layout.x += group.x;
-            layout.y += group.y;
+        if (this._baseLayoutCache) this._baseLayoutCache.set(activity.id, base);
+        const layout = { x: base.x, y: base.y, width: base.width, height: base.height };
+        if (base.groupId) {
+            layout.x += base.groupX;
+            layout.y += base.groupY;
             if (includeDisplayOffset) {
-                const offset = this.groupDisplayOffset(group.id);
+                const offset = this.groupDisplayOffset(base.groupId);
                 layout.x += offset.x;
                 layout.y += offset.y;
             }
@@ -3772,7 +3864,46 @@ class TimerHubApp {
 
     activityGroup(activity) {
         if (!activity?.groupId) return null;
+        if (this._canvasIndex) return this._canvasIndex.groupsById.get(activity.groupId) || null;
         return this.groups.find(group => group.id === activity.groupId) || null;
+    }
+
+    // One O(activities + groups) pass that removes the repeated groups.find /
+    // activities.filter calls from rendering, collision and pointer handlers.
+    // It is built fresh for every render and for every pointer-move query, so
+    // it can never go stale.
+    buildCanvasIndex() {
+        const groupsById = new Map();
+        const positionsById = new Map();
+        const activitiesByGroup = new Map();
+        for (let index = 0; index < this.groups.length; index += 1) {
+            const group = this.groups[index];
+            groupsById.set(group.id, group);
+        }
+        for (let index = 0; index < this.activities.length; index += 1) {
+            const activity = this.activities[index];
+            positionsById.set(activity.id, index);
+            const groupId = activity.groupId;
+            if (!groupId || !groupsById.has(groupId)) continue;
+            let members = activitiesByGroup.get(groupId);
+            if (!members) {
+                members = [];
+                activitiesByGroup.set(groupId, members);
+            }
+            members.push(activity);
+        }
+        return { groupsById, positionsById, activitiesByGroup };
+    }
+
+    groupMembers(group, index = this._canvasIndex) {
+        if (index) return index.activitiesByGroup.get(group.id) || [];
+        return this.activities.filter(activity => activity.groupId === group.id);
+    }
+
+    activityIndexOf(activity, index = this._canvasIndex) {
+        const position = index?.positionsById?.get(activity.id);
+        if (Number.isFinite(position)) return position;
+        return this.activities.indexOf(activity);
     }
 
     isCompleteLayout(layout) {
@@ -3897,9 +4028,10 @@ class TimerHubApp {
     }
 
     magneticActivityOthers(excludeId) {
+        const index = this.buildCanvasIndex();
         return this.activities
-            .filter(activity => activity.id !== excludeId && !this.activityGroup(activity)?.collapsed)
-            .map(activity => this.getActivityCanvasLayout(activity, this.activities.indexOf(activity)));
+            .filter(activity => activity.id !== excludeId && !index.groupsById.get(activity.groupId)?.collapsed)
+            .map(activity => this.getActivityCanvasLayout(activity, this.activityIndexOf(activity, index)));
     }
 
     magneticActivityAdjustment(layout, others, threshold = CANVAS_GRID_SIZE) {
@@ -4538,6 +4670,10 @@ class TimerHubApp {
                     Promise.resolve(this.storage.saveGroup?.(gesture.group)).catch(() => {
                         this.showToast(this.t('groupCreateFailed'));
                     });
+                    // The drag changed the intended persistent position; recompute
+                    // the temporary offsets for every remaining expanded group
+                    // without rebuilding the whole canvas.
+                    this.refreshGroupLayout();
                 }
                 return;
             }
