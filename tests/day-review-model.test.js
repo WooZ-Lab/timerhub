@@ -5698,18 +5698,27 @@ test('repeated expand and collapse cycles keep imported group offsets and anchor
 
     const offsets = () => Object.fromEntries(app.groups.map(group => [group.id, { ...app.groupDisplayOffset(group.id) }]));
     const anchors = () => app.groups.map(group => [group.x, group.y]);
-    const firstOffsets = offsets();
-    const firstAnchors = anchors();
-
-    for (let cycle = 0; cycle < 3; cycle += 1) {
-        for (const group of [...app.groups]) await app.toggleGroupCollapsed(group.id);
+    const collapseAll = async () => {
+        for (const group of [...app.groups]) if (!group.collapsed) await app.toggleGroupCollapsed(group.id);
         app.renderMain();
-        for (const group of [...app.groups]) await app.toggleGroupCollapsed(group.id);
+    };
+    const expandAll = async () => {
+        for (const group of [...app.groups]) if (group.collapsed) await app.toggleGroupCollapsed(group.id);
         app.renderMain();
-    }
+    };
 
-    assert.deepEqual(JSON.parse(JSON.stringify(offsets())), JSON.parse(JSON.stringify(firstOffsets)), 'neighbour displacement is recalculated without drift');
-    assert.deepEqual(JSON.parse(JSON.stringify(anchors())), JSON.parse(JSON.stringify(firstAnchors)), 'saved coordinates are never written by expand/collapse');
+    await collapseAll();
+    await expandAll();
+    const stableOffsets = JSON.parse(JSON.stringify(offsets()));
+    const stableAnchors = JSON.parse(JSON.stringify(anchors()));
+
+    await collapseAll();
+    await expandAll();
+    await collapseAll();
+    await expandAll();
+
+    assert.deepEqual(JSON.parse(JSON.stringify(offsets())), stableOffsets, 'neighbour displacement is recalculated without drift');
+    assert.deepEqual(JSON.parse(JSON.stringify(anchors())), stableAnchors, 'saved coordinates are never written by expand/collapse');
 });
 
 test('three imported activities default to small and produce a compact group', async () => {
@@ -5803,4 +5812,143 @@ test('nested imported groups each fit their own contents', async () => {
     const house = app.groups.find(group => group.name === 'Street · 10');
     assert.equal(app.activities.filter(activity => activity.groupId === street.id).length, 1);
     assert.equal(app.activities.filter(activity => activity.groupId === house.id).length, 2);
+});
+
+function groupGeometry(containers, groupId) {
+    const container = containers.filter(item => item.dataset.groupId === groupId).at(-1);
+    return {
+        left: Number.parseFloat(container.style.left),
+        top: Number.parseFloat(container.style.top),
+        width: Number.parseFloat(container.style.width),
+        height: Number.parseFloat(container.style.height)
+    };
+}
+
+function groupOverlaps(first, second) {
+    return first.left < second.left + second.width && second.left < first.left + first.width &&
+        first.top < second.top + second.height && second.top < first.top + first.height;
+}
+
+function createTwoGroupAnchorHarness(anchorX = 100, anchorY = 100) {
+    const harness = createGroupCanvasHarness();
+    const { app } = harness;
+    app.activities = [
+        { id: 'anchor-a1', name: 'A1', position: 0, groupId: 'anchor-a', size: 'medium' },
+        { id: 'anchor-b1', name: 'B1', position: 1, groupId: 'anchor-b', size: 'medium' }
+    ];
+    app.activityLayouts = new Map([
+        ['anchor-a1', { activityId: 'anchor-a1', x: 0, y: 0, width: 200, height: 120 }],
+        ['anchor-b1', { activityId: 'anchor-b1', x: 0, y: 0, width: 200, height: 120 }]
+    ]);
+    app.groups = [
+        { id: 'anchor-a', name: 'A', x: anchorX, y: anchorY, collapsed: false },
+        { id: 'anchor-b', name: 'B', x: anchorX, y: anchorY, collapsed: true }
+    ];
+    return harness;
+}
+
+test('expanding an overlapping group anchors the newly expanded group', async () => {
+    const harness = createTwoGroupAnchorHarness();
+    const { app, containers } = harness;
+    app.renderMain();
+
+    await app.toggleGroupCollapsed('anchor-b');
+    assert.deepEqual({ ...app.groupDisplayOffset('anchor-b') }, { x: 0, y: 0 }, 'the newly expanded group stays anchored');
+    assert.notDeepEqual({ ...app.groupDisplayOffset('anchor-a') }, { x: 0, y: 0 }, 'the earlier expanded neighbour steps aside');
+    assert.equal(groupOverlaps(groupGeometry(containers, 'anchor-a'), groupGeometry(containers, 'anchor-b')), false);
+    assert.deepEqual(JSON.parse(JSON.stringify(app.groups.map(group => [group.x, group.y]))), [[100, 100], [100, 100]], 'saved anchors are untouched');
+
+    await app.toggleGroupCollapsed('anchor-b');
+    assert.deepEqual({ ...app.groupDisplayOffset('anchor-a') }, { x: 0, y: 0 }, 'collapsing restores the neighbour');
+});
+
+test('sequential expansions always anchor the most recently expanded group', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app } = harness;
+    app.activities = [
+        { id: 'seq-a1', name: 'A1', position: 0, groupId: 'seq-a', size: 'medium' },
+        { id: 'seq-b1', name: 'B1', position: 1, groupId: 'seq-b', size: 'medium' },
+        { id: 'seq-c1', name: 'C1', position: 2, groupId: 'seq-c', size: 'medium' }
+    ];
+    app.activityLayouts = new Map([
+        ['seq-a1', { activityId: 'seq-a1', x: 0, y: 0, width: 200, height: 120 }],
+        ['seq-b1', { activityId: 'seq-b1', x: 0, y: 0, width: 200, height: 120 }],
+        ['seq-c1', { activityId: 'seq-c1', x: 0, y: 0, width: 200, height: 120 }]
+    ]);
+    app.groups = [
+        { id: 'seq-a', name: 'A', x: 100, y: 100, collapsed: true },
+        { id: 'seq-b', name: 'B', x: 100, y: 100, collapsed: true },
+        { id: 'seq-c', name: 'C', x: 100, y: 100, collapsed: true }
+    ];
+    app.renderMain();
+
+    await app.toggleGroupCollapsed('seq-a');
+    assert.deepEqual({ ...app.groupDisplayOffset('seq-a') }, { x: 0, y: 0 }, 'A anchors when expanded first');
+    await app.toggleGroupCollapsed('seq-b');
+    assert.deepEqual({ ...app.groupDisplayOffset('seq-b') }, { x: 0, y: 0 }, 'B anchors when expanded second');
+    await app.toggleGroupCollapsed('seq-c');
+    assert.deepEqual({ ...app.groupDisplayOffset('seq-c') }, { x: 0, y: 0 }, 'C anchors when expanded third');
+    assert.deepEqual(JSON.parse(JSON.stringify(app.groups.map(group => [group.x, group.y]))), [[100, 100], [100, 100], [100, 100]]);
+});
+
+test('expanded groups keep their anchor near every canvas edge', async () => {
+    const anchors = [[16, 16], [16, 2000], [3200, 16], [3200, 1980]];
+    for (const [x, y] of anchors) {
+        const harness = createTwoGroupAnchorHarness(x, y);
+        const { app } = harness;
+        app.renderMain();
+        await app.toggleGroupCollapsed('anchor-b');
+        assert.deepEqual(
+            { ...app.groupDisplayOffset('anchor-b') },
+            { x: 0, y: 0 },
+            `the expanded group stays anchored at ${x},${y}`
+        );
+        assert.deepEqual(
+            JSON.parse(JSON.stringify(app.groups.map(group => [group.x, group.y]))),
+            [[x, y], [x, y]],
+            `saved anchors are untouched at ${x},${y}`
+        );
+        assert.equal(groupGeometry(harness.containers, 'anchor-b').left, x - 20, 'the expanded container starts at the saved anchor');
+        assert.equal(groupGeometry(harness.containers, 'anchor-b').top, y - 36);
+    }
+});
+
+test('collapsing does not snap a neighbour back over user changes made while expanded', async () => {
+    const harness = createTwoGroupAnchorHarness();
+    const { app } = harness;
+    app.renderMain();
+    await app.toggleGroupCollapsed('anchor-b');
+    app.groups[0].x = 700;
+    app.renderMain();
+    assert.equal(groupGeometry(harness.containers, 'anchor-a').left, 680, 'the moved neighbour renders at its new saved position');
+
+    await app.toggleGroupCollapsed('anchor-b');
+    assert.deepEqual({ ...app.groupDisplayOffset('anchor-a') }, { x: 0, y: 0 });
+    assert.equal(groupGeometry(harness.containers, 'anchor-a').left, 680, 'the user move is preserved after collapse');
+});
+
+test('nested flattened groups follow the same anchoring rule', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app } = harness;
+    app.activities = [
+        { id: 'nest-street', name: 'S1', position: 0, groupId: 'nest-s', size: 'medium' },
+        { id: 'nest-house', name: 'H1', position: 1, groupId: 'nest-h', size: 'medium' }
+    ];
+    app.activityLayouts = new Map([
+        ['nest-street', { activityId: 'nest-street', x: 0, y: 0, width: 200, height: 120 }],
+        ['nest-house', { activityId: 'nest-house', x: 0, y: 0, width: 200, height: 120 }]
+    ]);
+    app.groups = [
+        { id: 'nest-s', name: 'Street', x: 200, y: 200, collapsed: false },
+        { id: 'nest-h', name: 'Street · 10', x: 200, y: 200, collapsed: true }
+    ];
+    app.renderMain();
+
+    await app.toggleGroupCollapsed('nest-h');
+    assert.deepEqual({ ...app.groupDisplayOffset('nest-h') }, { x: 0, y: 0 }, 'the nested house anchors where it expands');
+    assert.notDeepEqual({ ...app.groupDisplayOffset('nest-s') }, { x: 0, y: 0 }, 'the street neighbour steps aside');
+    assert.deepEqual(JSON.parse(JSON.stringify(app.groups.map(group => [group.x, group.y]))), [[200, 200], [200, 200]]);
+
+    await app.toggleGroupCollapsed('nest-h');
+    assert.deepEqual({ ...app.groupDisplayOffset('nest-s') }, { x: 0, y: 0 }, 'collapsing restores the street neighbour');
 });

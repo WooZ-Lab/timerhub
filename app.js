@@ -1406,6 +1406,7 @@ class TimerHubApp {
         this.canvasSelectionElement = null;
         this.selectedActivityIds = new Set();
         this.groupDisplayOffsets = new Map();
+        this.expandedGroupOrder = [];
         this.suppressActivityClick = null;
         this.editingActivityId = null;
         this.editingEntryId = null;
@@ -3361,11 +3362,21 @@ class TimerHubApp {
 
     computeGroupDisplayOffsets() {
         const offsets = new Map();
+        // Expansion priority: the group the user most recently expanded keeps
+        // its saved anchor (offset {0,0}); every other group it overlaps steps
+        // aside temporarily. Without an explicit expansion the order falls back
+        // to the stable group list order.
+        const rank = new Map();
+        this.expandedGroupOrder.forEach((id, index) => {
+            if (!rank.has(id)) rank.set(id, index);
+        });
+        const priorityOf = group => rank.has(group.id) ? rank.get(group.id) : Number.MAX_SAFE_INTEGER;
+        const expandedGroups = this.groups
+            .filter(group => !group.collapsed && this.groupMemberBoxes(group, false).length)
+            .sort((a, b) => (priorityOf(a) - priorityOf(b)) || (this.groups.indexOf(a) - this.groups.indexOf(b)));
         const expandedObstacles = [];
-        for (const group of this.groups) {
-            if (group.collapsed) continue;
+        for (const group of expandedGroups) {
             const boxes = this.groupMemberBoxes(group, false);
-            if (!boxes.length) continue;
             const bounds = this.groupContainerBounds(boxes);
             const { left, top } = this.resolveGroupCollision(bounds, expandedObstacles);
             expandedObstacles.push({ left, top, right: left + bounds.width, bottom: top + bounds.height });
@@ -3569,6 +3580,11 @@ class TimerHubApp {
         const group = this.groups.find(item => item.id === groupId);
         if (!group) return null;
         group.collapsed = !group.collapsed;
+        if (group.collapsed) {
+            this.expandedGroupOrder = this.expandedGroupOrder.filter(id => id !== group.id);
+        } else {
+            this.expandedGroupOrder = [group.id, ...this.expandedGroupOrder.filter(id => id !== group.id)];
+        }
         try {
             await this.storage.saveGroup?.(group);
         } catch {
@@ -3582,6 +3598,7 @@ class TimerHubApp {
     async setAllGroupsCollapsed(collapsed) {
         if (!this.groups.length) return false;
         for (const group of this.groups) group.collapsed = collapsed;
+        this.expandedGroupOrder = collapsed ? [] : this.groups.map(group => group.id);
         for (const group of this.groups) {
             try {
                 await this.storage.saveGroup?.(group);
@@ -3632,6 +3649,7 @@ class TimerHubApp {
             return { copy, layout };
         });
         this.groups.push(duplicate);
+        this.expandedGroupOrder = [duplicate.id, ...this.expandedGroupOrder.filter(id => id !== duplicate.id)];
         try {
             await this.storage.saveGroup?.(duplicate);
             for (const { copy, layout } of copies) {
@@ -3892,6 +3910,7 @@ class TimerHubApp {
             collapsed: false
         };
         this.groups.push(group);
+        this.expandedGroupOrder = [group.id, ...this.expandedGroupOrder.filter(id => id !== group.id)];
         try {
             await this.storage.saveGroup?.(group);
             for (const { activity, layout } of entries) {
