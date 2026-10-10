@@ -251,6 +251,15 @@ const extendedTranslations = {
         notificationBackgroundFallbackTitle: 'TimerHub', notificationBackgroundFallbackBody: 'Timer reminder',
         textLogTotal: 'Total', colorPickerLabel: 'Choose a color', shapePickerLabel: 'Choose a shape',
         sizePickerLabel: 'Choose a size',
+        icon: 'Icon',
+        iconPickerLabel: 'Choose a template icon',
+        iconNone: 'No icon',
+        iconVacuumAttic: 'Vacuum cleaner - attic',
+        iconVacuumBasement: 'Vacuum cleaner - basement',
+        iconMop: 'Mop / floor cleaning',
+        iconSqueegee: 'Window cleaning squeegee',
+        iconDuster: 'Dusting cloth',
+        iconCar: 'Car / travel to site',
         demoMasking: 'Masking', demoPainting: 'Painting', demoWallpapering: 'Wallpapering',
         demoUnloading: 'Unloading', demoTravel: 'Travel', demoBreak: 'Break',
         logFilename: 'timelog', backupFilename: 'timerhub_backup',
@@ -530,6 +539,15 @@ const extendedTranslations = {
         notificationBackgroundFallbackTitle: 'TimerHub', notificationBackgroundFallbackBody: 'Timer-Erinnerung',
         textLogTotal: 'Gesamt', colorPickerLabel: 'Farbe auswählen', shapePickerLabel: 'Form auswählen',
         sizePickerLabel: 'Größe auswählen',
+        icon: 'Symbol',
+        iconPickerLabel: 'Vorlagen-Symbol auswählen',
+        iconNone: 'Kein Symbol',
+        iconVacuumAttic: 'Staubsauger - Dachboden',
+        iconVacuumBasement: 'Staubsauger - Keller',
+        iconMop: 'Wischen / Bodenreinigung',
+        iconSqueegee: 'Fensterabzieher',
+        iconDuster: 'Staubtuch',
+        iconCar: 'Auto / Anfahrt',
         demoMasking: 'Abkleben', demoPainting: 'Streichen', demoWallpapering: 'Tapezieren',
         demoUnloading: 'Entladen', demoTravel: 'Anfahrt', demoBreak: 'Pause',
         logFilename: 'zeitprotokoll', backupFilename: 'timerhub_sicherung',
@@ -809,6 +827,15 @@ const extendedTranslations = {
         notificationBackgroundFallbackTitle: 'TimerHub', notificationBackgroundFallbackBody: 'Напоминание таймера',
         textLogTotal: 'Всего', colorPickerLabel: 'Выбрать цвет', shapePickerLabel: 'Выбрать форму',
         sizePickerLabel: 'Выбрать размер',
+        icon: 'Значок',
+        iconPickerLabel: 'Выбрать значок шаблона',
+        iconNone: 'Без значка',
+        iconVacuumAttic: 'Пылесос — чердак',
+        iconVacuumBasement: 'Пылесос — подвал',
+        iconMop: 'Мытьё полов',
+        iconSqueegee: 'Стеклоочиститель для окон',
+        iconDuster: 'Тряпка для пыли',
+        iconCar: 'Машина / проезд',
         demoMasking: 'Заклеивание', demoPainting: 'Покраска', demoWallpapering: 'Поклейка обоев',
         demoUnloading: 'Разгрузка', demoTravel: 'Дорога', demoBreak: 'Перерыв',
         logFilename: 'журнал-времени', backupFilename: 'timerhub-копия',
@@ -1578,6 +1605,72 @@ class TimerHubApp {
             { id: 'star', key: 'shapeStar', svg: 'M 0 -50 L 15 -20 L 50 -20 L 25 5 L 40 40 L 0 15 L -40 40 L -25 5 L -50 -20 L -15 -20 Z' },
             { id: 'heart', key: 'shapeHeart', svg: 'M 0 10 C -30 -20 -50 -10 -50 -20 C -50 -40 -30 -50 -15 -50 C 0 -60 15 -50 15 -50 C 30 -50 50 -40 50 -20 C 50 -10 30 -20 0 10' },
             { id: 'oval', key: 'shapeOval', svg: 'M -50 0 A 50 30 0 0 1 50 0 A 50 30 0 0 1 -50 0' }
+        ];
+
+        // Activity templates: a stable id plus a small, consistent set of
+        // outline glyphs drawn on a 24x24 grid. The identifier is persisted on
+        // the activity; the paths stay in code. Stroke/fill come from CSS so the
+        // icons inherit the contrast-aware activity text color.
+        this.ACTIVITY_ICONS = [
+            {
+                id: 'vacuum-attic',
+                key: 'iconVacuumAttic',
+                elements: [
+                    { tag: 'path', attrs: { d: 'M3 11 12 4l9 7' } },
+                    { tag: 'circle', attrs: { cx: '11', cy: '16', r: '3.2' } },
+                    { tag: 'path', attrs: { d: 'M14.2 16H18v-3' } }
+                ]
+            },
+            {
+                id: 'vacuum-basement',
+                key: 'iconVacuumBasement',
+                elements: [
+                    { tag: 'path', attrs: { d: 'M3 6h4v4h4v4h4' } },
+                    { tag: 'path', attrs: { d: 'M3 20h18' } },
+                    { tag: 'circle', attrs: { cx: '18', cy: '17.5', r: '2.5' } },
+                    { tag: 'path', attrs: { d: 'M18 15v-2' } }
+                ]
+            },
+            {
+                id: 'mop',
+                key: 'iconMop',
+                elements: [
+                    { tag: 'path', attrs: { d: 'M12 3v11' } },
+                    { tag: 'path', attrs: { d: 'M8 14h8l-1.2 3.2H9.2z' } },
+                    { tag: 'path', attrs: { d: 'M9.5 17.2l-.8 3M12 17.2v3.3M14.5 17.2l.8 3' } },
+                    { tag: 'path', attrs: { d: 'M4 21.5h3M17 21.5h3' } }
+                ]
+            },
+            {
+                id: 'squeegee',
+                key: 'iconSqueegee',
+                elements: [
+                    { tag: 'path', attrs: { d: 'M12 3.5V11' } },
+                    { tag: 'path', attrs: { d: 'M9.5 3.5h5' } },
+                    { tag: 'path', attrs: { d: 'M4 11h16v2.2H4z' } },
+                    { tag: 'path', attrs: { d: 'M6.5 16.5c1.3 1.6 1.3 3.2 0 4.8M11.5 17c1.3 1.6 1.3 3.2 0 4.8' } }
+                ]
+            },
+            {
+                id: 'duster',
+                key: 'iconDuster',
+                elements: [
+                    { tag: 'path', attrs: { d: 'M6 6.5c3.5-2.6 8.5-2.6 12 0v9c-3.5 2.6-8.5 2.6-12 0z' } },
+                    { tag: 'path', attrs: { d: 'M6 10.5c3.5 2 8.5 2 12 0' } },
+                    { tag: 'path', attrs: { d: 'M18.5 3.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z' } }
+                ]
+            },
+            {
+                id: 'car',
+                key: 'iconCar',
+                elements: [
+                    { tag: 'path', attrs: { d: 'M7.4 8.4 9 5.5h6l1.6 2.9' } },
+                    { tag: 'path', attrs: { d: 'M4 14.2 5.8 9.6A1.6 1.6 0 0 1 7.3 8.5h9.4a1.6 1.6 0 0 1 1.5 1.1L20 14.2v3.3H4z' } },
+                    { tag: 'circle', attrs: { cx: '8.2', cy: '17.5', r: '1.6' } },
+                    { tag: 'circle', attrs: { cx: '15.8', cy: '17.5', r: '1.6' } },
+                    { tag: 'path', attrs: { d: 'M3 21h18' } }
+                ]
+            }
         ];
     }
 
@@ -2474,6 +2567,9 @@ class TimerHubApp {
         // Shape picker
         this.populateShapePicker();
 
+        // Activity template (icon) picker
+        this.populateIconPicker();
+
         // Size buttons
         document.querySelectorAll('.size-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -2633,6 +2729,52 @@ class TimerHubApp {
             });
             picker.appendChild(btn);
         });
+    }
+
+    activityIcon(iconId) {
+        if (!iconId) return null;
+        return (this.ACTIVITY_ICONS || []).find(icon => icon.id === iconId) || null;
+    }
+
+    buildIconSvg(icon, className = '') {
+        if (!icon || typeof document.createElementNS !== 'function') return null;
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('viewBox', '0 0 24 24');
+        svg.setAttribute('aria-hidden', 'true');
+        if (className) svg.classList.add(className);
+        for (const item of icon.elements || []) {
+            const element = document.createElementNS('http://www.w3.org/2000/svg', item.tag);
+            for (const [name, value] of Object.entries(item.attrs || {})) {
+                element.setAttribute(name, value);
+            }
+            svg.appendChild(element);
+        }
+        return svg;
+    }
+
+    populateIconPicker() {
+        const picker = document.getElementById('iconPicker');
+        if (!picker) return;
+        picker.replaceChildren();
+        const options = [{ id: '', key: 'iconNone', elements: [{ tag: 'path', attrs: { d: 'M5 12h14' } }] }]
+            .concat(this.ACTIVITY_ICONS);
+        for (const icon of options) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'icon-option';
+            btn.dataset.icon = icon.id;
+            btn.dataset.i18nTitle = icon.key;
+            btn.dataset.i18nAriaLabel = icon.key;
+            btn.setAttribute('aria-label', this.t(icon.key));
+            btn.title = this.t(icon.key);
+            const svg = this.buildIconSvg(icon, 'icon-option-svg');
+            if (svg) btn.appendChild(svg);
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.icon-option').forEach(option => option.classList.remove('selected'));
+                btn.classList.add('selected');
+            });
+            picker.appendChild(btn);
+        }
     }
 
     applyTheme() {
@@ -3360,6 +3502,15 @@ class TimerHubApp {
             colorMark.style.backgroundColor = activity.color || '#18794e';
             colorMark.setAttribute('aria-hidden', 'true');
             btn.appendChild(colorMark);
+
+            // Activity template icon. Unknown or missing ids simply render no
+            // icon, so legacy and forward-compatible records stay valid.
+            const iconDefinition = this.activityIcon(activity.icon);
+            const iconElement = iconDefinition ? this.buildIconSvg(iconDefinition, 'activity-icon') : null;
+            if (iconElement) {
+                btn.classList.add('has-icon');
+                btn.appendChild(iconElement);
+            }
             btn.appendChild(name);
 
             if (activity.notes) {
@@ -6573,6 +6724,13 @@ class TimerHubApp {
             document.querySelectorAll('.size-btn').forEach(opt => opt.classList.remove('selected'));
             const sizeOpt = document.querySelector(`.size-btn[data-size="${activity.size}"]`);
             if (sizeOpt) sizeOpt.classList.add('selected');
+
+            // Select template icon (missing or unknown ids fall back to "none")
+            document.querySelectorAll('.icon-option').forEach(opt => opt.classList.remove('selected'));
+            const iconId = typeof activity.icon === 'string' ? activity.icon : '';
+            const iconOpt = Array.from(document.querySelectorAll('.icon-option'))
+                .find(opt => (opt.dataset.icon || '') === iconId);
+            (iconOpt || document.querySelector('.icon-option[data-icon=""]'))?.classList.add('selected');
         } else {
             title.textContent = this.t('createActivity');
             document.getElementById('activityName').value = '';
@@ -6594,6 +6752,8 @@ class TimerHubApp {
             document.querySelectorAll('.shape-option')[0]?.classList.add('selected');
             document.querySelectorAll('.size-btn').forEach(opt => opt.classList.remove('selected'));
             document.querySelector('.size-btn[data-size="medium"]')?.classList.add('selected');
+            document.querySelectorAll('.icon-option').forEach(opt => opt.classList.remove('selected'));
+            document.querySelector('.icon-option[data-icon=""]')?.classList.add('selected');
         }
 
         if (activityId) {
@@ -6629,6 +6789,7 @@ class TimerHubApp {
         };
         reveal('colorPicker');
         reveal('shapePicker');
+        reveal('iconPicker');
     }
 
     closeActivityModal() {
@@ -6648,10 +6809,12 @@ class TimerHubApp {
         const selectedColor = document.querySelector('.color-option.selected');
         const selectedShape = document.querySelector('.shape-option.selected');
         const selectedSize = document.querySelector('.size-btn.selected');
+        const selectedIcon = document.querySelector('.icon-option.selected');
 
         const color = selectedColor ? selectedColor.style.backgroundColor : this.COLORS[0];
         const shape = selectedShape ? selectedShape.dataset.shape : 'circle';
         const size = selectedSize ? selectedSize.dataset.size : 'medium';
+        const icon = selectedIcon && selectedIcon.dataset.icon ? selectedIcon.dataset.icon : '';
 
         const now = Date.now();
         const assignment = this.readClockodoAssignment('activity');
@@ -6669,6 +6832,8 @@ class TimerHubApp {
                 activity.serviceId = assignment.serviceId;
                 activity.customerName = assignment.customerName;
                 activity.serviceName = assignment.serviceName;
+                if (icon) activity.icon = icon;
+                else delete activity.icon;
                 activity.updatedAt = now;
                 await this.storage.saveActivity(activity);
             }
@@ -6690,6 +6855,7 @@ class TimerHubApp {
                 createdAt: now,
                 updatedAt: now
             };
+            if (icon) activity.icon = icon;
             this.activities.push(activity);
             await this.storage.saveActivity(activity);
         }
@@ -8718,6 +8884,7 @@ class TimerHubApp {
             assignment: assignmentName,
             importedAt: now
         };
+        if (activity.icon) record.icon = activity.icon;
         if (groupId) record.groupId = groupId;
         return record;
     }

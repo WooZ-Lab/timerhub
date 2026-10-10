@@ -79,6 +79,7 @@ Activity:
   "color": "#e74c3c",
   "shape": "square",
   "size": "large",
+  "icon": "mop",
   "exclude": false
 }
 ```
@@ -90,6 +91,7 @@ Activity:
 | `color` | no | `#RRGGBB`. Defaults to the TimerHub palette. |
 | `shape` | no | One of `circle`, `square`, `rounded`, `diamond`, `triangle`, `hexagon`, `octagon`, `star`, `heart`, `oval`. |
 | `size` | no | `small`, `medium` or `large`. |
+| `icon` | no | Activity template icon: `vacuum-attic`, `vacuum-basement`, `mop`, `squeegee`, `duster` or `car`. Omit when nothing matches. |
 | `exclude` | no | Explicitly exclude this activity from the import. |
 
 Unknown fields are rejected (no silent forward compatibility). This keeps the schema strict and predictable; a future change will use a new `version`.
@@ -146,12 +148,14 @@ Activity = {
   "color": "#RRGGBB" (optional),
   "shape": "circle" | "square" | "rounded" | "diamond" | "triangle" | "hexagon" | "octagon" | "star" | "heart" | "oval" (optional),
   "size": "small" | "medium" | "large" (optional),
+  "icon": "vacuum-attic" | "vacuum-basement" | "mop" | "squeegee" | "duster" | "car" (optional),
   "exclude": true (optional)
 }
 
 Rules:
 - Use "groups" for streets, locations, or other containers and "children" for nested containers such as houses. Nesting is unlimited, but keep it as shallow as the assignment allows.
 - Put every work instruction into exactly one activity. Use "activities" directly on the group it belongs to.
+- Set "icon" only when the instruction clearly matches one of the supported templates: vacuum-attic (vacuuming the attic), vacuum-basement (vacuuming the basement), mop (mopping or floor cleaning), squeegee (window cleaning), duster (dusting), car (travelling to a site). Omit it when nothing matches.
 - Preserve every address and every work instruction exactly as written. Never invent addresses, activities, colors, or requirements. If the assignment does not state a value, omit that property.
 - Never drop anything silently. If an instruction is intentionally not to be imported, represent it with "exclude": true instead of removing it.
 - Use "mode": "replace" only when the user explicitly asks to replace a previous TimerHub import of the same "name". Otherwise omit mode.

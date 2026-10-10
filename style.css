@@ -765,6 +765,56 @@ button:focus-visible,
     background-color: var(--bg-tertiary);
 }
 
+.icon-picker {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 6px 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+
+.icon-picker::-webkit-scrollbar {
+    display: none;
+}
+
+.icon-option {
+    flex: 0 0 var(--touch-target);
+    width: var(--touch-target);
+    height: var(--touch-target);
+    border: 2px solid var(--border-color);
+    background-color: var(--bg-secondary);
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-primary);
+    transition: all 0.2s;
+}
+
+.icon-option:active {
+    transform: scale(0.95);
+}
+
+.icon-option.selected {
+    border-color: var(--color-blue);
+    background-color: var(--bg-tertiary);
+}
+
+.icon-option svg {
+    width: 26px;
+    height: 26px;
+    overflow: visible;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
 .size-picker {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -2892,6 +2942,33 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 #activitiesGrid .activity-btn.activity-node > * {
     position: relative;
     z-index: 1;
+}
+
+/* Activity template icons: inherit the contrast-aware text color, never
+   intercept pointer events, and stack above the name on the node. */
+#activitiesGrid .activity-btn.activity-node.has-icon {
+    flex-direction: column;
+    gap: 2px;
+}
+
+#activitiesGrid .activity-btn.activity-node .activity-icon {
+    width: 24px;
+    height: 24px;
+    flex: 0 0 auto;
+    color: inherit;
+    opacity: .9;
+    pointer-events: none;
+    overflow: visible;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+#activitiesGrid .activity-btn.activity-node.large .activity-icon {
+    width: 32px;
+    height: 32px;
 }
 
 /* Resize handle remains outside the clipped activity node. */

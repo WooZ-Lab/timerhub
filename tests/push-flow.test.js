@@ -1317,6 +1317,20 @@ test('the canvas disables native text selection while editable fields keep it', 
     assert.equal(/\.group-title\s*\{[^}]*user-select/.test(styleSource), false, 'the group title relies on the scoped canvas rule, not a duplicate one');
 });
 
+test('activity template icons are pointer-transparent and styled like the pickers', () => {
+    const iconRule = styleSource.match(/#activitiesGrid \.activity-btn\.activity-node \.activity-icon\s*\{([^}]*)\}/s)?.[1] || '';
+    assert.match(iconRule, /pointer-events:\s*none/, 'icons never intercept drag, selection or timers');
+    assert.match(iconRule, /stroke:\s*currentColor/, 'icons inherit the contrast-aware activity text color');
+    assert.match(iconRule, /fill:\s*none/);
+
+    const pickerRule = styleSource.match(/\.icon-picker\s*\{([^}]*)\}/s)?.[1] || '';
+    assert.match(pickerRule, /overflow-x:\s*auto/, 'the icon picker scrolls horizontally like color and shape');
+    const optionRule = styleSource.match(/\.icon-option\s*\{([^}]*)\}/s)?.[1] || '';
+    assert.match(optionRule, /flex:\s*0 0 var\(--touch-target\)/, 'icon options meet the touch target size');
+    assert.match(styleSource, /\.icon-option\.selected\s*\{[^}]*border-color:\s*var\(--color-blue\)/s);
+    assert.match(htmlSource, /id="iconPicker" class="icon-picker"/);
+});
+
 test('duplicated Day Review and Time Log screen headings are removed while navigation labels remain', () => {
     assert.equal((htmlSource.match(/data-i18n="endOfDayReview"/g) || []).length, 0, 'the duplicated Day Review heading is gone');
     assert.equal((htmlSource.match(/data-i18n="timeLog"/g) || []).length, 1, 'the Time Log label only remains in the bottom navigation');

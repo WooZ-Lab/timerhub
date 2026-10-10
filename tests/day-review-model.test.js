@@ -210,6 +210,7 @@ function createTestApp(initialData = {}) {
         getElementById: id => elements.get(id) || null,
         querySelector: () => null,
         querySelectorAll: () => [],
+        createElementNS: () => testDocument.createElement(),
         createElement: () => {
             const element = {
                 value: '', textContent: '', style: { setProperty(name, value) { this[name] = value; } }, dataset: {}, className: '', id: '', hidden: false,
@@ -455,6 +456,7 @@ function createGroupCanvasHarness() {
     context.document.querySelector = selector => stage.querySelector(selector);
     context.document.querySelectorAll = selector => selector === '.activity-btn' ? buttons : [];
     context.document.createElement = () => makeElement();
+    context.document.createElementNS = () => makeElement();
     app.toggleActivity = async () => {};
     app.setupActivityCanvasInteractions();
 
@@ -7184,4 +7186,151 @@ test('empty groups and escape close the dialog without changing anything', async
     assert.equal(await app.deleteSelectedGroups(), true);
     assert.equal(app.groups.length, 0, 'the empty group can still be deleted');
     assert.equal(app.activities.length, 0);
+});
+
+test('the activity icon catalog is consistent and shared with assignment import', () => {
+    const { app, context } = createTestApp();
+    const icons = app.ACTIVITY_ICONS;
+    assert.ok(Array.isArray(icons), 'the catalog exists');
+    assert.deepEqual(
+        Array.from(icons, icon => icon.id),
+        ['vacuum-attic', 'vacuum-basement', 'mop', 'squeegee', 'duster', 'car'],
+        'the six required templates are present in a stable order'
+    );
+    assert.equal(new Set(icons.map(icon => icon.id)).size, icons.length, 'identifiers are unique');
+    for (const icon of icons) {
+        assert.ok(icon.key, `${icon.id} has a translation key`);
+        assert.ok(Array.isArray(icon.elements) && icon.elements.length > 0, `${icon.id} has geometry`);
+        for (const element of icon.elements) {
+            assert.ok(['path', 'circle', 'rect', 'ellipse', 'line', 'polyline'].includes(element.tag), `${icon.id} uses a simple SVG tag`);
+        }
+    }
+    const Assignment = vm.runInContext('TimerHubAssignment', context);
+    assert.deepEqual(
+        Array.from(Assignment.ACTIVITY_ICON_IDS),
+        Array.from(icons, icon => icon.id),
+        'assignment validation accepts exactly the icons the canvas can render'
+    );
+});
+
+test('icon SVG builders fail safe for missing and unknown identifiers', () => {
+    const { app } = createTestApp();
+    assert.equal(app.activityIcon(undefined), null);
+    assert.equal(app.activityIcon(''), null);
+    assert.equal(app.activityIcon('rocket'), null, 'unknown ids resolve to no icon');
+    const icon = app.activityIcon('mop');
+    assert.ok(icon);
+    const svg = app.buildIconSvg(icon, 'activity-icon');
+    assert.ok(svg, 'an SVG is built for a known icon');
+    assert.equal(svg.viewBox, '0 0 24 24');
+    assert.equal(svg['aria-hidden'], 'true');
+    assert.equal(svg.classList.contains('activity-icon'), true);
+    assert.equal(svg.children.length, icon.elements.length, 'every shape is rendered');
+});
+
+test('creating, editing and clearing an activity icon keeps the other fields intact', async () => {
+    const { app, document, storageData } = createTestApp();
+    app.renderMain = () => {};
+    app.generateId = () => 'icon-created';
+    const originalQuerySelector = document.querySelector;
+    const withIcon = icon => {
+        document.querySelector = selector => selector === '.icon-option.selected'
+            ? { dataset: { icon } }
+            : (typeof originalQuerySelector === 'function' ? originalQuerySelector(selector) : null);
+    };
+    document.getElementById('activityName').value = 'Attic vacuum';
+
+    withIcon('vacuum-attic');
+    await app.saveActivity();
+    const created = app.activities.find(activity => activity.id === 'icon-created');
+    assert.equal(created.icon, 'vacuum-attic', 'the created activity stores the icon id');
+    assert.equal(created.name, 'Attic vacuum', 'the name is stored independently');
+    assert.equal(storageData.activities.find(activity => activity.id === 'icon-created').icon, 'vacuum-attic', 'the icon is persisted');
+
+    app.editingActivityId = 'icon-created';
+    document.getElementById('activityName').value = 'Attic vacuum';
+    withIcon('car');
+    await app.saveActivity();
+    assert.equal(created.icon, 'car', 'editing changes only the icon');
+    assert.equal(created.name, 'Attic vacuum');
+    assert.equal(storageData.activities.find(activity => activity.id === 'icon-created').icon, 'car');
+
+    app.editingActivityId = 'icon-created';
+    document.getElementById('activityName').value = 'Attic vacuum';
+    withIcon('');
+    await app.saveActivity();
+    assert.equal(Object.hasOwn(created, 'icon'), false, 'clearing the icon removes the property');
+    assert.equal(Object.hasOwn(storageData.activities.find(activity => activity.id === 'icon-created'), 'icon'), false);
+    document.querySelector = originalQuerySelector;
+});
+
+test('canvas nodes render template icons, keep names, and ignore unknown identifiers', () => {
+    const harness = createGroupCanvasHarness();
+    const { app, buttons } = harness;
+    app.activities = [
+        { id: 'icon-a', name: 'Attic', position: 0, size: 'medium', icon: 'vacuum-attic' },
+        { id: 'icon-b', name: 'Plain', position: 1, size: 'medium' },
+        { id: 'icon-c', name: 'Unknown', position: 2, size: 'medium', icon: 'rocket' }
+    ];
+    app.activityLayouts = new Map();
+    app.groups = [];
+    app.renderMain();
+    const buttonOf = id => buttons.find(button => button.dataset.activityId === id);
+    const iconA = buttonOf('icon-a');
+    const iconB = buttonOf('icon-b');
+    const iconC = buttonOf('icon-c');
+    const renderedIcon = node => node.children.find(child => child.classList.contains('activity-icon'));
+    assert.ok(renderedIcon(iconA), 'the selected template renders');
+    assert.equal(iconA.classList.contains('has-icon'), true);
+    assert.equal(renderedIcon(iconA).children.length, 3);
+    assert.ok(iconA.children.some(child => child.classList.contains('btn-name')), 'the editable name stays visible');
+    assert.equal(renderedIcon(iconB), undefined, 'activities without an icon are unchanged');
+    assert.equal(renderedIcon(iconC), undefined, 'unknown identifiers fail safe');
+    assert.equal(iconB.classList.contains('has-icon'), false);
+});
+
+test('backup export and import preserve activity icons and legacy records', async () => {
+    const { app, storageData } = createTestApp();
+    storageData.activities = [
+        { id: 'icon-rt', name: 'Roundtrip', icon: 'car', position: 0 },
+        { id: 'legacy-rt', name: 'Legacy', position: 1 }
+    ];
+    await app.loadActivities();
+    assert.equal(app.activities.find(activity => activity.id === 'icon-rt').icon, 'car');
+    assert.equal(Object.hasOwn(app.activities.find(activity => activity.id === 'legacy-rt'), 'icon'), false, 'legacy activities stay valid');
+    const backup = await app.storage.exportAll();
+    assert.equal(backup.activities.find(activity => activity.id === 'icon-rt').icon, 'car', 'export keeps the icon');
+    storageData.activities = [];
+    await app.loadActivities();
+    await app.storage.importAll(backup, false);
+    await app.loadActivities();
+    assert.equal(app.activities.find(activity => activity.id === 'icon-rt').icon, 'car', 'import restores the icon');
+    assert.equal(Object.hasOwn(app.activities.find(activity => activity.id === 'legacy-rt'), 'icon'), false);
+});
+
+test('assignment import maps known icons, omits missing ones and rejects unknown ids', async () => {
+    const harness = makeAssignmentImportApp();
+    const { app, document } = harness;
+    document.getElementById('assignmentJsonInput').value = JSON.stringify({
+        format: 'timerhub-assignment',
+        version: 1,
+        name: 'Icon job',
+        groups: [{
+            name: 'Street',
+            activities: [{ name: 'Attic vacuum', icon: 'vacuum-attic' }, { name: 'Ordinary work' }]
+        }]
+    });
+    assert.equal(await app.validateAssignmentJson(), true);
+    assert.equal(await app.confirmAssignmentImport(), true);
+    const withIcon = app.activities.find(activity => activity.name === 'Attic vacuum');
+    assert.equal(withIcon.icon, 'vacuum-attic', 'the imported activity carries the template');
+    assert.equal(Object.hasOwn(app.activities.find(activity => activity.name === 'Ordinary work'), 'icon'), false, 'missing icons are not invented');
+
+    document.getElementById('assignmentJsonInput').value = JSON.stringify({
+        format: 'timerhub-assignment',
+        version: 1,
+        groups: [{ name: 'Street', activities: [{ name: 'Bad icon', icon: 'rocket' }] }]
+    });
+    assert.equal(await app.validateAssignmentJson(), false, 'unknown template ids are rejected');
+    assert.ok(document.getElementById('assignmentImportError').textContent.includes('icon'));
 });

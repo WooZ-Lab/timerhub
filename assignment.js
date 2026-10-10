@@ -4,6 +4,15 @@
     const MODES = ['add', 'replace'];
     const SHAPES = ['circle', 'square', 'rounded', 'diamond', 'triangle', 'hexagon', 'octagon', 'star', 'heart', 'oval'];
     const SIZES = ['small', 'medium', 'large'];
+    // Stable activity-template identifiers shared with the canvas icon catalog.
+    const ACTIVITY_ICON_IDS = [
+        'vacuum-attic',
+        'vacuum-basement',
+        'mop',
+        'squeegee',
+        'duster',
+        'car'
+    ];
     const PATH_SEPARATOR = ' · ';
     const LIMITS = Object.freeze({
         inputBytes: 512 * 1024,
@@ -51,7 +60,7 @@
     const normalizeActivity = (raw, path) => {
         if (!isRecord(raw)) fail('invalid_type', path);
         for (const key of Object.keys(raw)) {
-            if (!['name', 'notes', 'color', 'shape', 'size', 'exclude'].includes(key)) {
+            if (!['name', 'notes', 'color', 'shape', 'size', 'icon', 'exclude'].includes(key)) {
                 fail('unexpected_property', `${path}.${key}`);
             }
         }
@@ -72,6 +81,10 @@
         if (raw.size !== undefined) {
             if (typeof raw.size !== 'string' || !SIZES.includes(raw.size.trim().toLowerCase())) fail('invalid_value', `${path}.size`);
             activity.size = raw.size.trim().toLowerCase();
+        }
+        if (raw.icon !== undefined) {
+            if (typeof raw.icon !== 'string' || !ACTIVITY_ICON_IDS.includes(raw.icon.trim())) fail('invalid_value', `${path}.icon`);
+            activity.icon = raw.icon.trim();
         }
         if (raw.exclude === true) activity.exclude = true;
         return activity;
@@ -209,7 +222,8 @@
                 notes: activity.notes || '',
                 color: activity.color || null,
                 shape: activity.shape || null,
-                size: activity.size || null
+                size: activity.size || null,
+                icon: activity.icon || null
             };
             if (groupPath) plan.groups[plan.groups.length - 1].activities.push(entry);
             else plan.topLevelActivities.push(entry);
@@ -286,12 +300,14 @@
         '  "color": "#RRGGBB" (optional),',
         '  "shape": "circle" | "square" | "rounded" | "diamond" | "triangle" | "hexagon" | "octagon" | "star" | "heart" | "oval" (optional),',
         '  "size": "small" | "medium" | "large" (optional),',
+        '  "icon": "vacuum-attic" | "vacuum-basement" | "mop" | "squeegee" | "duster" | "car" (optional),',
         '  "exclude": true (optional)',
         '}',
         '',
         'Rules:',
         '- Use "groups" for streets, locations, or other containers and "children" for nested containers such as houses. Nesting is unlimited, but keep it as shallow as the assignment allows.',
         '- Put every work instruction into exactly one activity. Use "activities" directly on the group it belongs to.',
+        '- Set "icon" only when the instruction clearly matches one of the supported templates: vacuum-attic (vacuuming the attic), vacuum-basement (vacuuming the basement), mop (mopping or floor cleaning), squeegee (window cleaning), duster (dusting), car (travelling to a site). Omit it when nothing matches.',
         '- Preserve every address and every work instruction exactly as written. Never invent addresses, activities, colors, or requirements. If the assignment does not state a value, omit that property.',
         '- Never drop anything silently. If an instruction is intentionally not to be imported, represent it with "exclude": true instead of removing it.',
         '- Use "mode": "replace" only when the user explicitly asks to replace a previous TimerHub import of the same "name". Otherwise omit mode.',
@@ -306,6 +322,7 @@
         MODES,
         SHAPES,
         SIZES,
+        ACTIVITY_ICON_IDS,
         LIMITS,
         PATH_SEPARATOR,
         ASSIGNMENT_PROMPT,

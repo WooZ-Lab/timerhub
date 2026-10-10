@@ -151,6 +151,7 @@ function createTestApp(initialData = {}) {
         getElementById: id => elements.get(id) || null,
         querySelector: () => null,
         querySelectorAll: () => [],
+        createElementNS: () => testDocument.createElement(),
         createElement: () => {
             const element = {
                 value: '', textContent: '', style: { setProperty(name, value) { this[name] = value; } },
@@ -306,6 +307,7 @@ function createGroupCanvasHarness(initialData = {}) {
     context.document.querySelector = selector => stage.querySelector(selector);
     context.document.querySelectorAll = selector => selector === '.activity-btn' ? buttons : [];
     context.document.createElement = () => makeElement();
+    context.document.createElementNS = () => makeElement();
     app.toggleActivity = async () => {};
     app.setupActivityCanvasInteractions();
 
@@ -586,4 +588,29 @@ test('performance: nested groups render, toggle and drag with the same budget', 
         assert.ok(drag.elapsed < 4000, `nested drag under 4s (was ${formatMs(drag.elapsed)})`);
     }
     reportTable('nested groups', rows);
+});
+
+test('performance: template icons keep activity rendering cheap', async () => {
+    const rows = [];
+    for (const withIcons of [false, true]) {
+        const harness = createGroupCanvasHarness();
+        const { app } = harness;
+        app.groups = [];
+        app.activities = Array.from({ length: 100 }, (unused, index) => ({
+            id: `icon-perf-${index}`,
+            name: `Icon activity ${index}`,
+            position: index,
+            size: 'medium',
+            ...(withIcons ? { icon: 'vacuum-attic' } : {})
+        }));
+        app.activityLayouts = new Map();
+        const render = measure(withIcons ? 'with icons' : 'without icons', () => app.renderMain());
+        rows.push({
+            label: withIcons ? '100 activities with template icons' : '100 activities without icons',
+            elapsed: render.elapsed
+        });
+        assert.equal(app.activities.length, 100);
+        assert.ok(render.elapsed < 4000, `icon render stays under 4s (was ${formatMs(render.elapsed)})`);
+    }
+    reportTable('template icon render', rows);
 });
