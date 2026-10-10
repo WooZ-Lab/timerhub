@@ -1326,7 +1326,11 @@ test('activity template icons are pointer-transparent and styled like the picker
     const pickerRule = styleSource.match(/\.icon-picker\s*\{([^}]*)\}/s)?.[1] || '';
     assert.match(pickerRule, /overflow-x:\s*auto/, 'the icon picker scrolls horizontally like color and shape');
     const optionRule = styleSource.match(/\.icon-option\s*\{([^}]*)\}/s)?.[1] || '';
-    assert.match(optionRule, /flex:\s*0 0 var\(--touch-target\)/, 'icon options meet the touch target size');
+    assert.match(optionRule, /min-width:\s*var\(--touch-target\)/, 'icon options meet the touch target size');
+    assert.match(optionRule, /flex-direction:\s*column/, 'icons and labels stack vertically');
+    const labelRule = styleSource.match(/\.icon-option-label\s*\{([^}]*)\}/s)?.[1] || '';
+    assert.match(labelRule, /font-size:\s*12px/, 'picker labels stay legible on mobile');
+    assert.match(labelRule, /text-overflow:\s*ellipsis/);
     assert.match(styleSource, /\.icon-option\.selected\s*\{[^}]*border-color:\s*var\(--color-blue\)/s);
     assert.match(htmlSource, /id="iconPicker" class="icon-picker"/);
 });

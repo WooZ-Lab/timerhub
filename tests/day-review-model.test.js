@@ -177,7 +177,7 @@ function createTestApp(initialData = {}) {
         'createGroupFromGroupsBtn', 'deleteGroupsBtn', 'groupDeleteModal', 'groupDeleteModalTitle',
         'groupDeleteModalCloseBtn', 'groupDeleteSummary', 'groupDeleteOutcome', 'groupDeleteLockedWarning',
         'groupDeleteActivitiesKeep', 'groupDeleteActivitiesDelete', 'groupDeleteNestedKeep', 'groupDeleteNestedDelete',
-        'groupDeleteCancelBtn', 'groupDeleteConfirmBtn', 'groupEditLockedInput', 'undoCanvasBtn', 'redoCanvasBtn'
+        'groupDeleteCancelBtn', 'groupDeleteConfirmBtn', 'groupEditLockedInput', 'undoCanvasBtn', 'redoCanvasBtn', 'iconPicker'
     ]) {
         elements.set(id, {
             id,
@@ -7498,4 +7498,32 @@ test('the activity modal preselects the stored display mode and defaults to icon
     app.showActivityModal();
     assert.deepEqual(selected, ['.display-mode-btn[data-display-mode="icon-and-text"]'], 'new activities default to icon + text');
     document.querySelector = original;
+});
+
+test('the icon picker offers a labeled choice for every template', () => {
+    const { app, document } = createTestApp();
+    app.populateIconPicker();
+    const picker = document.getElementById('iconPicker');
+    assert.equal(picker.children.length, 7, 'none plus the six templates');
+    const expected = [
+        ['', 'iconNone', 'No icon'],
+        ['vacuum-attic', 'iconVacuumAttic', 'Roof'],
+        ['vacuum-basement', 'iconVacuumBasement', 'Basement'],
+        ['mop', 'iconMop', 'Mop'],
+        ['squeegee', 'iconSqueegee', 'Window'],
+        ['duster', 'iconDuster', 'Dust'],
+        ['car', 'iconCar', 'Car']
+    ];
+    picker.children.forEach((option, index) => {
+        const [id, key, label] = expected[index];
+        assert.equal(option.dataset.icon, id, `option ${index} keeps its stable id`);
+        assert.equal(option['aria-label'], label, `option ${index} has an accessible name`);
+        assert.equal(option.title, label, `option ${index} has a tooltip`);
+        assert.equal(option.dataset.i18nTitle, key);
+        const labelNode = option.children.find(child => child.classList.contains('icon-option-label'));
+        assert.ok(labelNode, `${id || 'none'} shows a visible label`);
+        assert.equal(labelNode.textContent, label);
+        assert.equal(labelNode.dataset.i18n, key, 'labels follow language changes');
+        assert.ok(option.children.some(child => child.classList.contains('icon-option-svg')), `${id || 'none'} keeps its artwork`);
+    });
 });

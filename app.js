@@ -245,12 +245,12 @@ const extendedTranslations = {
         displayModeIconAndText: 'Icon + text',
         displayModeIconOnly: 'Icon only',
         iconNone: 'No icon',
-        iconVacuumAttic: 'Vacuum cleaner - attic',
-        iconVacuumBasement: 'Vacuum cleaner - basement',
-        iconMop: 'Mop / floor cleaning',
-        iconSqueegee: 'Window cleaning squeegee',
-        iconDuster: 'Dusting cloth',
-        iconCar: 'Car / travel to site',
+        iconVacuumAttic: 'Roof',
+        iconVacuumBasement: 'Basement',
+        iconMop: 'Mop',
+        iconSqueegee: 'Window',
+        iconDuster: 'Dust',
+        iconCar: 'Car',
         demoMasking: 'Masking', demoPainting: 'Painting', demoWallpapering: 'Wallpapering',
         demoUnloading: 'Unloading', demoTravel: 'Travel', demoBreak: 'Break',
         logFilename: 'timelog', backupFilename: 'timerhub_backup',
@@ -536,12 +536,12 @@ const extendedTranslations = {
         displayModeIconAndText: 'Symbol + Text',
         displayModeIconOnly: 'Nur Symbol',
         iconNone: 'Kein Symbol',
-        iconVacuumAttic: 'Staubsauger - Dachboden',
-        iconVacuumBasement: 'Staubsauger - Keller',
-        iconMop: 'Wischen / Bodenreinigung',
-        iconSqueegee: 'Fensterabzieher',
-        iconDuster: 'Staubtuch',
-        iconCar: 'Auto / Anfahrt',
+        iconVacuumAttic: 'Dach',
+        iconVacuumBasement: 'Keller',
+        iconMop: 'Wischmopp',
+        iconSqueegee: 'Fenster',
+        iconDuster: 'Staub',
+        iconCar: 'Auto',
         demoMasking: 'Abkleben', demoPainting: 'Streichen', demoWallpapering: 'Tapezieren',
         demoUnloading: 'Entladen', demoTravel: 'Anfahrt', demoBreak: 'Pause',
         logFilename: 'zeitprotokoll', backupFilename: 'timerhub_sicherung',
@@ -827,12 +827,12 @@ const extendedTranslations = {
         displayModeIconAndText: 'Значок и текст',
         displayModeIconOnly: 'Только значок',
         iconNone: 'Без значка',
-        iconVacuumAttic: 'Пылесос — чердак',
-        iconVacuumBasement: 'Пылесос — подвал',
-        iconMop: 'Мытьё полов',
-        iconSqueegee: 'Стеклоочиститель для окон',
-        iconDuster: 'Тряпка для пыли',
-        iconCar: 'Машина / проезд',
+        iconVacuumAttic: 'Крыша',
+        iconVacuumBasement: 'Подвал',
+        iconMop: 'Швабра',
+        iconSqueegee: 'Окно',
+        iconDuster: 'Пыль',
+        iconCar: 'Машина',
         demoMasking: 'Заклеивание', demoPainting: 'Покраска', demoWallpapering: 'Поклейка обоев',
         demoUnloading: 'Разгрузка', demoTravel: 'Дорога', demoBreak: 'Перерыв',
         logFilename: 'журнал-времени', backupFilename: 'timerhub-копия',
@@ -1613,57 +1613,49 @@ class TimerHubApp {
                 id: 'vacuum-attic',
                 key: 'iconVacuumAttic',
                 elements: [
-                    { tag: 'path', attrs: { d: 'M2.4 9.2 L12 3.2 L21.6 9.2', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.7' } },
-                    { tag: 'path', attrs: { d: 'M5.2 17.6 H18.8 Q20.4 17.6 20.4 19.1 Q20.4 20.6 18.8 20.6 H5.2 Q3.6 20.6 3.6 19.1 Q3.6 17.6 5.2 17.6 Z', fill: 'currentColor', stroke: 'none' } },
-                    { tag: 'circle', attrs: { cx: '8', cy: '16.4', r: '1.5', fill: 'currentColor', stroke: 'none' } },
-                    { tag: 'path', attrs: { d: 'M9.9 17.6 L10.7 10.6 H13.3 L14.1 17.6 Z', fill: 'currentColor', stroke: 'none' } },
-                    { tag: 'path', attrs: { d: 'M11.1 10.6 V5.4 Q11.1 4.2 12 4.2 Q12.9 4.2 12.9 5.4 V10.6 Z M11.55 5.8 H12.45 V7.2 H11.55 Z', fill: 'currentColor', stroke: 'none', 'fill-rule': 'evenodd' } }
+                    { tag: 'path', attrs: { d: 'M2.4 12.2 L12 3.2 L21.6 12.2 L18.4 12.2 L12 6.2 L5.6 12.2 Z', fill: 'currentColor', stroke: 'none' } },
+                    { tag: 'path', attrs: { d: 'M5 13.6 H19', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5' } }
                 ]
             },
             {
                 id: 'vacuum-basement',
                 key: 'iconVacuumBasement',
                 elements: [
-                    { tag: 'path', attrs: { d: 'M2.4 8.4 H21.6', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.7' } },
-                    { tag: 'path', attrs: { d: 'M5.2 8.4 V11 H8.4 V13.8 H11.6 V16.6 H5.2 Z', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5' } },
-                    { tag: 'path', attrs: { d: 'M18.6 8.4 V21 H5.2 V16.6', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.7' } },
-                    { tag: 'path', attrs: { d: 'M11.6 18 H17.6 Q18.8 18 18.8 19.2 Q18.8 20.4 17.6 20.4 H11.6 Q10.4 20.4 10.4 19.2 Q10.4 18 11.6 18 Z', fill: 'currentColor', stroke: 'none' } },
-                    { tag: 'circle', attrs: { cx: '12.7', cy: '17.1', r: '1.3', fill: 'currentColor', stroke: 'none' } },
-                    { tag: 'path', attrs: { d: 'M14.3 18 L14.9 13.2 H15.9 L16.5 18 Z', fill: 'currentColor', stroke: 'none' } },
-                    { tag: 'path', attrs: { d: 'M14.9 13.2 V9.6 Q14.9 8.6 15.4 8.6 Q15.9 8.6 15.9 9.6 V13.2 Z M15.15 9.9 H15.65 V11 H15.15 Z', fill: 'currentColor', stroke: 'none', 'fill-rule': 'evenodd' } }
+                    { tag: 'path', attrs: { d: 'M2.4 7.6 H21.6', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.7' } },
+                    { tag: 'path', attrs: { d: 'M5 7.6 V20.6 H19 V7.6', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.7' } },
+                    { tag: 'path', attrs: { d: 'M5 10.4 H8.4 V13.2 H11.8 V16 H15.2', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5' } },
+                    { tag: 'path', attrs: { d: 'M15.4 20.6 V14.6 Q15.4 13.2 16.9 13.2 Q18.4 13.2 18.4 14.6 V20.6', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.6' } },
+                    { tag: 'circle', attrs: { cx: '17.7', cy: '17.2', r: '0.5', fill: 'currentColor', stroke: 'none' } }
                 ]
             },
             {
                 id: 'mop',
                 key: 'iconMop',
                 elements: [
-                    { tag: 'path', attrs: { d: 'M12 2.4 V10.8', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.8' } },
-                    { tag: 'path', attrs: { d: 'M7.4 10.8 H16.6 L15.3 14 H8.7 Z', fill: 'currentColor', stroke: 'none' } },
-                    { tag: 'path', attrs: { d: 'M9.3 14 Q8.9 16.2 8.4 18.2 M10.7 14 Q10.5 16.6 10.3 19 M12 14 V19.4 M13.3 14 Q13.5 16.6 13.7 19 M14.7 14 Q15.1 16.2 15.6 18.2', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.4' } }
+                    { tag: 'path', attrs: { d: 'M3.6 16.2 H20.4 V18.2 Q20.4 18.9 19.7 18.9 H4.3 Q3.6 18.9 3.6 18.2 Z', fill: 'currentColor', stroke: 'none' } },
+                    { tag: 'path', attrs: { d: 'M11.2 16.2 V14.6 H12.8 V16.2 Z', fill: 'currentColor', stroke: 'none' } },
+                    { tag: 'path', attrs: { d: 'M12 14.6 V4.4', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.8' } },
+                    { tag: 'path', attrs: { d: 'M10.5 3.5 H13.5', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.8' } }
                 ]
             },
             {
                 id: 'squeegee',
                 key: 'iconSqueegee',
                 elements: [
-                    { tag: 'path', attrs: { d: 'M12 2.6 V6.6', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.8' } },
-                    { tag: 'path', attrs: { d: 'M9.6 2.6 H14.4', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.8' } },
-                    { tag: 'path', attrs: { d: 'M7.6 6.6 H16.4 V8.4 H7.6 Z', fill: 'currentColor', stroke: 'none' } },
-                    { tag: 'path', attrs: { d: 'M4.6 8.4 H19.4 V10.4 Q12 11.8 4.6 10.4 Z', fill: 'currentColor', stroke: 'none' } },
-                    { tag: 'path', attrs: { d: 'M9.2 13.6 C10.2 14.9 10.2 16.3 9.2 17.4 C8.2 16.3 8.2 14.9 9.2 13.6 Z', fill: 'currentColor', stroke: 'none' } },
-                    { tag: 'path', attrs: { d: 'M14.8 15.4 C15.7 16.6 15.7 17.8 14.8 18.8 C13.9 17.8 13.9 16.6 14.8 15.4 Z', fill: 'currentColor', stroke: 'none' } },
-                    { tag: 'path', attrs: { d: 'M12.4 18.6 C13 19.4 13 20.2 12.4 20.8 C11.8 20.2 11.8 19.4 12.4 18.6 Z', fill: 'currentColor', stroke: 'none' } }
+                    { tag: 'path', attrs: { d: 'M4.2 4.6 H19.8 V18.6 H4.2 Z', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.8' } },
+                    { tag: 'path', attrs: { d: 'M12 4.6 V18.6 M4.2 11.6 H19.8', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.4' } },
+                    { tag: 'path', attrs: { d: 'M3 18.6 H21', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.8' } }
                 ]
             },
             {
                 id: 'duster',
                 key: 'iconDuster',
                 elements: [
-                    { tag: 'path', attrs: { d: 'M3.2 6.6 H20.8 M3.2 5.2 V8 M20.8 5.2 V8', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5' } },
-                    { tag: 'path', attrs: { d: 'M7.4 6.6 C7.2 9.6 7 12.6 7.4 15.4 C7.8 16.8 8.8 17.4 9.8 17 C10.6 16.7 11.4 17.2 12.2 17 C13 16.8 13.6 17.4 14.4 17.1 C15.2 16.8 16 16.4 16.2 15.2 C16.6 12.4 16.4 9.4 16.2 6.6 Z', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.6' } },
-                    { tag: 'path', attrs: { d: 'M9.6 8.6 C10.4 10.6 10.4 13 9.9 15.4', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.2' } },
-                    { tag: 'path', attrs: { d: 'M19.4 2.6 l.5 1.25 1.25.5 -1.25.5 -.5 1.25 -.5 -1.25 -1.25 -.5 1.25 -.5 Z', fill: 'currentColor', stroke: 'none' } },
-                    { tag: 'path', attrs: { d: 'M4 10.8 l.4.9 .9.4 -.9.4 -.4.9 -.4 -.9 -.9 -.4 .9 -.4 Z', fill: 'currentColor', stroke: 'none' } }
+                    { tag: 'path', attrs: { d: 'M3.8 18.8 H20.2', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5' } },
+                    { tag: 'path', attrs: { d: 'M5.6 18.8 C5.4 17.6 6 16.6 7 16 C7.6 15.6 8 15 8.8 14.8 C9.6 14.6 10.2 15 10.8 14.6 C11.6 14 12.6 14.2 13.2 14.8 C13.8 15.4 13.8 16 14.6 16.2 C15.8 16.6 16.8 17.4 17 18.6 Z', fill: 'currentColor', stroke: 'none' } },
+                    { tag: 'circle', attrs: { cx: '17.6', cy: '12.2', r: '0.6', fill: 'currentColor', stroke: 'none' } },
+                    { tag: 'circle', attrs: { cx: '19.4', cy: '15.2', r: '0.5', fill: 'currentColor', stroke: 'none' } },
+                    { tag: 'circle', attrs: { cx: '6.6', cy: '12.4', r: '0.5', fill: 'currentColor', stroke: 'none' } }
                 ]
             },
             {
@@ -2777,6 +2769,11 @@ class TimerHubApp {
             btn.title = this.t(icon.key);
             const svg = this.buildIconSvg(icon, 'icon-option-svg');
             if (svg) btn.appendChild(svg);
+            const label = document.createElement('span');
+            label.className = 'icon-option-label';
+            label.dataset.i18n = icon.key;
+            label.textContent = this.t(icon.key);
+            btn.appendChild(label);
             btn.addEventListener('click', () => {
                 document.querySelectorAll('.icon-option').forEach(option => option.classList.remove('selected'));
                 btn.classList.add('selected');

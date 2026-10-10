@@ -119,7 +119,7 @@ function createTestApp(initialData = {}) {
         'createGroupFromGroupsBtn', 'deleteGroupsBtn', 'groupDeleteModal', 'groupDeleteModalTitle',
         'groupDeleteModalCloseBtn', 'groupDeleteSummary', 'groupDeleteOutcome', 'groupDeleteLockedWarning',
         'groupDeleteActivitiesKeep', 'groupDeleteActivitiesDelete', 'groupDeleteNestedKeep', 'groupDeleteNestedDelete',
-        'groupDeleteCancelBtn', 'groupDeleteConfirmBtn', 'groupEditLockedInput', 'undoCanvasBtn', 'redoCanvasBtn'
+        'groupDeleteCancelBtn', 'groupDeleteConfirmBtn', 'groupEditLockedInput', 'undoCanvasBtn', 'redoCanvasBtn', 'iconPicker'
     ]) {
         elements.set(id, {
             id,
