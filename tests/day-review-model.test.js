@@ -7862,7 +7862,7 @@ test('root collision displacement carries every nested descendant by the same of
     assert.equal(grand.top, grandBase.top + rootOffset.y, 'the grandchild inherits the same offset');
 });
 
-test('nested siblings share the parent layout without root-style collision offsets', () => {
+test('overlapping nested siblings step aside with the shared collision rule', () => {
     const harness = createGroupCanvasHarness();
     const { app } = harness;
     app.groups = [
@@ -7882,10 +7882,120 @@ test('nested siblings share the parent layout without root-style collision offse
     const a = groupRect(harness.containers, 'ns-a');
     const b = groupRect(harness.containers, 'ns-b');
     const parent = groupRect(harness.containers, 'ns-parent');
-    assert.deepEqual({ ...app.groupDisplayOffset('ns-a') }, { x: 0, y: 0 }, 'nested groups do not receive root collision offsets');
-    assert.deepEqual({ ...app.groupDisplayOffset('ns-b') }, { x: 0, y: 0 });
-    assert.equal(a.left, 320, 'nested siblings keep their persistent anchors');
-    assert.equal(b.left, 320);
-    assert.ok(parent.right >= a.right && parent.right >= b.right, 'the parent wraps both nested siblings');
-    assert.ok(parent.bottom >= a.bottom && parent.bottom >= b.bottom);
+    assert.deepEqual({ ...app.groupDisplayOffset('ns-a') }, { x: 0, y: 0 }, 'the first nested sibling keeps its anchor');
+    assert.deepEqual({ ...app.groupDisplayOffset('ns-b') }, { x: 0, y: 196 }, 'the overlapping nested sibling steps down');
+    assert.equal(b.left, a.left, 'the temporary displacement stays directional');
+    assert.equal(b.top, a.bottom + 20, 'the sibling clears the anchored sibling by the shared gap');
+    assert.ok(parent.bottom >= b.bottom, 'the parent wraps the displaced sibling');
+    assert.ok(parent.right >= a.right && parent.right >= b.right);
+});
+
+test('expanding a nested group moves overlapping siblings so activity cards stay clear', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, containers, buttons } = harness;
+    app.groups = [
+        { id: 'mittwoch', name: 'MITTWOCH', x: 100, y: 100, collapsed: false },
+        { id: 'herten1', name: '1 HERTEN', x: 140, y: 300, collapsed: false, parentId: 'mittwoch' },
+        { id: 'herten2', name: '2 HERTEN', x: 700, y: 300, collapsed: false, parentId: 'mittwoch' },
+        { id: 'gladbeck', name: '3 GLADBECK', x: 140, y: 700, collapsed: true, parentId: 'mittwoch' },
+        { id: 'four', name: '4', x: 140, y: 1020, collapsed: true, parentId: 'mittwoch' }
+    ];
+    app.activities = [
+        { id: 'h1a', name: 'H1A', position: 0, groupId: 'herten1', size: 'small' },
+        { id: 'h2a', name: 'H2A', position: 1, groupId: 'herten2', size: 'small' },
+        { id: 'g1', name: 'Treppenhäuser Theodorstraße 29-33 (Oleksandr)', position: 2, groupId: 'gladbeck', size: 'small' },
+        { id: 'g2', name: 'G2', position: 3, groupId: 'gladbeck', size: 'small' },
+        { id: 'g3', name: 'G3', position: 4, groupId: 'gladbeck', size: 'small' },
+        { id: 'f1', name: 'F1', position: 5, groupId: 'four', size: 'small' }
+    ];
+    app.activityLayouts = new Map([
+        ['h1a', { activityId: 'h1a', x: 0, y: 0, width: 220, height: 120 }],
+        ['h2a', { activityId: 'h2a', x: 0, y: 0, width: 220, height: 120 }],
+        ['g1', { activityId: 'g1', x: 0, y: 0, width: 320, height: 190 }],
+        ['g2', { activityId: 'g2', x: 380, y: 0, width: 220, height: 120 }],
+        ['g3', { activityId: 'g3', x: 0, y: 220, width: 220, height: 120 }],
+        ['f1', { activityId: 'f1', x: 0, y: 0, width: 220, height: 120 }]
+    ]);
+    app.renderMain();
+    const activityRect = id => {
+        const button = buttons.find(item => item.dataset.activityId === id);
+        assert.ok(button, `button ${id}`);
+        const left = Number.parseFloat(button.style.left);
+        const top = Number.parseFloat(button.style.top);
+        return { left, top, right: left + Number.parseFloat(button.style.width), bottom: top + Number.parseFloat(button.style.height) };
+    };
+    const intersects = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+    const gladbeckCollapsed = groupRect(containers, 'gladbeck');
+    const fourBefore = groupRect(containers, 'four');
+    const mittwochBefore = groupRect(containers, 'mittwoch');
+    assert.equal(intersects(gladbeckCollapsed, fourBefore), false, 'the collapsed state has no overlap');
+
+    await app.toggleGroupCollapsed('gladbeck');
+    const gladbeck = groupRect(containers, 'gladbeck');
+    const four = groupRect(containers, 'four');
+    const herten1 = groupRect(containers, 'herten1');
+    const herten2 = groupRect(containers, 'herten2');
+    const mittwoch = groupRect(containers, 'mittwoch');
+
+    assert.deepEqual({ ...app.groupDisplayOffset('gladbeck') }, { x: 0, y: 0 }, 'the expanded group keeps its anchor');
+    assert.equal(four.top, fourBefore.top + (gladbeck.bottom + 20 - fourBefore.top), 'the sibling below is pushed down by the expanded bounds');
+    assert.equal(four.left, fourBefore.left, 'the shared rule shifts downward, not sideways, when that is the smaller move');
+    for (const id of ['g1', 'g2', 'g3']) {
+        const card = activityRect(id);
+        assert.ok(card.left >= gladbeck.left && card.top >= gladbeck.top && card.right <= gladbeck.right && card.bottom <= gladbeck.bottom, `${id} stays inside 3 GLADBECK`);
+        assert.equal(intersects(card, four), false, `${id} does not overlap sibling 4`);
+        assert.equal(intersects(card, herten1), false, `${id} does not overlap 1 HERTEN`);
+        assert.equal(intersects(card, herten2), false, `${id} does not overlap 2 HERTEN`);
+    }
+    assert.equal(intersects(gladbeck, four), false, 'the expanded container does not overlap sibling 4');
+    assert.ok(mittwoch.right >= gladbeck.right && mittwoch.bottom >= four.bottom, 'the parent wraps the displaced sibling');
+    assert.ok(mittwoch.left <= gladbeck.left && mittwoch.top <= gladbeck.top);
+
+    await app.toggleGroupCollapsed('gladbeck');
+    assert.deepEqual(groupRect(containers, 'gladbeck'), gladbeckCollapsed, 'collapsing restores the collapsed box');
+    assert.deepEqual(groupRect(containers, 'four'), fourBefore, 'collapsing returns the sibling to its intended position');
+    assert.deepEqual(groupRect(containers, 'mittwoch'), mittwochBefore, 'collapsing restores the parent');
+
+    await app.toggleGroupCollapsed('gladbeck');
+    assert.deepEqual(groupRect(containers, 'gladbeck'), gladbeck, 're-expansion is stable');
+    assert.deepEqual(groupRect(containers, 'four'), four, 'the sibling displacement is reproducible');
+    assert.deepEqual(groupRect(containers, 'mittwoch'), mittwoch);
+});
+
+test('sibling displacement recurses through multiple nesting depths', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, containers } = harness;
+    app.groups = [
+        { id: 'deep-root', name: 'Root', x: 100, y: 100, collapsed: false },
+        { id: 'deep-mid', name: 'Mid', x: 400, y: 400, collapsed: false, parentId: 'deep-root' },
+        { id: 'deep-a', name: 'A', x: 440, y: 440, collapsed: true, parentId: 'deep-mid' },
+        { id: 'deep-b', name: 'B', x: 440, y: 600, collapsed: true, parentId: 'deep-mid' }
+    ];
+    app.activities = [
+        { id: 'deep-m1', name: 'M1', position: 0, groupId: 'deep-mid', size: 'small' },
+        { id: 'deep-a1', name: 'A1', position: 1, groupId: 'deep-a', size: 'small' },
+        { id: 'deep-b1', name: 'B1', position: 2, groupId: 'deep-b', size: 'small' }
+    ];
+    app.activityLayouts = new Map([
+        ['deep-m1', { activityId: 'deep-m1', x: 600, y: 0, width: 220, height: 120 }],
+        ['deep-a1', { activityId: 'deep-a1', x: 0, y: 0, width: 220, height: 120 }],
+        ['deep-b1', { activityId: 'deep-b1', x: 0, y: 0, width: 220, height: 120 }]
+    ]);
+    app.renderMain();
+    const bCollapsed = groupRect(containers, 'deep-b');
+    await app.toggleGroupCollapsed('deep-a');
+    const a = groupRect(containers, 'deep-a');
+    const b = groupRect(containers, 'deep-b');
+    const mid = groupRect(containers, 'deep-mid');
+    const root = groupRect(containers, 'deep-root');
+    assert.equal(b.top, a.bottom + 20, 'the depth-2 sibling is pushed below the expanded sibling');
+    assert.equal(b.left, bCollapsed.left, 'the depth-2 displacement stays directional');
+    assert.ok(mid.bottom >= b.bottom && mid.right >= b.right, 'the parent at depth 1 wraps the displaced child');
+    assert.ok(root.bottom >= mid.bottom && root.right >= mid.right, 'the root at depth 0 wraps the whole subtree');
+    assert.deepEqual({ ...app.groupDisplayOffset('deep-b') }, { x: 0, y: b.top - bCollapsed.top }, 'the depth-2 offset is local to its parent');
+    assert.deepEqual({ ...app.groupDisplayOffset('deep-mid') }, { x: 0, y: 0 }, 'the intermediate parent is not displaced');
+    await app.toggleGroupCollapsed('deep-a');
+    assert.deepEqual(groupRect(containers, 'deep-b'), bCollapsed, 'collapsing the expressive sibling restores the other');
+    await app.toggleGroupCollapsed('deep-a');
+    assert.deepEqual(groupRect(containers, 'deep-b'), b, 're-expansion reproduces the same depth-2 layout');
 });

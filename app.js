@@ -3733,15 +3733,22 @@ class TimerHubApp {
                 ? this.groupCollapsedBounds(child)
                 : this.groupBaseBounds(child, index);
             if (!childBounds) continue;
+            // Children may carry a temporary collision offset at their own
+            // nesting level; the parent must wrap the displaced child too.
+            const own = this.groupOwnDisplayOffsets?.get(child.id) || { x: 0, y: 0 };
             boxes.push({
-                x: childBounds.left,
-                y: childBounds.top,
+                x: childBounds.left + own.x,
+                y: childBounds.top + own.y,
                 width: childBounds.width,
                 height: childBounds.height
             });
         }
         if (!boxes.length) return null;
         return this.groupContainerBounds(boxes);
+    }
+
+    groupDepth(group) {
+        return this.groupAncestors(group).length;
     }
 
     applyGroupBounds(container, bounds) {
@@ -3846,74 +3853,85 @@ class TimerHubApp {
     computeGroupDisplayOffsets() {
         const offsets = new Map();
         const displayBounds = new Map();
+        const ownOffsets = new Map();
+        // Published before resolution so groupBaseBounds can wrap children that
+        // already received their own temporary offset at a deeper level.
+        this.groupOwnDisplayOffsets = ownOffsets;
+        const index = this._canvasIndex;
         // Expansion priority: the group the user most recently expanded keeps
         // the position where it was displayed when collapsed; every other group
-        // it overlaps steps aside temporarily. Without an explicit expansion the
-        // order falls back to the stable saved-anchor order. The carry is a
-        // transient display offset and is never written to persistent state.
+        // it overlaps steps aside temporarily. Without an explicit expansion
+        // the order falls back to the stable saved-anchor order. Carries and
+        // offsets are transient display state and are never persisted.
         const rank = new Map();
-        this.expandedGroupOrder.forEach((id, index) => {
-            if (!rank.has(id)) rank.set(id, index);
+        this.expandedGroupOrder.forEach((id, rankIndex) => {
+            if (!rank.has(id)) rank.set(id, rankIndex);
         });
         const priorityOf = group => rank.has(group.id) ? rank.get(group.id) : Number.MAX_SAFE_INTEGER;
-        // Only root groups participate in collision layout. Nested groups move
-        // with their root ancestor and inherit its temporary offset.
-        const index = this._canvasIndex;
-        const roots = this.groups.filter(group => !this.groupParent(group, index));
-        const expandedGroups = roots
-            .filter(group => !group.collapsed)
-            .map(group => ({ group, bounds: this.groupBaseBounds(group, index) }))
-            .filter(entry => entry.bounds)
-            .sort((a, b) => (priorityOf(a.group) - priorityOf(b.group)) || this.compareGroupLayoutOrder(a.group, b.group));
-        const expandedObstacles = [];
-        for (const { group, bounds } of expandedGroups) {
-            const carry = this.expandedGroupCarry.get(group.id) || { x: 0, y: 0 };
-            const { left, top } = this.resolveGroupCollision({
-                left: bounds.left + carry.x,
-                top: bounds.top + carry.y,
-                right: bounds.right + carry.x,
-                bottom: bounds.bottom + carry.y,
-                width: bounds.width,
-                height: bounds.height
-            }, expandedObstacles);
-            expandedObstacles.push({ left, top, right: left + bounds.width, bottom: top + bounds.height });
-            offsets.set(group.id, { x: left - bounds.left, y: top - bounds.top });
-        }
-        // Collapsed root groups are the temporary ones: they step aside for
-        // anchored expanded groups and return to their saved positions once
-        // nothing expanded overlaps them.
-        const displacedCollapsed = [];
-        const collapsedGroups = roots
-            .filter(group => group.collapsed)
-            .filter(group => this.groupBaseBounds(group, index))
-            .sort((a, b) => this.compareGroupLayoutOrder(a, b));
-        for (const group of collapsedGroups) {
-            const bounds = this.groupCollapsedBounds(group);
-            if (expandedObstacles.some(other => this.rectanglesIntersect(bounds, other))) {
+        // The exact same directional collision rule is applied to every set of
+        // siblings. Root groups compete with each other; nested groups compete
+        // with their siblings inside their parent. Offsets stay local to the
+        // level and are composed with the ancestor offset afterwards.
+        const resolveSiblings = siblings => {
+            const expandedGroups = siblings
+                .filter(group => !group.collapsed)
+                .map(group => ({ group, bounds: this.groupBaseBounds(group, index) }))
+                .filter(entry => entry.bounds)
+                .sort((a, b) => (priorityOf(a.group) - priorityOf(b.group)) || this.compareGroupLayoutOrder(a.group, b.group));
+            const expandedObstacles = [];
+            for (const { group, bounds } of expandedGroups) {
+                const carry = this.expandedGroupCarry.get(group.id) || { x: 0, y: 0 };
+                const { left, top } = this.resolveGroupCollision({
+                    left: bounds.left + carry.x,
+                    top: bounds.top + carry.y,
+                    right: bounds.right + carry.x,
+                    bottom: bounds.bottom + carry.y,
+                    width: bounds.width,
+                    height: bounds.height
+                }, expandedObstacles);
+                expandedObstacles.push({ left, top, right: left + bounds.width, bottom: top + bounds.height });
+                ownOffsets.set(group.id, { x: left - bounds.left, y: top - bounds.top });
+            }
+            // Collapsed groups are the temporary ones: they step aside for
+            // anchored expanded siblings and return to their saved position
+            // once nothing expanded overlaps them.
+            const displacedCollapsed = [];
+            const collapsedGroups = siblings
+                .filter(group => group.collapsed)
+                .filter(group => this.groupBaseBounds(group, index))
+                .sort((a, b) => this.compareGroupLayoutOrder(a, b));
+            for (const group of collapsedGroups) {
+                const bounds = this.groupCollapsedBounds(group);
+                if (!expandedObstacles.some(other => this.rectanglesIntersect(bounds, other))) continue;
                 const { left, top } = this.resolveGroupCollision(bounds, [...expandedObstacles, ...displacedCollapsed]);
                 displacedCollapsed.push({ left, top, right: left + bounds.width, bottom: top + bounds.height });
-                offsets.set(group.id, { x: left - bounds.left, y: top - bounds.top });
+                ownOffsets.set(group.id, { x: left - bounds.left, y: top - bounds.top });
             }
+        };
+
+        // Deepest first: a group's sibling bounds must include the offsets its
+        // own children already received before the group is resolved against
+        // its siblings.
+        const byDepth = [...this.groups].sort((a, b) =>
+            (this.groupDepth(b) - this.groupDepth(a)) || this.compareGroupLayoutOrder(a, b));
+        for (const group of byDepth) {
+            if (group.collapsed) continue;
+            if (!this.isGroupVisible(group)) continue;
+            const children = this.groupChildren(group, index);
+            if (children.length) resolveSiblings(children);
         }
-        // Propagate the root offset to every descendant and publish the final
-        // display bounds used by hit testing and rendering.
-        for (const group of this.groups) {
-            let totalOffset = offsets.get(group.id) || { x: 0, y: 0 };
-            if (!offsets.has(group.id)) {
-                let node = group;
-                let guard = 0;
-                while (node?.parentId && guard < 200) {
-                    const parent = this.groupParent(node, index);
-                    if (!parent) break;
-                    const parentOffset = offsets.get(parent.id);
-                    if (parentOffset) {
-                        totalOffset = parentOffset;
-                        break;
-                    }
-                    node = parent;
-                    guard += 1;
-                }
-            }
+        const roots = this.groups.filter(group => !this.groupParent(group, index));
+        resolveSiblings(roots);
+
+        // Top-down: every group's total offset is its ancestor total plus its
+        // own local displacement; publish display bounds for hit testing.
+        const ordered = [...this.groups].sort((a, b) =>
+            (this.groupDepth(a) - this.groupDepth(b)) || this.compareGroupLayoutOrder(a, b));
+        for (const group of ordered) {
+            const parent = this.groupParent(group, index);
+            const parentTotal = parent ? (offsets.get(parent.id) || { x: 0, y: 0 }) : { x: 0, y: 0 };
+            const own = ownOffsets.get(group.id) || { x: 0, y: 0 };
+            const totalOffset = { x: parentTotal.x + own.x, y: parentTotal.y + own.y };
             if (totalOffset.x || totalOffset.y) offsets.set(group.id, totalOffset);
             const base = group.collapsed ? this.groupCollapsedBounds(group) : this.groupBaseBounds(group, index);
             if (!base) continue;
@@ -4242,9 +4260,15 @@ class TimerHubApp {
     // grows in place instead of jumping back to its saved anchor. The carry is
     // transient display state only.
     captureExpandedGroupCarry(groupId) {
-        const offset = this.groupDisplayOffset(groupId);
-        if (offset.x || offset.y) {
-            this.expandedGroupCarry.set(groupId, { x: offset.x, y: offset.y });
+        // The carry is the group's own displacement within its parent, not the
+        // inherited ancestor offset, so it is applied at exactly one level.
+        const group = this.groups.find(item => item.id === groupId);
+        const total = this.groupDisplayOffset(groupId);
+        const parent = group ? this.groupParent(group) : null;
+        const parentTotal = parent ? this.groupDisplayOffset(parent.id) : { x: 0, y: 0 };
+        const own = { x: total.x - parentTotal.x, y: total.y - parentTotal.y };
+        if (own.x || own.y) {
+            this.expandedGroupCarry.set(groupId, own);
         } else {
             this.expandedGroupCarry.delete(groupId);
         }
@@ -4273,7 +4297,6 @@ class TimerHubApp {
 
     async setAllGroupsCollapsed(collapsed) {
         if (!this.groups.length) return false;
-        const previousOffsets = new Map(this.groups.map(group => [group.id, { ...this.groupDisplayOffset(group.id) }]));
         for (const group of this.groups) group.collapsed = collapsed;
         if (collapsed) {
             this.expandedGroupOrder = [];
@@ -4281,10 +4304,9 @@ class TimerHubApp {
         } else {
             this.expandedGroupOrder = this.sortedGroupsForLayout().map(group => group.id);
             this.expandedGroupCarry.clear();
-            for (const group of this.groups) {
-                const offset = previousOffsets.get(group.id);
-                if (offset && (offset.x || offset.y)) this.expandedGroupCarry.set(group.id, { ...offset });
-            }
+            // Preserve where each group was displayed while collapsed (its own
+            // local displacement), exactly like a single expansion.
+            for (const group of this.groups) this.captureExpandedGroupCarry(group.id);
         }
         for (const group of this.groups) {
             try {
