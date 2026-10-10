@@ -1301,6 +1301,22 @@ test('canvas toolbar, centered group modal, and single settings heading are wire
     assert.equal((htmlSource.match(/data-i18n="settings"/g) || []).length, 1, 'settings heading is not duplicated');
 });
 
+test('the canvas disables native text selection while editable fields keep it', () => {
+    const canvasRule = styleSource.match(/\.canvas-viewport,\s*\.canvas-viewport \*\s*\{([^}]*)\}/s)?.[1] || '';
+    assert.match(canvasRule, /-webkit-user-select:\s*none/, 'webkit text selection is disabled on the canvas');
+    assert.match(canvasRule, /user-select:\s*none/, 'standard text selection is disabled on the canvas');
+    assert.match(canvasRule, /-webkit-touch-callout:\s*none/, 'the iOS long-press callout is suppressed');
+    assert.match(canvasRule, /-webkit-user-drag:\s*none/, 'native element dragging is suppressed');
+
+    const editableRule = styleSource.match(/\.canvas-viewport input,[\s\S]*?\{([^}]*)\}/s)?.[1] || '';
+    assert.match(editableRule, /-webkit-user-select:\s*text/, 'editable controls re-enable selection');
+    assert.match(editableRule, /user-select:\s*text/);
+
+    assert.match(styleSource, /body\s*\{\s*user-select:\s*text;\s*\}/, 'text selection stays enabled globally outside the canvas');
+    assert.match(htmlSource, /class="canvas-viewport" id="activityCanvasViewport"/, 'the rule targets the real canvas element');
+    assert.equal(/\.group-title\s*\{[^}]*user-select/.test(styleSource), false, 'the group title relies on the scoped canvas rule, not a duplicate one');
+});
+
 test('duplicated Day Review and Time Log screen headings are removed while navigation labels remain', () => {
     assert.equal((htmlSource.match(/data-i18n="endOfDayReview"/g) || []).length, 0, 'the duplicated Day Review heading is gone');
     assert.equal((htmlSource.match(/data-i18n="timeLog"/g) || []).length, 1, 'the Time Log label only remains in the bottom navigation');
