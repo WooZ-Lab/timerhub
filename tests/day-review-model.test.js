@@ -7527,3 +7527,365 @@ test('the icon picker offers a labeled choice for every template', () => {
         assert.ok(option.children.some(child => child.classList.contains('icon-option-svg')), `${id || 'none'} keeps its artwork`);
     });
 });
+
+function groupRect(containers, groupId) {
+    const container = containers.filter(item => item.dataset.groupId === groupId).at(-1);
+    assert.ok(container, `container for ${groupId}`);
+    const left = Number.parseFloat(container.style.left);
+    const top = Number.parseFloat(container.style.top);
+    const width = Number.parseFloat(container.style.width);
+    const height = Number.parseFloat(container.style.height);
+    return { left, top, right: left + width, bottom: top + height, width, height };
+}
+
+function makeNestedHierarchyHarness(options = {}) {
+    const harness = createGroupCanvasHarness();
+    const { app, storageData } = harness;
+    const baseX = options.baseX ?? 400;
+    const baseY = options.baseY ?? 304;
+    app.groups = [
+        { id: 'nh-root', name: 'Root', x: baseX, y: baseY, collapsed: options.rootCollapsed === true },
+        { id: 'nh-child', name: 'Child', x: baseX + 40, y: baseY + 40, collapsed: options.childCollapsed === true, parentId: 'nh-root' },
+        { id: 'nh-grand', name: 'Grand', x: baseX + 80, y: baseY + 80, collapsed: options.grandCollapsed === true, parentId: 'nh-child' }
+    ];
+    app.activities = [
+        { id: 'nh-r1', name: 'R1', position: 0, groupId: 'nh-root', size: 'medium' },
+        { id: 'nh-c1', name: 'C1', position: 1, groupId: 'nh-child', size: 'medium' },
+        { id: 'nh-g1', name: 'G1', position: 2, groupId: 'nh-grand', size: 'medium' }
+    ];
+    app.activityLayouts = new Map([
+        ['nh-r1', { activityId: 'nh-r1', x: 0, y: 0, width: 200, height: 120 }],
+        ['nh-c1', { activityId: 'nh-c1', x: 0, y: 0, width: 200, height: 120 }],
+        ['nh-g1', { activityId: 'nh-g1', x: 0, y: 0, width: 200, height: 120 }]
+    ]);
+    storageData.groups = structuredClone(app.groups);
+    storageData.activities = structuredClone(app.activities);
+    storageData.layout = [...app.activityLayouts.values()].map(layout => structuredClone(layout));
+    app.renderMain();
+    return harness;
+}
+
+function makeGroupChain(depth, baseX = 200, baseY = 200) {
+    const harness = createGroupCanvasHarness();
+    const { app, storageData } = harness;
+    app.groups = [];
+    app.activities = [];
+    app.activityLayouts = new Map();
+    let parentId = null;
+    for (let level = 0; level < depth; level += 1) {
+        const id = `chain-${level}`;
+        const group = {
+            id,
+            name: `Level ${level}`,
+            x: baseX + level * 40,
+            y: baseY + level * 40,
+            collapsed: level === depth - 1
+        };
+        if (parentId) group.parentId = parentId;
+        app.groups.push(group);
+        const activityId = `${id}-activity`;
+        app.activities.push({ id: activityId, name: `A${level}`, position: level, groupId: id, size: 'medium' });
+        app.activityLayouts.set(activityId, { activityId, x: 0, y: 0, width: 200, height: 120 });
+        parentId = id;
+    }
+    storageData.groups = structuredClone(app.groups);
+    storageData.activities = structuredClone(app.activities);
+    storageData.layout = [...app.activityLayouts.values()].map(layout => structuredClone(layout));
+    app.renderMain();
+    return harness;
+}
+
+test('root groups expand downward and rightward from their saved anchor', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app } = harness;
+    app.groups = [{ id: 'rx', name: 'R', x: 100, y: 100, collapsed: true }];
+    app.activities = [
+        { id: 'rx-1', name: 'A', position: 0, groupId: 'rx', size: 'medium' },
+        { id: 'rx-2', name: 'B', position: 1, groupId: 'rx', size: 'medium' }
+    ];
+    app.activityLayouts = new Map([
+        ['rx-1', { activityId: 'rx-1', x: 0, y: 0, width: 200, height: 120 }],
+        ['rx-2', { activityId: 'rx-2', x: 300, y: 220, width: 200, height: 120 }]
+    ]);
+    app.renderMain();
+    const collapsed = groupRect(harness.containers, 'rx');
+    assert.equal(collapsed.left, 80, 'collapsed box starts at the anchor (x - padding)');
+    assert.equal(collapsed.top, 64, 'collapsed box starts at the anchor (y - header)');
+    await app.toggleGroupCollapsed('rx');
+    const expanded = groupRect(harness.containers, 'rx');
+    assert.equal(expanded.left, collapsed.left, 'expansion never moves the left edge');
+    assert.equal(expanded.top, collapsed.top, 'expansion never moves the top edge');
+    assert.ok(expanded.right > collapsed.right, 'expansion grows rightward');
+    assert.ok(expanded.bottom > collapsed.bottom, 'expansion grows downward');
+    await app.toggleGroupCollapsed('rx');
+    assert.deepEqual(groupRect(harness.containers, 'rx'), collapsed, 'collapsing restores the exact box');
+    await app.toggleGroupCollapsed('rx');
+    assert.deepEqual(groupRect(harness.containers, 'rx'), expanded, 're-expanding restores the exact box');
+});
+
+test('groups inside a parent expand downward and rightward within the parent layout', async () => {
+    const harness = makeNestedHierarchyHarness({ childCollapsed: true });
+    const { app } = harness;
+    const rootBefore = groupRect(harness.containers, 'nh-root');
+    const childBefore = groupRect(harness.containers, 'nh-child');
+    assert.equal(harness.containers.some(item => item.dataset.groupId === 'nh-grand'), false, 'collapsing the child hides the grandchild');
+
+    await app.toggleGroupCollapsed('nh-child');
+    const rootAfter = groupRect(harness.containers, 'nh-root');
+    const childAfter = groupRect(harness.containers, 'nh-child');
+    const grandAfter = groupRect(harness.containers, 'nh-grand');
+    assert.equal(childAfter.left, childBefore.left, 'the child expands from its own anchor');
+    assert.equal(childAfter.top, childBefore.top);
+    assert.ok(childAfter.right > childBefore.right, 'the child grows rightward inside the parent');
+    assert.ok(childAfter.bottom > childBefore.bottom, 'the child grows downward inside the parent');
+    assert.equal(rootAfter.left, rootBefore.left, 'the parent keeps its anchor');
+    assert.equal(rootAfter.top, rootBefore.top);
+    assert.ok(rootAfter.right >= childAfter.right, 'the parent contains the expanded child');
+    assert.ok(rootAfter.bottom >= childAfter.bottom);
+    assert.ok(grandAfter.left >= childAfter.left && grandAfter.top >= childAfter.top, 'the grandchild stays inside the child');
+    assert.ok(grandAfter.right <= childAfter.right && grandAfter.bottom <= childAfter.bottom);
+});
+
+test('groups nested two or more levels deep follow the same predictable expansion rule', async () => {
+    const harness = makeNestedHierarchyHarness({ grandCollapsed: true });
+    const { app } = harness;
+    const collapsed = {
+        root: groupRect(harness.containers, 'nh-root'),
+        child: groupRect(harness.containers, 'nh-child'),
+        grand: groupRect(harness.containers, 'nh-grand')
+    };
+    await app.toggleGroupCollapsed('nh-grand');
+    const expanded = {
+        root: groupRect(harness.containers, 'nh-root'),
+        child: groupRect(harness.containers, 'nh-child'),
+        grand: groupRect(harness.containers, 'nh-grand')
+    };
+    assert.equal(expanded.grand.left, collapsed.grand.left, 'depth does not change the anchor rule');
+    assert.equal(expanded.grand.top, collapsed.grand.top);
+    assert.ok(expanded.grand.right > collapsed.grand.right, 'the deepest group grows rightward');
+    assert.ok(expanded.grand.bottom > collapsed.grand.bottom, 'the deepest group grows downward');
+    assert.equal(expanded.child.left, collapsed.child.left);
+    assert.equal(expanded.child.top, collapsed.child.top);
+    assert.ok(expanded.child.right >= expanded.grand.right && expanded.child.bottom >= expanded.grand.bottom);
+    assert.equal(expanded.root.left, collapsed.root.left);
+    assert.equal(expanded.root.top, collapsed.root.top);
+    assert.ok(expanded.root.right >= expanded.child.right && expanded.root.bottom >= expanded.child.bottom);
+
+    await app.toggleGroupCollapsed('nh-grand');
+    assert.deepEqual(groupRect(harness.containers, 'nh-grand'), collapsed.grand);
+    await app.toggleGroupCollapsed('nh-grand');
+    assert.deepEqual(groupRect(harness.containers, 'nh-grand'), expanded.grand);
+    assert.deepEqual(groupRect(harness.containers, 'nh-child'), expanded.child);
+    assert.deepEqual(groupRect(harness.containers, 'nh-root'), expanded.root);
+});
+
+test('mixed hierarchies keep every container wrapping its own activities and children', () => {
+    const harness = makeNestedHierarchyHarness();
+    const { containers, buttons } = harness;
+    const inside = (activityId, groupId) => {
+        const button = buttons.find(item => item.dataset.activityId === activityId);
+        assert.ok(button, `button ${activityId}`);
+        const rect = groupRect(containers, groupId);
+        const left = Number.parseFloat(button.style.left);
+        const top = Number.parseFloat(button.style.top);
+        const width = Number.parseFloat(button.style.width);
+        const height = Number.parseFloat(button.style.height);
+        return left >= rect.left && top >= rect.top && left + width <= rect.right && top + height <= rect.bottom;
+    };
+    assert.ok(inside('nh-r1', 'nh-root'), 'the root activity is inside the root container');
+    assert.ok(inside('nh-c1', 'nh-child'), 'the child activity is inside the child container');
+    assert.ok(inside('nh-g1', 'nh-grand'), 'the grandchild activity is inside the grandchild container');
+    const root = groupRect(containers, 'nh-root');
+    const child = groupRect(containers, 'nh-child');
+    const grand = groupRect(containers, 'nh-grand');
+    assert.ok(root.left <= child.left && root.top <= child.top && root.right >= child.right && root.bottom >= child.bottom, 'root wraps the child');
+    assert.ok(child.left <= grand.left && child.top <= grand.top && child.right >= grand.right && child.bottom >= grand.bottom, 'child wraps the grandchild');
+});
+
+test('nested expansion near canvas boundaries never reverses direction', async () => {
+    const harness = makeNestedHierarchyHarness({ baseX: 3200, baseY: 1980, grandCollapsed: true });
+    const { app } = harness;
+    const collapsed = groupRect(harness.containers, 'nh-grand');
+    await app.toggleGroupCollapsed('nh-grand');
+    const expanded = groupRect(harness.containers, 'nh-grand');
+    assert.equal(expanded.left, collapsed.left, 'the far-right anchor is not nudged left');
+    assert.equal(expanded.top, collapsed.top, 'the far-bottom anchor is not nudged up');
+    assert.ok(expanded.right >= collapsed.right);
+    assert.ok(expanded.bottom > collapsed.bottom);
+    assert.ok(Number.isFinite(expanded.right) && Number.isFinite(expanded.bottom), 'coordinates stay finite near the boundary');
+    const child = groupRect(harness.containers, 'nh-child');
+    const root = groupRect(harness.containers, 'nh-root');
+    assert.ok(child.right >= expanded.right && root.right >= child.right);
+});
+
+test('expanding or collapsing a parent keeps descendants directionally consistent', async () => {
+    const harness = makeNestedHierarchyHarness();
+    const { app } = harness;
+    const baseline = {
+        root: groupRect(harness.containers, 'nh-root'),
+        child: groupRect(harness.containers, 'nh-child'),
+        grand: groupRect(harness.containers, 'nh-grand')
+    };
+    await app.toggleGroupCollapsed('nh-root');
+    assert.equal(harness.containers.some(item => item.dataset.groupId === 'nh-child'), false, 'collapsing the root hides the child');
+    assert.equal(harness.containers.some(item => item.dataset.groupId === 'nh-grand'), false, 'collapsing the root hides the grandchild');
+    await app.toggleGroupCollapsed('nh-root');
+    assert.deepEqual(groupRect(harness.containers, 'nh-root'), baseline.root);
+    assert.deepEqual(groupRect(harness.containers, 'nh-child'), baseline.child);
+    assert.deepEqual(groupRect(harness.containers, 'nh-grand'), baseline.grand);
+
+    await app.toggleGroupCollapsed('nh-child');
+    const rootWithChildCollapsed = groupRect(harness.containers, 'nh-root');
+    assert.equal(rootWithChildCollapsed.left, baseline.root.left, 'the parent stays anchored');
+    assert.equal(rootWithChildCollapsed.top, baseline.root.top);
+    assert.ok(rootWithChildCollapsed.right <= baseline.root.right, 'the parent shrinks with the hidden grandchild');
+    assert.ok(rootWithChildCollapsed.bottom <= baseline.root.bottom);
+    await app.toggleGroupCollapsed('nh-child');
+    assert.deepEqual(groupRect(harness.containers, 'nh-root'), baseline.root);
+    assert.deepEqual(groupRect(harness.containers, 'nh-child'), baseline.child);
+    assert.deepEqual(groupRect(harness.containers, 'nh-grand'), baseline.grand);
+});
+
+test('repeated collapse and expand of a deeply nested group is stable', async () => {
+    const harness = makeGroupChain(4, 200, 200);
+    const { app } = harness;
+    await app.toggleGroupCollapsed('chain-3');
+    const expanded = [0, 1, 2, 3].map(level => groupRect(harness.containers, `chain-${level}`));
+    const anchors = app.groups.map(group => ({ id: group.id, x: group.x, y: group.y }));
+    for (let cycle = 0; cycle < 3; cycle += 1) {
+        await app.toggleGroupCollapsed('chain-3');
+        assert.equal(harness.containers.some(item => item.dataset.groupId === 'chain-3'), true, 'the deepest group still renders when collapsed');
+        await app.toggleGroupCollapsed('chain-3');
+    }
+    [0, 1, 2, 3].forEach(level => {
+        assert.deepEqual(groupRect(harness.containers, `chain-${level}`), expanded[level], `level ${level} is stable across cycles`);
+    });
+    assert.deepEqual(app.groups.map(group => ({ id: group.id, x: group.x, y: group.y })), anchors, 'saved anchors never change');
+});
+
+test('moved or resized ancestors keep nested expansion predictable', async () => {
+    const harness = makeNestedHierarchyHarness({ grandCollapsed: true });
+    const { app, containers, pointer } = harness;
+    const relative = {
+        child: { x: app.groups.find(g => g.id === 'nh-child').x - app.groups.find(g => g.id === 'nh-root').x, y: app.groups.find(g => g.id === 'nh-child').y - app.groups.find(g => g.id === 'nh-root').y },
+        grand: { x: app.groups.find(g => g.id === 'nh-grand').x - app.groups.find(g => g.id === 'nh-child').x, y: app.groups.find(g => g.id === 'nh-grand').y - app.groups.find(g => g.id === 'nh-child').y }
+    };
+    const title = containers.filter(item => item.dataset.groupId === 'nh-root').at(-1).children[0];
+    pointer('pointerdown', title, 400, 280);
+    pointer('pointermove', title, 464, 344);
+    pointer('pointerup', title, 464, 344);
+    const root = app.groups.find(g => g.id === 'nh-root');
+    const child = app.groups.find(g => g.id === 'nh-child');
+    const grand = app.groups.find(g => g.id === 'nh-grand');
+    assert.equal(root.x, 464, 'the dragged root is grid-snapped');
+    assert.equal(root.y, 368);
+    assert.equal(child.x - root.x, relative.child.x, 'the child keeps its relative position');
+    assert.equal(child.y - root.y, relative.child.y);
+    assert.equal(grand.x - child.x, relative.grand.x, 'the grandchild keeps its relative position');
+    assert.equal(grand.y - child.y, relative.grand.y);
+
+    await app.toggleGroupCollapsed('nh-grand');
+    const expandedGrand = groupRect(containers, 'nh-grand');
+    assert.equal(expandedGrand.left, grand.x - 20, 'the moved descendant expands from its own anchor');
+    assert.equal(expandedGrand.top, grand.y - 36);
+    await app.toggleGroupCollapsed('nh-grand');
+
+    await app.toggleGroupCollapsed('nh-root');
+    app.resizeCollapsedGroup(root, 420, 180);
+    await app.toggleGroupCollapsed('nh-root');
+    assert.equal(child.x - root.x, relative.child.x, 'resizing the collapsed ancestor never moves descendants');
+    assert.equal(grand.x - child.x, relative.grand.x);
+    await app.toggleGroupCollapsed('nh-grand');
+    const afterResize = groupRect(containers, 'nh-grand');
+    assert.equal(afterResize.left, grand.x - 20, 'expansion stays anchored after an ancestor resize');
+    assert.equal(afterResize.top, grand.y - 36);
+    assert.ok(afterResize.bottom > expandedGrand.bottom - 1, 'expansion still grows downward');
+});
+
+test('reloaded nested hierarchies retain structure and expansion behavior', async () => {
+    const first = makeNestedHierarchyHarness({ grandCollapsed: true });
+    const storedGroups = structuredClone(first.storageData.groups);
+    const storedActivities = structuredClone(first.storageData.activities);
+    const storedLayouts = structuredClone(first.storageData.layout);
+
+    const harness = createGroupCanvasHarness();
+    const { app, storageData, containers } = harness;
+    storageData.groups = [...storedGroups].reverse();
+    storageData.activities = storedActivities;
+    storageData.layout = storedLayouts;
+    await app.loadActivities();
+    await app.loadGroups();
+    app.renderMain();
+
+    assert.equal(app.groups.length, 3);
+    assert.equal(app.groups.find(group => group.id === 'nh-child').parentId, 'nh-root', 'hierarchy survives the reload');
+    assert.equal(app.groups.find(group => group.id === 'nh-grand').parentId, 'nh-child');
+    const collapsed = groupRect(containers, 'nh-grand');
+    await app.toggleGroupCollapsed('nh-grand');
+    const expanded = groupRect(containers, 'nh-grand');
+    assert.equal(expanded.left, collapsed.left);
+    assert.equal(expanded.top, collapsed.top);
+    assert.ok(expanded.right > collapsed.right && expanded.bottom > collapsed.bottom, 'reloaded groups expand downward and rightward');
+    const child = groupRect(containers, 'nh-child');
+    const root = groupRect(containers, 'nh-root');
+    assert.ok(child.right >= expanded.right && root.right >= child.right, 'the reloaded hierarchy stays nested');
+    assert.ok(child.bottom >= expanded.bottom && root.bottom >= child.bottom);
+});
+
+test('root collision displacement carries every nested descendant by the same offset', () => {
+    const harness = makeNestedHierarchyHarness();
+    const { app } = harness;
+    // A root that sorts before (and overlaps) the hierarchy anchors first and
+    // pushes the whole hierarchy aside.
+    app.groups.push({ id: 'nh-sibling', name: 'Sibling', x: 400, y: 200, collapsed: false });
+    app.activities.push({ id: 'nh-s1', name: 'S1', position: 3, groupId: 'nh-sibling', size: 'medium' });
+    app.activityLayouts.set('nh-s1', { activityId: 'nh-s1', x: 0, y: 0, width: 200, height: 120 });
+    app.renderMain();
+
+    const rootOffset = { ...app.groupDisplayOffset('nh-root') };
+    const childOffset = { ...app.groupDisplayOffset('nh-child') };
+    const grandOffset = { ...app.groupDisplayOffset('nh-grand') };
+    assert.ok(rootOffset.x !== 0 || rootOffset.y !== 0, 'the sibling displaced the hierarchy');
+    assert.deepEqual(childOffset, rootOffset, 'the child inherits the root offset');
+    assert.deepEqual(grandOffset, rootOffset, 'the grandchild inherits the root offset');
+    const root = groupRect(harness.containers, 'nh-root');
+    const child = groupRect(harness.containers, 'nh-child');
+    const grand = groupRect(harness.containers, 'nh-grand');
+    assert.equal(child.left - root.left, 40, 'relative positions do not change under displacement');
+    assert.equal(grand.left - child.left, 40);
+    assert.equal(child.top - root.top, 40);
+    assert.equal(grand.top - child.top, 40);
+    const rootBase = { ...app.groupBaseBounds(app.groups.find(group => group.id === 'nh-root')) };
+    const grandBase = { ...app.groupBaseBounds(app.groups.find(group => group.id === 'nh-grand')) };
+    assert.equal(root.left, rootBase.left + rootOffset.x, 'the root is displayed at its base bounds plus the offset');
+    assert.equal(root.top, rootBase.top + rootOffset.y);
+    assert.equal(grand.top, grandBase.top + rootOffset.y, 'the grandchild inherits the same offset');
+});
+
+test('nested siblings share the parent layout without root-style collision offsets', () => {
+    const harness = createGroupCanvasHarness();
+    const { app } = harness;
+    app.groups = [
+        { id: 'ns-parent', name: 'Parent', x: 300, y: 300, collapsed: false },
+        { id: 'ns-a', name: 'A', x: 340, y: 340, collapsed: false, parentId: 'ns-parent' },
+        { id: 'ns-b', name: 'B', x: 340, y: 340, collapsed: false, parentId: 'ns-parent' }
+    ];
+    app.activities = [
+        { id: 'ns-a1', name: 'A1', position: 0, groupId: 'ns-a', size: 'medium' },
+        { id: 'ns-b1', name: 'B1', position: 1, groupId: 'ns-b', size: 'medium' }
+    ];
+    app.activityLayouts = new Map([
+        ['ns-a1', { activityId: 'ns-a1', x: 0, y: 0, width: 200, height: 120 }],
+        ['ns-b1', { activityId: 'ns-b1', x: 0, y: 0, width: 200, height: 120 }]
+    ]);
+    app.renderMain();
+    const a = groupRect(harness.containers, 'ns-a');
+    const b = groupRect(harness.containers, 'ns-b');
+    const parent = groupRect(harness.containers, 'ns-parent');
+    assert.deepEqual({ ...app.groupDisplayOffset('ns-a') }, { x: 0, y: 0 }, 'nested groups do not receive root collision offsets');
+    assert.deepEqual({ ...app.groupDisplayOffset('ns-b') }, { x: 0, y: 0 });
+    assert.equal(a.left, 320, 'nested siblings keep their persistent anchors');
+    assert.equal(b.left, 320);
+    assert.ok(parent.right >= a.right && parent.right >= b.right, 'the parent wraps both nested siblings');
+    assert.ok(parent.bottom >= a.bottom && parent.bottom >= b.bottom);
+});
