@@ -262,6 +262,53 @@ test('the AI prompt documents the exact schema and safety rules', () => {
     assert.ok(prompt.includes('"mode": "replace"'));
     assert.ok(/Return valid JSON only/.test(prompt));
     assert.ok(/Never invent/.test(prompt));
-    assert.ok(/ambiguous/.test(prompt));
+    assert.ok(/clarification/.test(prompt));
     assert.ok(/clarifying question/.test(prompt));
+});
+
+test('activity display modes validate and map into the import plan', () => {
+    const Assignment = makeAssignment();
+    const normalized = Assignment.normalizeAssignment({
+        format: 'timerhub-assignment',
+        version: 1,
+        groups: [{
+            name: 'Street',
+            activities: [
+                { name: 'Icon only', icon: 'mop', displayMode: 'icon-only' },
+                { name: 'Explicit default', displayMode: 'icon-and-text' },
+                { name: 'Default' }
+            ]
+        }]
+    });
+    const plan = Assignment.buildPlan(normalized);
+    const activities = plan.groups[0].activities;
+    assert.equal(activities[0].displayMode, 'icon-only');
+    assert.equal(activities[1].displayMode, 'icon-and-text');
+    assert.equal(activities[2].displayMode, null, 'omitted modes stay omitted');
+    assert.equal(activities[2].icon, null);
+    assert.deepEqual(plain(Assignment.DISPLAY_MODES), ['icon-only', 'icon-and-text']);
+    assert.throws(
+        () => Assignment.normalizeAssignment({
+            format: 'timerhub-assignment', version: 1,
+            activities: [{ name: 'A', displayMode: 'sideways' }]
+        }),
+        /invalid_value/
+    );
+    assert.throws(
+        () => Assignment.normalizeAssignment({
+            format: 'timerhub-assignment', version: 1,
+            activities: [{ name: 'A', displayMode: 5 }]
+        }),
+        /invalid_value/,
+        'non-string modes follow the existing enum validation convention'
+    );
+});
+
+test('the assignment prompt documents display modes, icons and Anfahrt sequencing', () => {
+    const Assignment = makeAssignment();
+    assert.match(Assignment.ASSIGNMENT_PROMPT, /"displayMode": "icon-only" \| "icon-and-text"/);
+    assert.match(Assignment.ASSIGNMENT_PROMPT, /"icon": "vacuum-attic" \| "vacuum-basement" \| "mop" \| "squeegee" \| "duster" \| "car"/);
+    assert.match(Assignment.ASSIGNMENT_PROMPT, /Anfahrt/);
+    assert.match(Assignment.ASSIGNMENT_PROMPT, /ask a concise clarifying question/);
+    assert.match(Assignment.ASSIGNMENT_PROMPT, /legacy: seeds the initial node size only/);
 });

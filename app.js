@@ -25,7 +25,6 @@ const translations = {
         color: 'Color',
         customColor: 'Custom color',
         shape: 'Shape',
-        size: 'Size',
         save: 'Save',
         cancel: 'Cancel',
         edit: 'Edit',
@@ -61,9 +60,6 @@ const translations = {
         deleted: 'Deleted',
         restoreSuccess: 'Data restored successfully',
         backupSuccess: 'Backup file created successfully',
-        small: 'Small',
-        medium: 'Medium',
-        large: 'Large',
     },
     de: {
         timerRunning: 'Timer läuft',
@@ -82,7 +78,6 @@ const translations = {
         color: 'Farbe',
         customColor: 'Eigene Farbe',
         shape: 'Form',
-        size: 'Größe',
         save: 'Speichern',
         cancel: 'Abbrechen',
         edit: 'Bearbeiten',
@@ -118,9 +113,6 @@ const translations = {
         deleted: 'Gelöscht',
         restoreSuccess: 'Daten erfolgreich wiederhergestellt',
         backupSuccess: 'Sicherungsdatei wurde erstellt',
-        small: 'Klein',
-        medium: 'Mittel',
-        large: 'Groß',
     },
     ru: {
         timerRunning: 'Таймер запущен',
@@ -139,7 +131,6 @@ const translations = {
         color: 'Цвет',
         customColor: 'Свой цвет',
         shape: 'Форма',
-        size: 'Размер',
         save: 'Сохранить',
         cancel: 'Отменить',
         edit: 'Редактировать',
@@ -175,9 +166,6 @@ const translations = {
         deleted: 'Удалено',
         restoreSuccess: 'Данные успешно восстановлены',
         backupSuccess: 'Файл резервной копии создан',
-        small: 'Маленький',
-        medium: 'Средний',
-        large: 'Большой',
     }
 };
 
@@ -250,9 +238,12 @@ const extendedTranslations = {
         notificationHttpStatus: ' (HTTP {status})',
         notificationBackgroundFallbackTitle: 'TimerHub', notificationBackgroundFallbackBody: 'Timer reminder',
         textLogTotal: 'Total', colorPickerLabel: 'Choose a color', shapePickerLabel: 'Choose a shape',
-        sizePickerLabel: 'Choose a size',
         icon: 'Icon',
         iconPickerLabel: 'Choose a template icon',
+        displayMode: 'Display',
+        displayModePickerLabel: 'Choose how the activity is displayed',
+        displayModeIconAndText: 'Icon + text',
+        displayModeIconOnly: 'Icon only',
         iconNone: 'No icon',
         iconVacuumAttic: 'Vacuum cleaner - attic',
         iconVacuumBasement: 'Vacuum cleaner - basement',
@@ -538,9 +529,12 @@ const extendedTranslations = {
         notificationHttpStatus: ' (HTTP {status})',
         notificationBackgroundFallbackTitle: 'TimerHub', notificationBackgroundFallbackBody: 'Timer-Erinnerung',
         textLogTotal: 'Gesamt', colorPickerLabel: 'Farbe auswählen', shapePickerLabel: 'Form auswählen',
-        sizePickerLabel: 'Größe auswählen',
         icon: 'Symbol',
         iconPickerLabel: 'Vorlagen-Symbol auswählen',
+        displayMode: 'Anzeige',
+        displayModePickerLabel: 'Darstellung der Aktivität wählen',
+        displayModeIconAndText: 'Symbol + Text',
+        displayModeIconOnly: 'Nur Symbol',
         iconNone: 'Kein Symbol',
         iconVacuumAttic: 'Staubsauger - Dachboden',
         iconVacuumBasement: 'Staubsauger - Keller',
@@ -826,9 +820,12 @@ const extendedTranslations = {
         notificationHttpStatus: ' (HTTP {status})',
         notificationBackgroundFallbackTitle: 'TimerHub', notificationBackgroundFallbackBody: 'Напоминание таймера',
         textLogTotal: 'Всего', colorPickerLabel: 'Выбрать цвет', shapePickerLabel: 'Выбрать форму',
-        sizePickerLabel: 'Выбрать размер',
         icon: 'Значок',
         iconPickerLabel: 'Выбрать значок шаблона',
+        displayMode: 'Отображение',
+        displayModePickerLabel: 'Как отображать занятие',
+        displayModeIconAndText: 'Значок и текст',
+        displayModeIconOnly: 'Только значок',
         iconNone: 'Без значка',
         iconVacuumAttic: 'Пылесос — чердак',
         iconVacuumBasement: 'Пылесос — подвал',
@@ -2581,11 +2578,11 @@ class TimerHubApp {
         // Activity template (icon) picker
         this.populateIconPicker();
 
-        // Size buttons
-        document.querySelectorAll('.size-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('selected'));
-                e.target.classList.add('selected');
+        // Activity display mode (icon-only vs icon + text)
+        document.querySelectorAll('.display-mode-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.display-mode-btn').forEach(other => other.classList.remove('selected'));
+                btn.classList.add('selected');
             });
         });
 
@@ -3520,6 +3517,9 @@ class TimerHubApp {
             const iconElement = iconDefinition ? this.buildIconSvg(iconDefinition, 'activity-icon') : null;
             if (iconElement) {
                 btn.classList.add('has-icon');
+                // Icon-only is honored only when an icon actually exists; a
+                // missing icon falls back to the visible name.
+                if (activity.displayMode === 'icon-only') btn.classList.add('is-icon-only');
                 btn.appendChild(iconElement);
             }
             btn.appendChild(name);
@@ -6731,17 +6731,17 @@ class TimerHubApp {
                 .find(opt => opt.dataset.shape === activity.shape);
             if (shapeOpt) shapeOpt.classList.add('selected');
 
-            // Select size
-            document.querySelectorAll('.size-btn').forEach(opt => opt.classList.remove('selected'));
-            const sizeOpt = document.querySelector(`.size-btn[data-size="${activity.size}"]`);
-            if (sizeOpt) sizeOpt.classList.add('selected');
-
             // Select template icon (missing or unknown ids fall back to "none")
             document.querySelectorAll('.icon-option').forEach(opt => opt.classList.remove('selected'));
             const iconId = typeof activity.icon === 'string' ? activity.icon : '';
             const iconOpt = Array.from(document.querySelectorAll('.icon-option'))
                 .find(opt => (opt.dataset.icon || '') === iconId);
             (iconOpt || document.querySelector('.icon-option[data-icon=""]'))?.classList.add('selected');
+
+            // Select display mode (legacy activities without the property use the default)
+            document.querySelectorAll('.display-mode-btn').forEach(opt => opt.classList.remove('selected'));
+            const modeOpt = document.querySelector(`.display-mode-btn[data-display-mode="${activity.displayMode === 'icon-only' ? 'icon-only' : 'icon-and-text'}"]`);
+            modeOpt?.classList.add('selected');
         } else {
             title.textContent = this.t('createActivity');
             document.getElementById('activityName').value = '';
@@ -6761,10 +6761,10 @@ class TimerHubApp {
             if (customInput) customInput.value = '#4A90E2';
             document.querySelectorAll('.shape-option').forEach(opt => opt.classList.remove('selected'));
             document.querySelectorAll('.shape-option')[0]?.classList.add('selected');
-            document.querySelectorAll('.size-btn').forEach(opt => opt.classList.remove('selected'));
-            document.querySelector('.size-btn[data-size="medium"]')?.classList.add('selected');
             document.querySelectorAll('.icon-option').forEach(opt => opt.classList.remove('selected'));
             document.querySelector('.icon-option[data-icon=""]')?.classList.add('selected');
+            document.querySelectorAll('.display-mode-btn').forEach(opt => opt.classList.remove('selected'));
+            document.querySelector('.display-mode-btn[data-display-mode="icon-and-text"]')?.classList.add('selected');
         }
 
         if (activityId) {
@@ -6819,13 +6819,14 @@ class TimerHubApp {
 
         const selectedColor = document.querySelector('.color-option.selected');
         const selectedShape = document.querySelector('.shape-option.selected');
-        const selectedSize = document.querySelector('.size-btn.selected');
         const selectedIcon = document.querySelector('.icon-option.selected');
+        const selectedDisplayMode = document.querySelector('.display-mode-btn.selected');
 
         const color = selectedColor ? selectedColor.style.backgroundColor : this.COLORS[0];
         const shape = selectedShape ? selectedShape.dataset.shape : 'circle';
-        const size = selectedSize ? selectedSize.dataset.size : 'medium';
         const icon = selectedIcon && selectedIcon.dataset.icon ? selectedIcon.dataset.icon : '';
+        // Normalize the default mode away: an absent property means icon + text.
+        const displayMode = selectedDisplayMode?.dataset.displayMode === 'icon-only' ? 'icon-only' : '';
 
         const now = Date.now();
         const assignment = this.readClockodoAssignment('activity');
@@ -6837,7 +6838,6 @@ class TimerHubApp {
                 activity.name = name;
                 activity.color = color;
                 activity.shape = shape;
-                activity.size = size;
                 activity.notes = notes;
                 activity.customerId = assignment.customerId;
                 activity.serviceId = assignment.serviceId;
@@ -6845,17 +6845,20 @@ class TimerHubApp {
                 activity.serviceName = assignment.serviceName;
                 if (icon) activity.icon = icon;
                 else delete activity.icon;
+                if (displayMode) activity.displayMode = displayMode;
+                else delete activity.displayMode;
                 activity.updatedAt = now;
                 await this.storage.saveActivity(activity);
             }
         } else {
-            // Create
+            // Create. `size` is a legacy initial-size hint: the canvas resize
+            // controls are the single source of truth for node dimensions now.
             const activity = {
                 id: this.generateId(),
                 name: name,
                 color: color,
                 shape: shape,
-                size: size,
+                size: 'medium',
                 notes: notes,
                 customerId: assignment.customerId,
                 serviceId: assignment.serviceId,
@@ -6867,6 +6870,7 @@ class TimerHubApp {
                 updatedAt: now
             };
             if (icon) activity.icon = icon;
+            if (displayMode) activity.displayMode = displayMode;
             this.activities.push(activity);
             await this.storage.saveActivity(activity);
         }
@@ -8896,6 +8900,7 @@ class TimerHubApp {
             importedAt: now
         };
         if (activity.icon) record.icon = activity.icon;
+        if (activity.displayMode) record.displayMode = activity.displayMode;
         if (groupId) record.groupId = groupId;
         return record;
     }

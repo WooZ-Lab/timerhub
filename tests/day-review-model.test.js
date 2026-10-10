@@ -7338,3 +7338,164 @@ test('assignment import maps known icons, omits missing ones and rejects unknown
     assert.equal(await app.validateAssignmentJson(), false, 'unknown template ids are rejected');
     assert.ok(document.getElementById('assignmentImportError').textContent.includes('icon'));
 });
+
+test('activity display mode controls the canvas icon and label with graceful fallbacks', () => {
+    const harness = createGroupCanvasHarness();
+    const { app, buttons } = harness;
+    app.groups = [];
+    app.activities = [
+        { id: 'dm-icon-only', name: 'Cellar vacuum', position: 0, size: 'medium', icon: 'vacuum-basement', displayMode: 'icon-only' },
+        { id: 'dm-both', name: 'Windows', position: 1, size: 'medium', icon: 'squeegee', displayMode: 'icon-and-text' },
+        { id: 'dm-legacy', name: 'Travel', position: 2, size: 'medium', icon: 'car' },
+        { id: 'dm-no-icon', name: 'Plain work', position: 3, size: 'medium', displayMode: 'icon-only' },
+        { id: 'dm-unknown-icon', name: 'Unknown icon', position: 4, size: 'medium', icon: 'rocket', displayMode: 'icon-only' }
+    ];
+    app.activityLayouts = new Map();
+    app.renderMain();
+    const buttonOf = id => buttons.find(button => button.dataset.activityId === id);
+    const hasName = node => Boolean(node.children.find(child => child.classList.contains('btn-name')));
+
+    const iconOnly = buttonOf('dm-icon-only');
+    assert.equal(iconOnly.classList.contains('has-icon'), true);
+    assert.equal(iconOnly.classList.contains('is-icon-only'), true, 'icon-only mode is applied when an icon exists');
+    assert.ok(hasName(iconOnly), 'the label element stays in the DOM and is hidden by CSS');
+
+    const both = buttonOf('dm-both');
+    assert.equal(both.classList.contains('is-icon-only'), false, 'icon-and-text keeps the label');
+
+    const legacy = buttonOf('dm-legacy');
+    assert.equal(legacy.classList.contains('is-icon-only'), false, 'legacy activities without the property keep the default');
+
+    const noIcon = buttonOf('dm-no-icon');
+    assert.equal(noIcon.classList.contains('has-icon'), false);
+    assert.equal(noIcon.classList.contains('is-icon-only'), false, 'icon-only without an icon falls back to text');
+    assert.ok(hasName(noIcon));
+
+    const unknownIcon = buttonOf('dm-unknown-icon');
+    assert.equal(unknownIcon.classList.contains('has-icon'), false);
+    assert.equal(unknownIcon.classList.contains('is-icon-only'), false, 'unknown icon ids fall back to text');
+});
+
+test('switching display modes edits only that property and removes the default value', async () => {
+    const { app, document, storageData } = createTestApp();
+    app.renderMain = () => {};
+    const baseQuery = document.querySelector;
+    const existing = {
+        id: 'dm-edit', name: 'Keep me', color: '#123456', shape: 'hexagon', size: 'large',
+        notes: 'note', customerId: '5', serviceId: '9', customerName: 'Beta', serviceName: 'Repair',
+        icon: 'mop', displayMode: 'icon-only', position: 0
+    };
+    app.activities = [existing];
+    app.editingActivityId = 'dm-edit';
+    app.storage.saveActivity = async activity => {
+        const index = storageData.activities.findIndex(item => item.id === activity.id);
+        if (index >= 0) storageData.activities[index] = structuredClone(activity);
+        else storageData.activities.push(structuredClone(activity));
+        return activity;
+    };
+    storageData.activities = [structuredClone(existing)];
+
+    const withQueries = selection => {
+        document.querySelector = selector => selection[selector] ?? null;
+    };
+    document.getElementById('activityName').value = 'Keep me';
+    document.getElementById('activityNotes').value = 'note';
+
+    withQueries({
+        '.color-option.selected': { style: { backgroundColor: '#123456' } },
+        '.shape-option.selected': { dataset: { shape: 'hexagon' } },
+        '.icon-option.selected': { dataset: { icon: 'mop' } },
+        '.display-mode-btn.selected': { dataset: { displayMode: 'icon-and-text' } }
+    });
+    await app.saveActivity();
+    assert.equal(Object.hasOwn(existing, 'displayMode'), false, 'the default mode is normalized away');
+    assert.equal(existing.icon, 'mop', 'the icon is untouched');
+    assert.equal(existing.size, 'large', 'legacy size is untouched');
+    assert.equal(existing.notes, 'note');
+    assert.equal(existing.id, 'dm-edit');
+    assert.equal(storageData.activities[0].displayMode, undefined);
+
+    app.editingActivityId = 'dm-edit';
+    document.getElementById('activityName').value = 'Keep me';
+    document.getElementById('activityNotes').value = 'note';
+    withQueries({
+        '.display-mode-btn.selected': { dataset: { displayMode: 'icon-only' } }
+    });
+    await app.saveActivity();
+    assert.equal(existing.displayMode, 'icon-only');
+    assert.equal(storageData.activities[0].displayMode, 'icon-only', 'the switch is persisted');
+    assert.equal(existing.name, 'Keep me');
+    document.querySelector = baseQuery;
+});
+
+test('display mode survives reload, backup round-trips and assignment import', async () => {
+    const { app, storageData } = createTestApp();
+    storageData.activities = [
+        { id: 'dm-round', name: 'Roundtrip', icon: 'duster', displayMode: 'icon-only', position: 0 },
+        { id: 'dm-legacy', name: 'Legacy', position: 1 }
+    ];
+    await app.loadActivities();
+    assert.equal(app.activities.find(a => a.id === 'dm-round').displayMode, 'icon-only');
+    assert.equal(Object.hasOwn(app.activities.find(a => a.id === 'dm-legacy'), 'displayMode'), false);
+    const backup = await app.storage.exportAll();
+    assert.equal(backup.activities.find(a => a.id === 'dm-round').displayMode, 'icon-only', 'export keeps the mode');
+    storageData.activities = [];
+    await app.loadActivities();
+    await app.storage.importAll(backup, false);
+    await app.loadActivities();
+    assert.equal(app.activities.find(a => a.id === 'dm-round').displayMode, 'icon-only', 'import restores the mode');
+
+    const harness = makeAssignmentImportApp();
+    const assignmentDocument = harness.document;
+    assignmentDocument.getElementById('assignmentJsonInput').value = JSON.stringify({
+        format: 'timerhub-assignment',
+        version: 1,
+        name: 'Display modes',
+        groups: [{
+            name: 'Street',
+            activities: [
+                { name: 'Icon only task', icon: 'vacuum-attic', displayMode: 'icon-only' },
+                { name: 'Default task', icon: 'mop' },
+                { name: 'Explicit default', icon: 'car', displayMode: 'icon-and-text' }
+            ]
+        }]
+    });
+    assert.equal(await harness.app.validateAssignmentJson(), true);
+    assert.equal(await harness.app.confirmAssignmentImport(), true);
+    assert.equal(harness.app.activities.find(a => a.name === 'Icon only task').displayMode, 'icon-only');
+    assert.equal(Object.hasOwn(harness.app.activities.find(a => a.name === 'Default task'), 'displayMode'), false, 'omitted mode stays absent');
+    assert.equal(harness.app.activities.find(a => a.name === 'Explicit default').displayMode, 'icon-and-text');
+
+    assignmentDocument.getElementById('assignmentJsonInput').value = JSON.stringify({
+        format: 'timerhub-assignment',
+        version: 1,
+        groups: [{ name: 'Street', activities: [{ name: 'Bad mode', displayMode: 'sideways' }] }]
+    });
+    assert.equal(await harness.app.validateAssignmentJson(), false, 'unknown display modes are rejected');
+    assert.ok(assignmentDocument.getElementById('assignmentImportError').textContent.includes('displayMode'));
+});
+
+test('the activity modal preselects the stored display mode and defaults to icon + text', () => {
+    const { app, document } = createTestApp();
+    app.activities = [
+        { id: 'mode-a', name: 'A', displayMode: 'icon-only' },
+        { id: 'mode-b', name: 'B' }
+    ];
+    const original = document.querySelector;
+    const selected = [];
+    document.querySelector = selector => {
+        if (selector.startsWith('.display-mode-btn[data-display-mode=')) {
+            return { classList: { add: () => selected.push(selector) } };
+        }
+        return original(selector);
+    };
+    app.showActivityModal('mode-a');
+    assert.deepEqual(selected, ['.display-mode-btn[data-display-mode="icon-only"]']);
+    selected.length = 0;
+    app.showActivityModal('mode-b');
+    assert.deepEqual(selected, ['.display-mode-btn[data-display-mode="icon-and-text"]'], 'legacy activities default to icon + text');
+    selected.length = 0;
+    app.showActivityModal();
+    assert.deepEqual(selected, ['.display-mode-btn[data-display-mode="icon-and-text"]'], 'new activities default to icon + text');
+    document.querySelector = original;
+});

@@ -80,6 +80,7 @@ Activity:
   "shape": "square",
   "size": "large",
   "icon": "mop",
+  "displayMode": "icon-and-text",
   "exclude": false
 }
 ```
@@ -90,8 +91,9 @@ Activity:
 | `notes` | no | Default note for new time entries, up to 500 characters. |
 | `color` | no | `#RRGGBB`. Defaults to the TimerHub palette. |
 | `shape` | no | One of `circle`, `square`, `rounded`, `diamond`, `triangle`, `hexagon`, `octagon`, `star`, `heart`, `oval`. |
-| `size` | no | `small`, `medium` or `large`. |
+| `size` | no | `small`, `medium` or `large`. Legacy: it only seeds the initial node size when the Activity has no explicit canvas layout yet. The canvas resize controls are the source of truth afterwards, and the creation dialog no longer exposes this field. |
 | `icon` | no | Activity template icon: `vacuum-attic`, `vacuum-basement`, `mop`, `squeegee`, `duster` or `car`. Omit when nothing matches. |
+| `displayMode` | no | `icon-only` renders just the icon; `icon-and-text` renders icon and name. Omit for the default (`icon-and-text`). |
 | `exclude` | no | Explicitly exclude this activity from the import. |
 
 Unknown fields are rejected (no silent forward compatibility). This keeps the schema strict and predictable; a future change will use a new `version`.
@@ -124,9 +126,12 @@ The same prompt is available in the import dialog via **Copy AI prompt**.
 
 ```text
 You convert a work assignment into the TimerHub assignment JSON format.
+
 Return valid JSON only. Do not use Markdown fences, comments, or explanations.
 
-Schema (version 1):
+If a required clarification is necessary because the execution sequence cannot be determined, ask a concise clarifying question in plain text instead of returning JSON.
+
+Schema, version 1:
 {
   "format": "timerhub-assignment",
   "version": 1,
@@ -135,6 +140,7 @@ Schema (version 1):
   "groups": [Group, ...],
   "activities": [Activity, ...]
 }
+
 Group = {
   "name": "required group name",
   "collapsed": true (optional),
@@ -142,26 +148,43 @@ Group = {
   "activities": [Activity, ...],
   "children": [Group, ...]
 }
+
 Activity = {
   "name": "required activity name",
   "notes": "optional note",
   "color": "#RRGGBB" (optional),
   "shape": "circle" | "square" | "rounded" | "diamond" | "triangle" | "hexagon" | "octagon" | "star" | "heart" | "oval" (optional),
-  "size": "small" | "medium" | "large" (optional),
+  "size": "small" | "medium" | "large" (optional, legacy: seeds the initial node size only),
   "icon": "vacuum-attic" | "vacuum-basement" | "mop" | "squeegee" | "duster" | "car" (optional),
+  "displayMode": "icon-only" | "icon-and-text" (optional),
   "exclude": true (optional)
 }
 
 Rules:
-- Use "groups" for streets, locations, or other containers and "children" for nested containers such as houses. Nesting is unlimited, but keep it as shallow as the assignment allows.
-- Put every work instruction into exactly one activity. Use "activities" directly on the group it belongs to.
-- Set "icon" only when the instruction clearly matches one of the supported templates: vacuum-attic (vacuuming the attic), vacuum-basement (vacuuming the basement), mop (mopping or floor cleaning), squeegee (window cleaning), duster (dusting), car (travelling to a site). Omit it when nothing matches.
-- Preserve every address and every work instruction exactly as written. Never invent addresses, activities, colors, or requirements. If the assignment does not state a value, omit that property.
-- Never drop anything silently. If an instruction is intentionally not to be imported, represent it with "exclude": true instead of removing it.
-- Use "mode": "replace" only when the user explicitly asks to replace a previous TimerHub import of the same "name". Otherwise omit mode.
-- Group and activity names must be unique among their siblings.
-- If any instruction is ambiguous or cannot be interpreted reliably, stop and ask the user a clarifying question instead of guessing. A clarifying question must not be valid JSON; ask it before producing the final JSON.
-- Output raw JSON only, with no other text.
+1. Strict sequencing: the execution order of tasks and travel (Anfahrt) is determined by the user's input sequence or explicit instructions. Never reorder locations or invent a route geographically.
+2. Clarification on order: if the order of locations or tasks is essential but cannot be determined from the input, ask a concise clarifying question instead of guessing. Do not manufacture a route, and do not ask unnecessary questions when the input already establishes a reasonable order.
+3. Anfahrt: include travel activities with "icon": "car" at the beginning, before the first object, and between consecutive objects as instructed by the user. Do not invent extra travel activities when the assignment does not support them.
+4. Placement of Anfahrt: place travel activities outside location groups, at the root level of the "activities" array, in the correct sequence relative to the root groups. Do not place them inside a street, building, or house group.
+5. Group hierarchy: use "groups" for streets, locations, or other containers and "children" for nested containers such as houses. Nesting is unlimited, but keep it as shallow as the assignment allows. Put every work instruction into exactly one Activity and attach it to the most appropriate group.
+6. Icon selection: set "icon" only when the instruction clearly matches one of the supported templates:
+   - "vacuum-attic": vacuuming an attic or an explicitly equivalent roof-space area.
+   - "vacuum-basement": vacuuming a basement or an explicitly equivalent cellar.
+   - "mop": mopping or floor-cleaning work that clearly matches the template.
+   - "squeegee": window cleaning using or clearly associated with a squeegee.
+   - "duster": dusting or wiping dust from surfaces.
+   - "car": travel activities such as Anfahrt.
+   Omit the icon when nothing clearly matches. Do not assign an icon based merely on a vague association.
+7. Display mode: the optional "displayMode" property controls whether the Activity shows only its icon or shows its icon and text.
+   - "icon-only" means render the icon without a visible Activity name.
+   - "icon-and-text" means render the icon together with the Activity name.
+   - Set "displayMode": "icon-only" only when the input explicitly requests icon-only display or the task is clearly intended as a compact visual marker.
+   - Otherwise omit "displayMode" and allow TimerHub to apply its default.
+   - Do not omit the "name" property when using icon-only mode. The name remains the Activity logical identity and must be preserved even when it is not displayed on the canvas.
+8. Preserve source information: preserve every address and work instruction exactly as written wherever the schema permits. Never invent addresses, activities, colors, or requirements. If the assignment does not state a value, omit that property instead of guessing.
+9. Exclusions: never silently discard an instruction. If an instruction must be represented but intentionally not imported as an active Activity or group, use "exclude": true where supported. Preserve the excluded item original name and relevant information.
+10. Import mode: use "mode": "replace" only when the user explicitly requests replacing a previous TimerHub import with the same "name". Otherwise omit "mode" or use the established default "add".
+11. Unique names: group and Activity names must be unique among their siblings. If duplicate source names occur, preserve the original wording wherever possible and use the smallest necessary disambiguation without inventing factual details.
+12. Output validity: return only a schema-valid object unless a required clarification is necessary. Never include unsupported properties. Do not silently omit required source information because the schema cannot represent it; ask for clarification or use a supported notes/exclusion mechanism.
 ```
 
 ## Security notes

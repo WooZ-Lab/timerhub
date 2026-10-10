@@ -1331,6 +1331,23 @@ test('activity template icons are pointer-transparent and styled like the picker
     assert.match(htmlSource, /id="iconPicker" class="icon-picker"/);
 });
 
+test('display modes scale the canvas icon and hide the label without reserving space', () => {
+    assert.match(htmlSource, /class="display-mode-picker"/);
+    assert.match(htmlSource, /data-display-mode="icon-only"/);
+    assert.match(htmlSource, /data-display-mode="icon-and-text"/);
+    assert.equal(htmlSource.includes('size-picker'), false, 'the obsolete size picker is removed from the modal');
+    assert.equal(htmlSource.includes('size-btn'), false);
+
+    const iconRule = styleSource.match(/#activitiesGrid \.activity-btn\.activity-node \.activity-icon\s*\{([^}]*)\}/s)?.[1] || '';
+    assert.match(iconRule, /cqmin/, 'the icon scales with the node as it is resized');
+    const iconOnlyLabel = styleSource.match(/#activitiesGrid \.activity-btn\.activity-node\.is-icon-only \.btn-name\s*\{([^}]*)\}/s)?.[1] || '';
+    assert.match(iconOnlyLabel, /display:\s*none/, 'icon-only mode hides the label instead of reserving space');
+    const iconOnlyIcon = styleSource.match(/#activitiesGrid \.activity-btn\.activity-node\.is-icon-only \.activity-icon\s*\{([^}]*)\}/s)?.[1] || '';
+    assert.match(iconOnlyIcon, /cqmin/);
+    const pickerRule = styleSource.match(/\.display-mode-picker\s*\{([^}]*)\}/s)?.[1] || '';
+    assert.match(pickerRule, /grid-template-columns:\s*repeat\(2/);
+});
+
 test('duplicated Day Review and Time Log screen headings are removed while navigation labels remain', () => {
     assert.equal((htmlSource.match(/data-i18n="endOfDayReview"/g) || []).length, 0, 'the duplicated Day Review heading is gone');
     assert.equal((htmlSource.match(/data-i18n="timeLog"/g) || []).length, 1, 'the Time Log label only remains in the bottom navigation');
@@ -1393,12 +1410,13 @@ test('the transfer-code explanation is shortened and the QR note removed in ever
     }
 });
 
-test('activity name, color, and shape selections persist when saving', async () => {
+test('activity name, color, shape, icon, and display mode selections persist when saving', async () => {
     const browser = makeBrowserHarness(makeBackend());
     const saved = [];
     const colorOption = { style: { backgroundColor: 'rgb(255, 255, 255)' } };
     const shapeOption = { dataset: { shape: 'diamond' } };
-    const sizeOption = { dataset: { size: 'large' } };
+    const iconOption = { dataset: { icon: 'mop' } };
+    const displayOption = { dataset: { displayMode: 'icon-only' } };
     const nodes = {
         activityName: { value: 'Diamond activity' },
         activityModal: { classList: { remove() {} } }
@@ -1407,7 +1425,8 @@ test('activity name, color, and shape selections persist when saving', async () 
     browser.document.querySelector = selector => ({
         '.color-option.selected': colorOption,
         '.shape-option.selected': shapeOption,
-        '.size-btn.selected': sizeOption
+        '.icon-option.selected': iconOption,
+        '.display-mode-btn.selected': displayOption
     })[selector] || null;
     browser.app.storage = { saveActivity: async activity => saved.push({ ...activity }) };
     browser.app.generateId = () => 'shape-activity';
@@ -1417,7 +1436,35 @@ test('activity name, color, and shape selections persist when saving', async () 
     assert.equal(saved.at(-1).name, 'Diamond activity');
     assert.equal(saved.at(-1).color, 'rgb(255, 255, 255)');
     assert.equal(saved.at(-1).shape, 'diamond');
-    assert.equal(saved.at(-1).size, 'large');
+    assert.equal(saved.at(-1).icon, 'mop');
+    assert.equal(saved.at(-1).displayMode, 'icon-only');
+    assert.equal(saved.at(-1).size, 'medium', 'new activities keep the legacy default size hint');
+});
+
+test('the activity editor no longer exposes size while canvas resizing stays intact', async () => {
+    assert.equal(htmlSource.includes('size-picker'), false, 'the modal size picker markup is gone');
+    assert.equal(htmlSource.includes('size-btn'), false);
+    assert.equal(styleSource.includes('.size-btn'), false, 'the obsolete size styles are removed');
+    assert.equal(styleSource.includes('.size-picker'), false);
+
+    const browser = makeBrowserHarness(makeBackend());
+    const saved = [];
+    const existing = { id: 'legacy-size', name: 'Legacy', size: 'large', position: 0, color: '#ffffff', shape: 'circle' };
+    browser.app.activities = [existing];
+    browser.app.editingActivityId = 'legacy-size';
+    browser.document.getElementById = id => ({
+        activityName: { value: 'Legacy' },
+        activityModal: { classList: { remove() {} } }
+    })[id] || null;
+    browser.document.querySelector = selector => ({
+        '.color-option.selected': { style: { backgroundColor: '#ffffff' } },
+        '.shape-option.selected': { dataset: { shape: 'circle' } }
+    })[selector] || null;
+    browser.app.storage = { saveActivity: async activity => saved.push(activity) };
+    browser.app.renderMain = () => {};
+
+    await browser.app.saveActivity();
+    assert.equal(saved.at(-1).size, 'large', 'editing preserves the legacy size value');
 });
 
 test('Clockodo customer and service fields use input placeholders instead of separate labels', () => {

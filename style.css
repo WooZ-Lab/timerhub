@@ -268,7 +268,7 @@ html, body {
 .activity-btn:focus-visible,
 .color-option:focus-visible,
 .shape-option:focus-visible,
-.size-btn:focus-visible,
+.display-mode-btn:focus-visible,
 button:focus-visible,
 [role="button"]:focus-visible {
     outline: 3px solid var(--color-blue);
@@ -815,13 +815,14 @@ button:focus-visible,
     stroke-linejoin: round;
 }
 
-.size-picker {
+.display-mode-picker {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 8px;
 }
 
-.size-btn {
+.display-mode-btn {
+    min-height: var(--touch-target);
     padding: 10px;
     border: 2px solid var(--border-color);
     background-color: var(--bg-primary);
@@ -833,11 +834,11 @@ button:focus-visible,
     transition: all 0.2s;
 }
 
-.size-btn:active {
+.display-mode-btn:active {
     transform: scale(0.98);
 }
 
-.size-btn.selected {
+.display-mode-btn.selected {
     border-color: var(--color-blue);
     background-color: var(--color-blue);
     color: var(--action-text);
@@ -1934,7 +1935,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .review-suspicious-banner { border-radius:var(--radius-md); }
 .date-nav-btn { width:var(--touch-target); height:var(--touch-target); }
 .small-btn { min-height:var(--touch-target); }
-.color-option, .shape-option, .size-btn { min-width:var(--touch-target); min-height:var(--touch-target); }
+.color-option, .shape-option, .display-mode-btn { min-width:var(--touch-target); min-height:var(--touch-target); }
 @media (max-width: 600px) {
     :root { --navbar-height: calc(var(--safe-top) + 59px); --bottom-nav-height: calc(69px + env(safe-area-inset-bottom, 0px)); }
     .navbar-content { height:58px; padding:0 16px; }
@@ -2952,8 +2953,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 }
 
 #activitiesGrid .activity-btn.activity-node .activity-icon {
-    width: 24px;
-    height: 24px;
+    width: clamp(20px, 20cqmin, 44px);
+    height: clamp(20px, 20cqmin, 44px);
     flex: 0 0 auto;
     color: inherit;
     opacity: .9;
@@ -2966,9 +2967,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     stroke-linejoin: round;
 }
 
-#activitiesGrid .activity-btn.activity-node.large .activity-icon {
-    width: 32px;
-    height: 32px;
+/* Icon-only mode: no label, and the icon is free to dominate the node. */
+#activitiesGrid .activity-btn.activity-node.is-icon-only .btn-name {
+    display: none;
+}
+
+#activitiesGrid .activity-btn.activity-node.is-icon-only .activity-icon {
+    width: clamp(26px, 40cqmin, 72px);
+    height: clamp(26px, 40cqmin, 72px);
 }
 
 /* Resize handle remains outside the clipped activity node. */
