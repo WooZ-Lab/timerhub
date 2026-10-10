@@ -64,6 +64,9 @@ function createTestApp(initialData = {}) {
         async deleteGroup(id) {
             storageData.groups = storageData.groups.filter(group => group.id !== id);
         },
+        async deleteLayout(id) {
+            storageData.layout = storageData.layout.filter(layout => layout.activityId !== id);
+        },
         async getLayout() { return structuredClone(storageData.layout); },
         async saveLayout(layout) {
             writes.layout += 1;
@@ -114,7 +117,9 @@ function createTestApp(initialData = {}) {
         'groupEditModal', 'groupEditModalTitle', 'groupEditModalCloseBtn', 'groupEditNameInput', 'groupEditNameError',
         'groupEditColorOptions', 'groupEditCancelBtn', 'groupEditSaveBtn',
         'createGroupFromGroupsBtn', 'deleteGroupsBtn', 'groupDeleteModal', 'groupDeleteModalTitle',
-        'groupDeleteModalCloseBtn', 'groupDeleteSummary', 'groupDeleteCancelBtn', 'groupDeleteConfirmBtn'
+        'groupDeleteModalCloseBtn', 'groupDeleteSummary', 'groupDeleteOutcome', 'groupDeleteLockedWarning',
+        'groupDeleteActivitiesKeep', 'groupDeleteActivitiesDelete', 'groupDeleteNestedKeep', 'groupDeleteNestedDelete',
+        'groupDeleteCancelBtn', 'groupDeleteConfirmBtn', 'groupEditLockedInput', 'undoCanvasBtn', 'redoCanvasBtn'
     ]) {
         elements.set(id, {
             id,

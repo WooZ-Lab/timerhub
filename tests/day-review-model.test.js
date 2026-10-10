@@ -32,6 +32,9 @@ function createTestApp(initialData = {}) {
         async deleteActivity(id) {
             storageData.activities = storageData.activities.filter(a => a.id !== id);
         },
+        async deleteLayout(id) {
+            storageData.layout = storageData.layout.filter(layout => layout.activityId !== id);
+        },
         async getTimeEntries() { return structuredClone(storageData.timeEntries); },
         async saveTimeEntry(e) {
             const idx = storageData.timeEntries.findIndex(item => item.id === e.id);
@@ -172,7 +175,9 @@ function createTestApp(initialData = {}) {
         'groupEditModal', 'groupEditModalTitle', 'groupEditModalCloseBtn', 'groupEditNameInput', 'groupEditNameError',
         'groupEditColorOptions', 'groupEditCancelBtn', 'groupEditSaveBtn',
         'createGroupFromGroupsBtn', 'deleteGroupsBtn', 'groupDeleteModal', 'groupDeleteModalTitle',
-        'groupDeleteModalCloseBtn', 'groupDeleteSummary', 'groupDeleteCancelBtn', 'groupDeleteConfirmBtn'
+        'groupDeleteModalCloseBtn', 'groupDeleteSummary', 'groupDeleteOutcome', 'groupDeleteLockedWarning',
+        'groupDeleteActivitiesKeep', 'groupDeleteActivitiesDelete', 'groupDeleteNestedKeep', 'groupDeleteNestedDelete',
+        'groupDeleteCancelBtn', 'groupDeleteConfirmBtn', 'groupEditLockedInput', 'undoCanvasBtn', 'redoCanvasBtn'
     ]) {
         elements.set(id, {
             id,
@@ -6904,7 +6909,12 @@ test('deleting selected groups keeps member activities and lifts nested groups',
     app.setGroupSelection(['del-root']);
 
     assert.equal(app.openGroupDeleteModal(), true, 'the confirmation dialog opens');
-    assert.ok(document.getElementById('groupDeleteSummary').textContent.includes('1'), 'the summary reports the deletion');
+    assert.ok(document.getElementById('groupDeleteSummary').textContent.includes('2'), 'the summary reports the hierarchy size');
+    assert.equal(document.getElementById('groupDeleteConfirmBtn').disabled, true, 'confirmation stays disabled until both choices are explicit');
+    app.pendingGroupDeletion.choices.activities = 'keep';
+    app.pendingGroupDeletion.choices.nested = 'keep';
+    assert.equal(app.updateGroupDeleteDialog(), true);
+    assert.equal(document.getElementById('groupDeleteConfirmBtn').disabled, false);
     assert.equal(await app.deleteSelectedGroups(), true);
 
     assert.equal(app.groups.some(item => item.id === 'del-root'), false, 'the group is deleted');
@@ -6943,5 +6953,235 @@ test('canceling the delete confirmation changes nothing and keyboard delete open
     app.handleGlobalKeydown({ key: 'Delete', target: { tagName: 'DIV' }, preventDefault() {} });
     assert.ok(document.getElementById('groupDeleteSummary').textContent.length > 0, 'keyboard delete opens the confirmation');
     app.handleGlobalKeydown({ key: 'Escape', target: { tagName: 'DIV' } });
-    assert.equal(app.selectedGroupIds.size, 0);
+    assert.equal(app.pendingGroupDeletion, null, 'escape closes the confirmation dialog first');
+    app.handleGlobalKeydown({ key: 'Escape', target: { tagName: 'DIV' } });
+    assert.equal(app.selectedGroupIds.size, 0, 'a second escape clears the selection');
+});
+
+function createGroupDeletionHarness() {
+    const harness = createGroupCanvasHarness();
+    const { app, storageData } = harness;
+    app.groups = [
+        { id: 'hier-root', name: 'Root', x: 100, y: 100, collapsed: false },
+        { id: 'hier-child', name: 'Child', x: 140, y: 140, collapsed: false, parentId: 'hier-root' },
+        { id: 'hier-grand', name: 'Grand', x: 180, y: 180, collapsed: false, parentId: 'hier-child' },
+        { id: 'hier-other', name: 'Other', x: 900, y: 100, collapsed: false }
+    ];
+    app.activities = [
+        { id: 'hier-r1', name: 'R1', position: 0, groupId: 'hier-root', size: 'medium' },
+        { id: 'hier-c1', name: 'C1', position: 1, groupId: 'hier-child', size: 'medium' },
+        { id: 'hier-g1', name: 'G1', position: 2, groupId: 'hier-grand', size: 'medium' },
+        { id: 'hier-o1', name: 'O1', position: 3, groupId: 'hier-other', size: 'medium' }
+    ];
+    app.activityLayouts = new Map([
+        ['hier-r1', { activityId: 'hier-r1', x: 0, y: 0, width: 200, height: 120 }],
+        ['hier-c1', { activityId: 'hier-c1', x: 0, y: 0, width: 200, height: 120 }],
+        ['hier-g1', { activityId: 'hier-g1', x: 0, y: 0, width: 200, height: 120 }],
+        ['hier-o1', { activityId: 'hier-o1', x: 0, y: 0, width: 200, height: 120 }]
+    ]);
+    app.timeEntries = [{ id: 'hier-entry', activityId: 'hier-r1', startTimestamp: 1, endTimestamp: 2, syncStatus: 'unsynced' }];
+    storageData.groups = structuredClone(app.groups);
+    storageData.activities = structuredClone(app.activities);
+    storageData.layout = [...app.activityLayouts.values()].map(layout => structuredClone(layout));
+    storageData.timeEntries = structuredClone(app.timeEntries);
+    app.renderMain();
+    app.setGroupSelection(['hier-root']);
+    return harness;
+}
+
+async function confirmGroupDeletion(app, activities, nested) {
+    app.openGroupDeleteModal();
+    app.pendingGroupDeletion.choices.activities = activities;
+    app.pendingGroupDeletion.choices.nested = nested;
+    app.updateGroupDeleteDialog();
+    return app.deleteSelectedGroups();
+}
+
+test('deletion keep/keep removes only the selected container', async () => {
+    const { app, storageData } = createGroupDeletionHarness();
+    assert.equal(await confirmGroupDeletion(app, 'keep', 'keep'), true);
+    assert.equal(app.groups.some(group => group.id === 'hier-root'), false);
+    assert.equal(app.groups.find(group => group.id === 'hier-child').parentId, undefined, 'child moves to the root level');
+    assert.equal(app.groups.find(group => group.id === 'hier-grand').parentId, 'hier-child', 'grandchild keeps its parent');
+    assert.equal(app.groups.some(group => group.id === 'hier-other'), true);
+    assert.deepEqual(app.activities.map(activity => activity.id).sort(), ['hier-c1', 'hier-g1', 'hier-o1', 'hier-r1']);
+    assert.equal(app.activities.find(activity => activity.id === 'hier-r1').groupId, undefined, 'direct members become ungrouped');
+    assert.equal(app.activities.find(activity => activity.id === 'hier-c1').groupId, 'hier-child', 'nested members keep their group');
+    assert.equal(app.activityLayouts.get('hier-r1').x, 100, 'ungrouped activity keeps its absolute position');
+    assert.equal(app.activityLayouts.get('hier-r1').y, 100);
+    assert.equal(storageData.groups.find(group => group.id === 'hier-child').parentId, undefined);
+    assert.equal(storageData.activities.find(activity => activity.id === 'hier-r1').groupId, undefined);
+    assert.equal(storageData.layout.find(layout => layout.activityId === 'hier-r1').x, 100);
+    assert.equal(app.timeEntries.length, 1, 'Day Review history is untouched');
+    assert.equal(storageData.timeEntries.length, 1);
+});
+
+test('deletion keep/delete removes nested groups but preserves every activity', async () => {
+    const { app, storageData } = createGroupDeletionHarness();
+    assert.equal(await confirmGroupDeletion(app, 'keep', 'delete'), true);
+    assert.deepEqual(app.groups.map(group => group.id), ['hier-other'], 'the whole nested hierarchy is removed');
+    assert.deepEqual(app.activities.map(activity => activity.id).sort(), ['hier-c1', 'hier-g1', 'hier-o1', 'hier-r1']);
+    assert.equal(app.activities.find(activity => activity.id === 'hier-c1').groupId, undefined);
+    assert.equal(app.activities.find(activity => activity.id === 'hier-g1').groupId, undefined);
+    assert.equal(app.activityLayouts.get('hier-r1').x, 100);
+    assert.equal(app.activityLayouts.get('hier-c1').x, 140, 'nested member keeps its absolute position');
+    assert.equal(app.activityLayouts.get('hier-g1').x, 180);
+    assert.equal(storageData.groups.length, 1);
+    assert.equal(storageData.activities.length, 4, 'no activity is lost');
+    assert.equal(storageData.layout.find(layout => layout.activityId === 'hier-g1').x, 180);
+    assert.equal(app.timeEntries.length, 1);
+});
+
+test('deletion delete/keep removes activities but keeps nested group containers', async () => {
+    const { app, storageData } = createGroupDeletionHarness();
+    assert.equal(await confirmGroupDeletion(app, 'delete', 'keep'), true);
+    assert.equal(app.groups.some(group => group.id === 'hier-root'), false);
+    assert.equal(app.groups.find(group => group.id === 'hier-child').parentId, undefined);
+    assert.equal(app.groups.some(group => group.id === 'hier-grand'), true, 'descendant groups survive');
+    assert.deepEqual(app.activities.map(activity => activity.id).sort(), ['hier-o1'], 'all hierarchy activities are deleted');
+    assert.equal(storageData.activities.length, 1);
+    assert.equal(storageData.layout.some(layout => layout.activityId === 'hier-r1'), false, 'deleted layouts are removed');
+    assert.equal(storageData.layout.some(layout => layout.activityId === 'hier-c1'), false);
+    assert.equal(storageData.layout.some(layout => layout.activityId === 'hier-g1'), false);
+    assert.equal(app.timeEntries.length, 1, 'logged time entries stay independent');
+});
+
+test('deletion delete/delete removes the whole hierarchy', async () => {
+    const { app, storageData } = createGroupDeletionHarness();
+    assert.equal(await confirmGroupDeletion(app, 'delete', 'delete'), true);
+    assert.deepEqual(app.groups.map(group => group.id), ['hier-other']);
+    assert.deepEqual(app.activities.map(activity => activity.id), ['hier-o1']);
+    assert.deepEqual(storageData.groups.map(group => group.id), ['hier-other']);
+    assert.deepEqual(storageData.activities.map(activity => activity.id), ['hier-o1']);
+    assert.equal(storageData.layout.length, 1);
+    assert.equal(app.timeEntries.length, 1);
+});
+
+test('the deletion dialog requires both explicit choices and reports the outcome', async () => {
+    const { app, context } = createGroupDeletionHarness();
+    const document = context.document;
+    app.openGroupDeleteModal();
+    assert.equal(document.getElementById('groupDeleteConfirmBtn').disabled, true, 'confirm is disabled before choices');
+    assert.ok(document.getElementById('groupDeleteOutcome').textContent.length > 0, 'a hint asks for the choices');
+    app.pendingGroupDeletion.choices.activities = 'delete';
+    app.updateGroupDeleteDialog();
+    assert.equal(document.getElementById('groupDeleteConfirmBtn').disabled, true, 'one choice is not enough');
+    assert.equal(app.updateGroupDeleteDialog(), false);
+    app.pendingGroupDeletion.choices.nested = 'delete';
+    assert.equal(app.updateGroupDeleteDialog(), true);
+    assert.equal(document.getElementById('groupDeleteConfirmBtn').disabled, false);
+    assert.ok(document.getElementById('groupDeleteOutcome').textContent.includes('3'), 'the outcome reports the deleted activities');
+    app.closeGroupDeleteModal();
+    assert.equal(app.pendingGroupDeletion, null, 'closing resets the pending choices');
+});
+
+test('locked groups and locked ancestors block deletion until unlocked', async () => {
+    const { app, context, storageData } = createGroupDeletionHarness();
+    const document = context.document;
+    app.groups.find(group => group.id === 'hier-child').locked = true;
+    storageData.groups = structuredClone(app.groups);
+    app.openGroupDeleteModal();
+    app.pendingGroupDeletion.choices.activities = 'delete';
+    app.pendingGroupDeletion.choices.nested = 'delete';
+    assert.equal(app.updateGroupDeleteDialog(), false, 'locked descendants block the destructive delete');
+    assert.notEqual(document.getElementById('groupDeleteLockedWarning').style.display, 'none');
+    assert.equal(document.getElementById('groupDeleteConfirmBtn').disabled, true);
+    assert.equal(await app.deleteSelectedGroups(), false, 'the deletion cannot run while locked');
+    assert.equal(app.groups.length, 4, 'the hierarchy is untouched');
+
+    // A locked descendant does not block choices where it survives.
+    app.pendingGroupDeletion.choices.activities = 'keep';
+    app.pendingGroupDeletion.choices.nested = 'keep';
+    assert.equal(app.updateGroupDeleteDialog(), true, 'surviving locked groups do not block');
+
+    // Explicit unlock through the editor is the authorized workflow.
+    app.openGroupEditModal('hier-child');
+    document.getElementById('groupEditLockedInput').checked = false;
+    assert.equal(await app.saveGroupEdit(), true);
+    app.groups.find(group => group.id === 'hier-root').locked = true;
+    storageData.groups = structuredClone(app.groups);
+    app.openGroupDeleteModal();
+    app.pendingGroupDeletion.choices.activities = 'delete';
+    app.pendingGroupDeletion.choices.nested = 'delete';
+    assert.equal(app.updateGroupDeleteDialog(), false, 'a locked selected root blocks deletion too');
+    app.openGroupEditModal('hier-root');
+    document.getElementById('groupEditLockedInput').checked = false;
+    assert.equal(await app.saveGroupEdit(), true);
+    app.openGroupDeleteModal();
+    app.pendingGroupDeletion.choices.activities = 'delete';
+    app.pendingGroupDeletion.choices.nested = 'delete';
+    assert.equal(app.updateGroupDeleteDialog(), true, 'after unlocking the delete is allowed again');
+    assert.equal(await app.deleteSelectedGroups(), true);
+    assert.equal(app.groups.some(group => group.id === 'hier-child'), false, 'the unlocked hierarchy is deleted correctly');
+});
+
+test('deleting groups is one undo entry and undo/redo restore exact states', async () => {
+    const { app, storageData } = createGroupDeletionHarness();
+    const sortedIds = records => [...records].sort((a, b) => String(a.id).localeCompare(String(b.id)));
+    const beforeGroups = JSON.stringify(sortedIds(app.groups));
+    const beforeActivities = JSON.stringify(sortedIds(app.activities));
+    assert.equal(await confirmGroupDeletion(app, 'keep', 'delete'), true);
+    assert.equal(app.canvasUndoStack.length, 1, 'the whole deletion is a single history entry');
+    assert.equal(app.groups.length, 1);
+
+    assert.equal(await app.undoCanvas(), true);
+    assert.equal(JSON.stringify(sortedIds(app.groups)), beforeGroups, 'undo restores the hierarchy');
+    assert.equal(JSON.stringify(sortedIds(app.activities)), beforeActivities, 'undo restores the activities');
+    assert.equal(app.activityLayouts.get('hier-c1').x, 0, 'undo restores the group-relative layouts');
+    assert.equal(storageData.groups.length, 4, 'undo restores persisted groups');
+    assert.equal(storageData.activities.length, 4, 'undo restores persisted activities');
+    assert.equal(app.canvasRedoStack.length, 1);
+
+    assert.equal(await app.redoCanvas(), true);
+    assert.deepEqual(app.groups.map(group => group.id), ['hier-other'], 'redo reapplies the same choices');
+    assert.deepEqual(app.activities.map(activity => activity.id).sort(), ['hier-c1', 'hier-g1', 'hier-o1', 'hier-r1']);
+    assert.equal(app.activityLayouts.get('hier-c1').x, 140, 'redo reapplies the ungrouped layouts');
+    assert.equal(storageData.activities.length, 4);
+    assert.equal(await app.undoCanvas(), true);
+    assert.equal(JSON.stringify(sortedIds(app.groups)), beforeGroups);
+});
+
+test('multi-selection deletion handles each hierarchy without double processing', async () => {
+    const { app } = createGroupDeletionHarness();
+    app.setGroupSelection(['hier-root', 'hier-other']);
+    assert.equal(await confirmGroupDeletion(app, 'keep', 'keep'), true);
+    assert.equal(app.groups.some(group => group.id === 'hier-root'), false);
+    assert.equal(app.groups.some(group => group.id === 'hier-other'), false);
+    assert.equal(app.groups.find(group => group.id === 'hier-child').parentId, undefined);
+    assert.equal(app.activities.find(activity => activity.id === 'hier-o1').groupId, undefined, 'the second hierarchy is ungrouped');
+    assert.deepEqual(app.activities.map(activity => activity.id).sort(), ['hier-c1', 'hier-g1', 'hier-o1', 'hier-r1']);
+
+    // A nested group that is also selected is handled once, through its root.
+    const second = createGroupDeletionHarness();
+    second.app.setGroupSelection(['hier-root', 'hier-child']);
+    assert.deepEqual(second.app.selectedTopLevelGroups().map(group => group.id), ['hier-root']);
+    assert.equal(await confirmGroupDeletion(second.app, 'keep', 'keep'), true);
+    assert.equal(second.app.groups.some(group => group.id === 'hier-child'), true, 'the also-selected child survives');
+    assert.equal(second.app.groups.filter(group => group.id === 'hier-child').length, 1, 'no duplicate processing');
+});
+
+test('empty groups and escape close the dialog without changing anything', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, context, storageData } = harness;
+    const document = context.document;
+    app.groups = [{ id: 'empty-group', name: 'Empty', x: 10, y: 10, collapsed: false }];
+    storageData.groups = structuredClone(app.groups);
+    app.activities = [];
+    app.renderMain();
+    app.setGroupSelection(['empty-group']);
+    app.openGroupDeleteModal();
+    assert.ok(document.getElementById('groupDeleteSummary').textContent.includes('0'), 'empty hierarchies report zero contents');
+    app.pendingGroupDeletion.choices.activities = 'delete';
+    app.pendingGroupDeletion.choices.nested = 'delete';
+    app.updateGroupDeleteDialog();
+    app.handleGlobalKeydown({ key: 'Escape', target: { tagName: 'DIV' } });
+    assert.equal(app.pendingGroupDeletion, null, 'escape closes the dialog');
+    assert.equal(app.groups.length, 1, 'escape changes nothing');
+    app.openGroupDeleteModal();
+    app.pendingGroupDeletion.choices.activities = 'delete';
+    app.pendingGroupDeletion.choices.nested = 'delete';
+    app.updateGroupDeleteDialog();
+    assert.equal(await app.deleteSelectedGroups(), true);
+    assert.equal(app.groups.length, 0, 'the empty group can still be deleted');
+    assert.equal(app.activities.length, 0);
 });

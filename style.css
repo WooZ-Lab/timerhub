@@ -2041,6 +2041,42 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 }
 .group-collapse-btn:hover, .group-duplicate-btn:hover { background:var(--brand-soft); }
 
+/* Group deletion choices, lock indicator and form helpers */
+.group-delete-choice {
+    margin: 0 0 12px;
+    padding: 8px 10px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+}
+.group-delete-choice legend {
+    padding: 0 4px;
+    font-weight: 700;
+    font-size: 13px;
+}
+.checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 36px;
+    cursor: pointer;
+}
+.checkbox-row input {
+    width: 20px;
+    height: 20px;
+    flex: 0 0 auto;
+}
+.group-lock-indicator {
+    flex: 0 0 auto;
+    font-size: 12px;
+    line-height: 1;
+    padding: 0 2px;
+}
+.form-error {
+    margin: 6px 0 0;
+    color: var(--danger-color, #e74c3c);
+    font-size: 13px;
+}
+
 /* Group accent color (only applied when a color was explicitly chosen) */
 .group-container[style*="--group-accent"] {
     border-color: color-mix(in srgb, var(--group-accent) 55%, var(--border-color));

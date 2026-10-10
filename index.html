@@ -48,6 +48,8 @@
                 <button id="createGroupBtn" class="canvas-tool-btn" aria-label="Create group from selection" data-i18n-aria-label="createGroupFromSelection" hidden>▣</button>
                 <button id="createGroupFromGroupsBtn" class="canvas-tool-btn" aria-label="Group selected groups" data-i18n-aria-label="groupSelectedGroups" hidden>▤</button>
                 <button id="deleteGroupsBtn" class="canvas-tool-btn" aria-label="Delete selected groups" data-i18n-aria-label="deleteSelectedGroups" hidden>🗑</button>
+                <button id="undoCanvasBtn" class="canvas-tool-btn" aria-label="Undo" data-i18n-aria-label="undoAction" hidden>↶</button>
+                <button id="redoCanvasBtn" class="canvas-tool-btn" aria-label="Redo" data-i18n-aria-label="redoAction" hidden>↷</button>
             </div>
             <div class="canvas-viewport" id="activityCanvasViewport" role="region" aria-label="Activity canvas" data-i18n-aria-label="activityCanvas">
                 <div class="activities-grid" id="activitiesGrid">
@@ -645,6 +647,12 @@
                         <label data-i18n="groupColorLabel">Group color</label>
                         <div id="groupEditColorOptions" class="group-color-options" role="radiogroup" aria-label="Group color"></div>
                     </div>
+                    <div class="form-group">
+                        <label class="checkbox-row" for="groupEditLockedInput">
+                            <input type="checkbox" id="groupEditLockedInput">
+                            <span data-i18n="groupLockedLabel">Lock this group (deletion is blocked until unlocked)</span>
+                        </label>
+                    </div>
                 </div>
 
                 <div class="modal-footer">
@@ -663,7 +671,18 @@
                 </div>
                 <div class="modal-body">
                     <p id="groupDeleteSummary"></p>
-                    <p data-i18n="deleteGroupsNotice">Member activities are kept as ungrouped canvas items. Nested groups move up one level.</p>
+                    <fieldset class="group-delete-choice">
+                        <legend data-i18n="deleteChoiceActivitiesLegend">Activities in this hierarchy</legend>
+                        <label class="checkbox-row"><input type="radio" id="groupDeleteActivitiesKeep" name="groupDeleteActivities" value="keep"> <span data-i18n="deleteChoiceKeepActivities">Keep: move them to the canvas</span></label>
+                        <label class="checkbox-row"><input type="radio" id="groupDeleteActivitiesDelete" name="groupDeleteActivities" value="delete"> <span data-i18n="deleteChoiceDeleteActivities">Delete permanently</span></label>
+                    </fieldset>
+                    <fieldset class="group-delete-choice">
+                        <legend data-i18n="deleteChoiceNestedLegend">Nested groups</legend>
+                        <label class="checkbox-row"><input type="radio" id="groupDeleteNestedKeep" name="groupDeleteNested" value="keep"> <span data-i18n="deleteChoiceKeepNested">Keep: move them up one level</span></label>
+                        <label class="checkbox-row"><input type="radio" id="groupDeleteNestedDelete" name="groupDeleteNested" value="delete"> <span data-i18n="deleteChoiceDeleteNested">Delete with all contents</span></label>
+                    </fieldset>
+                    <p id="groupDeleteOutcome" role="status"></p>
+                    <p id="groupDeleteLockedWarning" class="warning" role="alert" style="display:none;"></p>
                 </div>
                 <div class="modal-footer">
                     <button id="groupDeleteCancelBtn" class="btn-secondary" data-i18n="cancel">Cancel</button>

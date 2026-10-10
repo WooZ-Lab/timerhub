@@ -441,11 +441,23 @@ const extendedTranslations = {
         groupSelectedGroupsCount: 'Group {count} groups',
         deleteSelectedGroups: 'Delete selected groups',
         deleteGroupsTitle: 'Delete groups',
-        deleteGroupsNotice: 'Member activities are kept as ungrouped canvas items. Nested groups move up one level.',
-        deleteGroupsSummary: '{groups} group(s) will be deleted. {activities} member activity(ies) stay on the canvas and {children} nested group(s) move up one level.',
+        deleteGroupsSummary: 'Selected hierarchy: {groups} group(s), {activities} activity(ies), {children} nested group(s).',
+        deleteChoiceActivitiesLegend: 'Activities in this hierarchy',
+        deleteChoiceNestedLegend: 'Nested groups',
+        deleteChoiceKeepActivities: 'Keep: move them to the canvas',
+        deleteChoiceDeleteActivities: 'Delete permanently',
+        deleteChoiceKeepNested: 'Keep: move them up one level',
+        deleteChoiceDeleteNested: 'Delete with all contents',
+        deleteChoiceRequired: 'Choose what happens to activities and nested groups before confirming.',
+        deleteOutcomeSummary: 'Keeps {keptActivities} activity(ies), deletes {deletedActivities}; keeps {keptGroups} group(s), deletes {deletedGroups}.',
+        deleteLockedWarning: 'Locked groups cannot be deleted: {names}. Unlock them in the group editor first.',
+        undoAction: 'Undo',
+        redoAction: 'Redo',
         groupDeleteFailed: 'Could not delete the groups. Try again.',
         groupDeleted: 'Groups deleted',
         groupEditTitle: 'Edit group',
+        groupLockedLabel: 'Lock this group (deletion is blocked until unlocked)',
+        groupLocked: 'Locked group',
         groupColorLabel: 'Group color', groupColorDefault: 'Default',
         groupNameRequired: 'Enter a group name.',
         groupEditSaveFailed: 'Could not save the group. Try again.',
@@ -708,11 +720,23 @@ const extendedTranslations = {
         groupSelectedGroupsCount: '{count} Gruppen gruppieren',
         deleteSelectedGroups: 'Ausgewählte Gruppen löschen',
         deleteGroupsTitle: 'Gruppen löschen',
-        deleteGroupsNotice: 'Mitgliedsaktivitäten bleiben als ungruppierte Elemente auf dem Canvas. Verschachtelte Gruppen rücken eine Ebene nach oben.',
-        deleteGroupsSummary: '{groups} Gruppe(n) werden gelöscht. {activities} Mitgliedsaktivität(en) bleiben auf dem Canvas und {children} verschachtelte Gruppe(n) rücken eine Ebene nach oben.',
+        deleteGroupsSummary: 'Ausgewählte Hierarchie: {groups} Gruppe(n), {activities} Aktivität(en), {children} verschachtelte Gruppe(n).',
+        deleteChoiceActivitiesLegend: 'Aktivitäten in dieser Hierarchie',
+        deleteChoiceNestedLegend: 'Verschachtelte Gruppen',
+        deleteChoiceKeepActivities: 'Behalten: auf den Canvas verschieben',
+        deleteChoiceDeleteActivities: 'Endgültig löschen',
+        deleteChoiceKeepNested: 'Behalten: eine Ebene nach oben verschieben',
+        deleteChoiceDeleteNested: 'Mit allen Inhalten löschen',
+        deleteChoiceRequired: 'Bitte zuerst festlegen, was mit Aktivitäten und verschachtelten Gruppen passiert.',
+        deleteOutcomeSummary: '{keptActivities} Aktivität(en) bleiben, {deletedActivities} werden gelöscht; {keptGroups} Gruppe(n) bleiben, {deletedGroups} werden gelöscht.',
+        deleteLockedWarning: 'Gesperrte Gruppen können nicht gelöscht werden: {names}. Bitte zuerst im Gruppen-Editor entsperren.',
+        undoAction: 'Rückgängig',
+        redoAction: 'Wiederholen',
         groupDeleteFailed: 'Gruppen konnten nicht gelöscht werden. Bitte erneut versuchen.',
         groupDeleted: 'Gruppen gelöscht',
         groupEditTitle: 'Gruppe bearbeiten',
+        groupLockedLabel: 'Gruppe sperren (Löschen erst nach Entsperren möglich)',
+        groupLocked: 'Gesperrte Gruppe',
         groupColorLabel: 'Gruppenfarbe', groupColorDefault: 'Standard',
         groupNameRequired: 'Bitte einen Gruppennamen eingeben.',
         groupEditSaveFailed: 'Gruppe konnte nicht gespeichert werden. Bitte erneut versuchen.',
@@ -975,11 +999,23 @@ const extendedTranslations = {
         groupSelectedGroupsCount: 'Сгруппировать группы ({count})',
         deleteSelectedGroups: 'Удалить выбранные группы',
         deleteGroupsTitle: 'Удалить группы',
-        deleteGroupsNotice: 'Занятия участников останутся на холсте без группы. Вложенные группы поднимутся на уровень выше.',
-        deleteGroupsSummary: 'Будет удалено групп: {groups}. Занятий останется на холсте: {activities}, вложенных групп поднимется: {children}.',
+        deleteGroupsSummary: 'Выбранная иерархия: групп — {groups}, занятий — {activities}, вложенных групп — {children}.',
+        deleteChoiceActivitiesLegend: 'Занятия в этой иерархии',
+        deleteChoiceNestedLegend: 'Вложенные группы',
+        deleteChoiceKeepActivities: 'Оставить: перенести на холст',
+        deleteChoiceDeleteActivities: 'Удалить навсегда',
+        deleteChoiceKeepNested: 'Оставить: поднять на уровень выше',
+        deleteChoiceDeleteNested: 'Удалить со всем содержимым',
+        deleteChoiceRequired: 'Сначала выберите, что делать с занятиями и вложенными группами.',
+        deleteOutcomeSummary: 'Останется занятий: {keptActivities}, будет удалено: {deletedActivities}; останется групп: {keptGroups}, будет удалено: {deletedGroups}.',
+        deleteLockedWarning: 'Заблокированные группы нельзя удалить: {names}. Сначала снимите блокировку в редакторе группы.',
+        undoAction: 'Отменить',
+        redoAction: 'Повторить',
         groupDeleteFailed: 'Не удалось удалить группы. Попробуйте ещё раз.',
         groupDeleted: 'Группы удалены',
         groupEditTitle: 'Редактировать группу',
+        groupLockedLabel: 'Заблокировать группу (удаление запрещено до разблокировки)',
+        groupLocked: 'Заблокированная группа',
         groupColorLabel: 'Цвет группы', groupColorDefault: 'По умолчанию',
         groupNameRequired: 'Введите название группы.',
         groupEditSaveFailed: 'Не удалось сохранить группу. Попробуйте ещё раз.',
@@ -1284,6 +1320,10 @@ class StorageRepository {
         return this.persistMutation(['layout'], tx => { tx.objectStore('layout').put(layout); });
     }
 
+    async deleteLayout(id) {
+        return this.persistMutation(['layout'], tx => { tx.objectStore('layout').delete(id); });
+    }
+
     // Groups
     async getGroups() {
         const tx = this.db.transaction(['groups'], 'readonly');
@@ -1459,6 +1499,10 @@ class TimerHubApp {
         this.canvasSelectionElement = null;
         this.selectedActivityIds = new Set();
         this.selectedGroupIds = new Set();
+        this.pendingGroupDeletion = null;
+        this.canvasUndoStack = [];
+        this.canvasRedoStack = [];
+        this.maxCanvasHistory = 30;
         this.groupDisplayOffsets = new Map();
         this.expandedGroupOrder = [];
         // Transient positions where expanded groups were last seen, captured
@@ -2192,6 +2236,20 @@ class TimerHubApp {
         sel('groupDeleteModalCloseBtn')?.addEventListener('click', () => this.closeGroupDeleteModal());
         sel('groupDeleteCancelBtn')?.addEventListener('click', () => this.closeGroupDeleteModal());
         sel('groupDeleteConfirmBtn')?.addEventListener('click', () => this.deleteSelectedGroups());
+        for (const [id, field, value] of [
+            ['groupDeleteActivitiesKeep', 'activities', 'keep'],
+            ['groupDeleteActivitiesDelete', 'activities', 'delete'],
+            ['groupDeleteNestedKeep', 'nested', 'keep'],
+            ['groupDeleteNestedDelete', 'nested', 'delete']
+        ]) {
+            sel(id)?.addEventListener('change', () => {
+                if (!this.pendingGroupDeletion) return;
+                this.pendingGroupDeletion.choices[field] = value;
+                this.updateGroupDeleteDialog();
+            });
+        }
+        sel('undoCanvasBtn')?.addEventListener('click', () => this.undoCanvas());
+        sel('redoCanvasBtn')?.addEventListener('click', () => this.redoCanvas());
         document.addEventListener?.('keydown', event => this.handleGlobalKeydown(event));
         document.getElementById('groupEditNameInput')?.addEventListener('keydown', event => {
             if (event.key === 'Enter') {
@@ -3445,6 +3503,13 @@ class TimerHubApp {
             title.appendChild(titleText);
             title.appendChild(editButton);
             title.appendChild(duplicateButton);
+            if (group.locked) {
+                const lockIndicator = document.createElement('span');
+                lockIndicator.className = 'group-lock-indicator';
+                lockIndicator.textContent = '🔒';
+                lockIndicator.setAttribute('aria-label', this.t('groupLocked'));
+                title.appendChild(lockIndicator);
+            }
             container.appendChild(title);
 
             if (group.collapsed) {
@@ -4348,6 +4413,12 @@ class TimerHubApp {
         return this.activities.indexOf(activity);
     }
 
+    // Plain-data clone for persisted canvas records. Works in every runtime the
+    // app targets without depending on structuredClone support.
+    cloneCanvasRecord(record) {
+        return JSON.parse(JSON.stringify(record));
+    }
+
     isCompleteLayout(layout) {
         return Boolean(layout)
             && Number.isFinite(Number(layout.x))
@@ -4599,6 +4670,7 @@ class TimerHubApp {
             deleteGroups.setAttribute('aria-label', label);
             deleteGroups.title = label;
         }
+        this.updateCanvasHistoryActions();
     }
 
     selectedTopLevelGroups() {
@@ -4682,88 +4754,312 @@ class TimerHubApp {
         return group;
     }
 
-    groupDeletionPlan() {
-        const selected = this.selectedTopLevelGroups();
-        const deleting = new Set(selected.map(group => group.id));
-        const activities = [];
-        const liftedGroups = [];
-        for (const group of selected) {
-            activities.push(...this.groupMembers(group));
-            for (const child of this.groupChildren(group)) {
-                if (!deleting.has(child.id)) liftedGroups.push(child);
+    isGroupDeletionProtected(group) {
+        if (group?.locked === true) return true;
+        return this.groupAncestors(group).some(ancestor => ancestor.locked === true);
+    }
+
+    groupDeletionPlan(choices = { activities: 'keep', nested: 'keep' }) {
+        const roots = this.selectedTopLevelGroups();
+        const deletingGroupIds = new Set(roots.map(group => group.id));
+        if (choices.nested === 'delete') {
+            for (const root of roots) {
+                for (const id of this.groupDescendantIds(root.id)) deletingGroupIds.add(id);
             }
         }
-        return { groups: selected, activities, liftedGroups };
+        const hierarchyGroups = [];
+        const visit = group => {
+            hierarchyGroups.push(group);
+            for (const child of this.groupChildren(group)) visit(child);
+        };
+        for (const root of roots) visit(root);
+        const activities = [];
+        for (const group of hierarchyGroups) activities.push(...this.groupMembers(group));
+        const nestedGroups = hierarchyGroups.filter(group => !roots.includes(group));
+        const deletingGroups = hierarchyGroups.filter(group => deletingGroupIds.has(group.id));
+        const survivingGroups = hierarchyGroups.filter(group => !deletingGroupIds.has(group.id));
+        return {
+            roots,
+            choices,
+            deletingGroupIds,
+            hierarchyGroups,
+            nestedGroups,
+            deletingGroups,
+            survivingGroups,
+            activities,
+            activitiesToDelete: choices.activities === 'delete' ? activities : [],
+            activitiesToKeep: choices.activities === 'delete' ? [] : activities,
+            locked: deletingGroups.filter(group => this.isGroupDeletionProtected(group))
+        };
     }
 
     openGroupDeleteModal() {
         const plan = this.groupDeletionPlan();
-        if (!plan.groups.length) return false;
+        if (!plan.roots.length) return false;
+        this.pendingGroupDeletion = { choices: { activities: null, nested: null } };
+        for (const id of ['groupDeleteActivitiesKeep', 'groupDeleteActivitiesDelete', 'groupDeleteNestedKeep', 'groupDeleteNestedDelete']) {
+            const input = document.getElementById(id);
+            if (input) input.checked = false;
+        }
         const summary = document.getElementById('groupDeleteSummary');
         if (summary) {
             summary.textContent = this.t('deleteGroupsSummary', {
-                groups: plan.groups.length,
+                groups: plan.hierarchyGroups.length,
                 activities: plan.activities.length,
-                children: plan.liftedGroups.length
+                children: plan.nestedGroups.length
             });
         }
+        this.updateGroupDeleteDialog();
         document.getElementById('groupDeleteModal')?.classList.add('active');
         return true;
     }
 
+    updateGroupDeleteDialog() {
+        const pending = this.pendingGroupDeletion;
+        if (!pending) return false;
+        const outcome = document.getElementById('groupDeleteOutcome');
+        const lockedWarning = document.getElementById('groupDeleteLockedWarning');
+        const confirm = document.getElementById('groupDeleteConfirmBtn');
+        const choices = pending.choices;
+        if (!choices.activities || !choices.nested) {
+            if (outcome) outcome.textContent = this.t('deleteChoiceRequired');
+            if (lockedWarning) {
+                lockedWarning.textContent = '';
+                lockedWarning.style.display = 'none';
+            }
+            if (confirm) confirm.disabled = true;
+            return false;
+        }
+        const plan = this.groupDeletionPlan(choices);
+        if (outcome) {
+            outcome.textContent = this.t('deleteOutcomeSummary', {
+                keptActivities: plan.activitiesToKeep.length,
+                deletedActivities: plan.activitiesToDelete.length,
+                keptGroups: plan.survivingGroups.length,
+                deletedGroups: plan.deletingGroups.length
+            });
+        }
+        if (lockedWarning) {
+            if (plan.locked.length) {
+                lockedWarning.textContent = this.t('deleteLockedWarning', {
+                    names: plan.locked.map(group => group.name).join(', ')
+                });
+                lockedWarning.style.display = '';
+            } else {
+                lockedWarning.textContent = '';
+                lockedWarning.style.display = 'none';
+            }
+        }
+        if (confirm) confirm.disabled = plan.locked.length > 0;
+        return plan.locked.length === 0;
+    }
+
     closeGroupDeleteModal() {
+        this.pendingGroupDeletion = null;
         document.getElementById('groupDeleteModal')?.classList.remove('active');
     }
 
+    captureGroupDeletionHistory(plan, reparented, ungrouped) {
+        const groupIds = new Set(plan.deletingGroupIds);
+        for (const entry of reparented) groupIds.add(entry.group.id);
+        const activityIds = new Set(plan.activitiesToDelete.map(activity => activity.id));
+        for (const entry of ungrouped) activityIds.add(entry.activity.id);
+        const before = { groups: [], activities: [], layouts: [] };
+        const after = { groups: [], activities: [], layouts: [] };
+        for (const id of groupIds) {
+            const group = this.groups.find(item => item.id === id);
+            if (group) before.groups.push(this.cloneCanvasRecord(group));
+        }
+        for (const entry of reparented) {
+            const group = this.groups.find(item => item.id === entry.group.id);
+            if (!group) continue;
+            const record = this.cloneCanvasRecord(group);
+            if (entry.nextParentId) record.parentId = entry.nextParentId;
+            else delete record.parentId;
+            after.groups.push(record);
+        }
+        for (const id of activityIds) {
+            const activity = this.activities.find(item => item.id === id);
+            const layout = this.activityLayouts.get(id);
+            if (activity) before.activities.push(this.cloneCanvasRecord(activity));
+            if (layout) before.layouts.push(this.cloneCanvasRecord(layout));
+        }
+        for (const entry of ungrouped) {
+            const activity = this.cloneCanvasRecord(entry.activity);
+            delete activity.groupId;
+            after.activities.push(activity);
+            after.layouts.push(this.cloneCanvasRecord(entry.layout));
+        }
+        return {
+            label: 'delete-groups',
+            ids: {
+                groups: [...groupIds],
+                activities: [...activityIds],
+                layouts: [...activityIds]
+            },
+            before,
+            after
+        };
+    }
+
+    recordCanvasHistory(entry) {
+        if (!entry) return;
+        this.canvasUndoStack.push(entry);
+        if (this.canvasUndoStack.length > this.maxCanvasHistory) this.canvasUndoStack.shift();
+        this.canvasRedoStack = [];
+        this.updateCanvasHistoryActions();
+    }
+
+    updateCanvasHistoryActions() {
+        const undo = document.getElementById('undoCanvasBtn');
+        if (undo) undo.hidden = this.canvasUndoStack.length === 0;
+        const redo = document.getElementById('redoCanvasBtn');
+        if (redo) redo.hidden = this.canvasRedoStack.length === 0;
+    }
+
+    pruneGroupTransientState() {
+        const valid = new Set(this.groups.map(group => group.id));
+        this.expandedGroupOrder = this.expandedGroupOrder.filter(id => valid.has(id));
+        for (const id of [...this.expandedGroupCarry.keys()]) {
+            if (!valid.has(id)) this.expandedGroupCarry.delete(id);
+        }
+    }
+
+    async applyCanvasHistoryState(entry, side) {
+        const state = entry[side];
+        const groupRecords = new Map(state.groups.map(record => [record.id, record]));
+        const activityRecords = new Map(state.activities.map(record => [record.id, record]));
+        const layoutRecords = new Map(state.layouts.map(record => [record.activityId, record]));
+        for (const id of entry.ids.groups) {
+            const record = groupRecords.get(id);
+            if (record) await this.storage.saveGroup?.(record);
+            else await this.storage.deleteGroup?.(id);
+        }
+        for (const id of entry.ids.activities) {
+            const record = activityRecords.get(id);
+            if (record) await this.storage.saveActivity(record);
+            else await this.storage.deleteActivity?.(id);
+        }
+        for (const id of entry.ids.layouts) {
+            const record = layoutRecords.get(id);
+            if (record) await this.storage.saveLayout(record);
+            else await this.storage.deleteLayout?.(id);
+        }
+        const groupIds = new Set(entry.ids.groups);
+        this.groups = this.groups.filter(group => !groupIds.has(group.id));
+        for (const record of state.groups) this.groups.push(this.cloneCanvasRecord(record));
+        this.pruneGroupTransientState();
+        const activityIds = new Set(entry.ids.activities);
+        this.activities = this.activities.filter(activity => !activityIds.has(activity.id));
+        for (const record of state.activities) this.activities.push(this.cloneCanvasRecord(record));
+        this.activities.sort((a, b) => (a.position || 0) - (b.position || 0));
+        for (const id of entry.ids.layouts) this.activityLayouts.delete(id);
+        for (const record of state.layouts) this.activityLayouts.set(record.activityId, this.cloneCanvasRecord(record));
+        this.selectedGroupIds = new Set();
+        this.selectedActivityIds = new Set();
+        this.renderMain();
+    }
+
+    async undoCanvas() {
+        const entry = this.canvasUndoStack.pop();
+        if (!entry) return false;
+        await this.applyCanvasHistoryState(entry, 'before');
+        this.canvasRedoStack.push(entry);
+        this.updateCanvasHistoryActions();
+        return true;
+    }
+
+    async redoCanvas() {
+        const entry = this.canvasRedoStack.pop();
+        if (!entry) return false;
+        await this.applyCanvasHistoryState(entry, 'after');
+        this.canvasUndoStack.push(entry);
+        this.updateCanvasHistoryActions();
+        return true;
+    }
+
     async deleteSelectedGroups() {
-        const plan = this.groupDeletionPlan();
-        if (!plan.groups.length) return false;
-        const deleting = new Set(plan.groups.map(group => group.id));
+        const pending = this.pendingGroupDeletion;
+        const choices = pending?.choices;
+        if (!choices?.activities || !choices?.nested) return false;
+        const plan = this.groupDeletionPlan(choices);
+        if (!plan.roots.length || plan.locked.length) return false;
+        const deletingGroupIds = new Set(plan.deletingGroupIds);
+        const groupById = new Map(this.groups.map(group => [group.id, group]));
+
+        const reparented = [];
+        for (const group of plan.hierarchyGroups) {
+            if (deletingGroupIds.has(group.id)) continue;
+            let nextParentId = group.parentId || null;
+            while (nextParentId && deletingGroupIds.has(nextParentId)) {
+                nextParentId = groupById.get(nextParentId)?.parentId || null;
+            }
+            if ((group.parentId || null) !== nextParentId) reparented.push({ group, nextParentId });
+        }
+
         const ungrouped = [];
-        this.closeGroupDeleteModal();
-        try {
-            for (const group of plan.groups) {
+        if (choices.activities === 'keep') {
+            for (const group of plan.deletingGroups) {
                 for (const activity of this.groupMembers(group)) {
                     const stored = this.activityLayouts.get(activity.id);
                     const fallback = this.getActivityCanvasLayout(activity, this.activityIndexOf(activity), false);
                     const absolute = stored && Number.isFinite(Number(stored.x)) && Number.isFinite(Number(stored.y))
                         ? { x: group.x + Number(stored.x), y: group.y + Number(stored.y), width: stored.width, height: stored.height }
                         : { x: fallback.x, y: fallback.y, width: fallback.width, height: fallback.height };
-                    delete activity.groupId;
-                    const layout = {
-                        activityId: activity.id,
-                        x: absolute.x,
-                        y: absolute.y,
-                        width: absolute.width,
-                        height: absolute.height
-                    };
-                    this.activityLayouts.set(activity.id, layout);
-                    ungrouped.push({ activity, layout });
-                }
-                for (const child of this.groupChildren(group)) {
-                    if (deleting.has(child.id)) continue;
-                    let nextParentId = group.parentId;
-                    while (nextParentId && deleting.has(nextParentId)) {
-                        nextParentId = this.groups.find(item => item.id === nextParentId)?.parentId;
-                    }
-                    if (nextParentId) child.parentId = nextParentId;
-                    else delete child.parentId;
-                    await this.storage.saveGroup?.(child);
+                    ungrouped.push({
+                        activity,
+                        layout: {
+                            activityId: activity.id,
+                            x: absolute.x,
+                            y: absolute.y,
+                            width: absolute.width,
+                            height: absolute.height
+                        }
+                    });
                 }
             }
-            for (const { activity, layout } of ungrouped) {
-                await this.storage.saveActivity(activity);
-                await this.storage.saveLayout(layout);
+        }
+
+        const historyEntry = this.captureGroupDeletionHistory(plan, reparented, ungrouped);
+        this.closeGroupDeleteModal();
+        try {
+            for (const entry of reparented) {
+                const record = this.cloneCanvasRecord(entry.group);
+                if (entry.nextParentId) record.parentId = entry.nextParentId;
+                else delete record.parentId;
+                await this.storage.saveGroup?.(record);
             }
-            for (const group of plan.groups) {
-                await this.storage.deleteGroup?.(group.id);
+            for (const group of plan.deletingGroups) await this.storage.deleteGroup?.(group.id);
+            for (const activity of plan.activitiesToDelete) {
+                await this.storage.deleteActivity?.(activity.id);
+                await this.storage.deleteLayout?.(activity.id);
+            }
+            for (const entry of ungrouped) {
+                const record = this.cloneCanvasRecord(entry.activity);
+                delete record.groupId;
+                await this.storage.saveActivity(record);
+                await this.storage.saveLayout(entry.layout);
             }
         } catch {
             this.showToast(this.t('groupDeleteFailed'));
             return false;
         }
-        this.groups = this.groups.filter(group => !deleting.has(group.id));
+        for (const entry of reparented) {
+            if (entry.nextParentId) entry.group.parentId = entry.nextParentId;
+            else delete entry.group.parentId;
+        }
+        const activityIdsToDelete = new Set(plan.activitiesToDelete.map(activity => activity.id));
+        this.activities = this.activities.filter(activity => !activityIdsToDelete.has(activity.id));
+        for (const id of activityIdsToDelete) this.activityLayouts.delete(id);
+        for (const entry of ungrouped) {
+            delete entry.activity.groupId;
+            this.activityLayouts.set(entry.activity.id, entry.layout);
+        }
+        this.groups = this.groups.filter(group => !deletingGroupIds.has(group.id));
+        this.pruneGroupTransientState();
         this.selectedGroupIds = new Set();
+        this.selectedActivityIds = new Set();
+        this.recordCanvasHistory(historyEntry);
         this.renderMain();
         this.showToast(this.t('groupDeleted'));
         return true;
@@ -4773,7 +5069,23 @@ class TimerHubApp {
         if (!event?.key) return;
         const tag = event.target?.tagName?.toLowerCase?.();
         if (tag === 'input' || tag === 'textarea' || event.target?.isContentEditable) return;
+        const modifier = Boolean(event.ctrlKey || event.metaKey);
+        if (modifier && (event.key === 'z' || event.key === 'Z')) {
+            if (typeof event.preventDefault === 'function') event.preventDefault();
+            if (event.shiftKey) this.redoCanvas();
+            else this.undoCanvas();
+            return;
+        }
+        if (modifier && (event.key === 'y' || event.key === 'Y')) {
+            if (typeof event.preventDefault === 'function') event.preventDefault();
+            this.redoCanvas();
+            return;
+        }
         if (event.key === 'Escape') {
+            if (this.pendingGroupDeletion) {
+                this.closeGroupDeleteModal();
+                return;
+            }
             this.clearGroupSelection();
             return;
         }
@@ -4851,6 +5163,8 @@ class TimerHubApp {
         this.editingGroupColor = typeof group.color === 'string' ? group.color : '';
         const input = document.getElementById('groupEditNameInput');
         if (input) input.value = group.name;
+        const lockedInput = document.getElementById('groupEditLockedInput');
+        if (lockedInput) lockedInput.checked = group.locked === true;
         this.renderGroupColorOptions();
         this.hideGroupEditNameError();
         document.getElementById('groupEditModal')?.classList.add('active');
@@ -4901,6 +5215,9 @@ class TimerHubApp {
         group.name = name;
         if (this.editingGroupColor) group.color = this.editingGroupColor;
         else delete group.color;
+        const lockedInput = document.getElementById('groupEditLockedInput');
+        if (lockedInput?.checked) group.locked = true;
+        else delete group.locked;
         try {
             await this.storage.saveGroup?.(group);
         } catch {
