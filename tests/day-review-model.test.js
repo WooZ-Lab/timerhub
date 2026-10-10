@@ -7282,7 +7282,11 @@ test('canvas nodes render template icons, keep names, and ignore unknown identif
     const renderedIcon = node => node.children.find(child => child.classList.contains('activity-icon'));
     assert.ok(renderedIcon(iconA), 'the selected template renders');
     assert.equal(iconA.classList.contains('has-icon'), true);
-    assert.equal(renderedIcon(iconA).children.length, 3);
+    assert.equal(
+        renderedIcon(iconA).children.length,
+        app.activityIcon('vacuum-attic').elements.length,
+        'every artwork element renders on the canvas'
+    );
     assert.ok(iconA.children.some(child => child.classList.contains('btn-name')), 'the editable name stays visible');
     assert.equal(renderedIcon(iconB), undefined, 'activities without an icon are unchanged');
     assert.equal(renderedIcon(iconC), undefined, 'unknown identifiers fail safe');

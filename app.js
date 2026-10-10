@@ -1607,68 +1607,79 @@ class TimerHubApp {
             { id: 'oval', key: 'shapeOval', svg: 'M -50 0 A 50 30 0 0 1 50 0 A 50 30 0 0 1 -50 0' }
         ];
 
-        // Activity templates: a stable id plus a small, consistent set of
-        // outline glyphs drawn on a 24x24 grid. The identifier is persisted on
-        // the activity; the paths stay in code. Stroke/fill come from CSS so the
-        // icons inherit the contrast-aware activity text color.
+        // Activity templates: a stable id plus a recognizable illustration on
+        // a 24x24 grid. Filled parts use currentColor with even-odd cut-outs;
+        // stroked parts inherit the contrast-aware activity text color, so the
+        // artwork stays legible on every node color and theme.
         this.ACTIVITY_ICONS = [
             {
                 id: 'vacuum-attic',
                 key: 'iconVacuumAttic',
                 elements: [
-                    { tag: 'path', attrs: { d: 'M3 11 12 4l9 7' } },
-                    { tag: 'circle', attrs: { cx: '11', cy: '16', r: '3.2' } },
-                    { tag: 'path', attrs: { d: 'M14.2 16H18v-3' } }
+                    { tag: 'path', attrs: { d: 'M2.4 9.2 L12 3.2 L21.6 9.2', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.7' } },
+                    { tag: 'path', attrs: { d: 'M5.2 17.6 H18.8 Q20.4 17.6 20.4 19.1 Q20.4 20.6 18.8 20.6 H5.2 Q3.6 20.6 3.6 19.1 Q3.6 17.6 5.2 17.6 Z', fill: 'currentColor', stroke: 'none' } },
+                    { tag: 'circle', attrs: { cx: '8', cy: '16.4', r: '1.5', fill: 'currentColor', stroke: 'none' } },
+                    { tag: 'path', attrs: { d: 'M9.9 17.6 L10.7 10.6 H13.3 L14.1 17.6 Z', fill: 'currentColor', stroke: 'none' } },
+                    { tag: 'path', attrs: { d: 'M11.1 10.6 V5.4 Q11.1 4.2 12 4.2 Q12.9 4.2 12.9 5.4 V10.6 Z M11.55 5.8 H12.45 V7.2 H11.55 Z', fill: 'currentColor', stroke: 'none', 'fill-rule': 'evenodd' } }
                 ]
             },
             {
                 id: 'vacuum-basement',
                 key: 'iconVacuumBasement',
                 elements: [
-                    { tag: 'path', attrs: { d: 'M3 6h4v4h4v4h4' } },
-                    { tag: 'path', attrs: { d: 'M3 20h18' } },
-                    { tag: 'circle', attrs: { cx: '18', cy: '17.5', r: '2.5' } },
-                    { tag: 'path', attrs: { d: 'M18 15v-2' } }
+                    { tag: 'path', attrs: { d: 'M2.4 8.4 H21.6', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.7' } },
+                    { tag: 'path', attrs: { d: 'M5.2 8.4 V11 H8.4 V13.8 H11.6 V16.6 H5.2 Z', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5' } },
+                    { tag: 'path', attrs: { d: 'M18.6 8.4 V21 H5.2 V16.6', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.7' } },
+                    { tag: 'path', attrs: { d: 'M11.6 18 H17.6 Q18.8 18 18.8 19.2 Q18.8 20.4 17.6 20.4 H11.6 Q10.4 20.4 10.4 19.2 Q10.4 18 11.6 18 Z', fill: 'currentColor', stroke: 'none' } },
+                    { tag: 'circle', attrs: { cx: '12.7', cy: '17.1', r: '1.3', fill: 'currentColor', stroke: 'none' } },
+                    { tag: 'path', attrs: { d: 'M14.3 18 L14.9 13.2 H15.9 L16.5 18 Z', fill: 'currentColor', stroke: 'none' } },
+                    { tag: 'path', attrs: { d: 'M14.9 13.2 V9.6 Q14.9 8.6 15.4 8.6 Q15.9 8.6 15.9 9.6 V13.2 Z M15.15 9.9 H15.65 V11 H15.15 Z', fill: 'currentColor', stroke: 'none', 'fill-rule': 'evenodd' } }
                 ]
             },
             {
                 id: 'mop',
                 key: 'iconMop',
                 elements: [
-                    { tag: 'path', attrs: { d: 'M12 3v11' } },
-                    { tag: 'path', attrs: { d: 'M8 14h8l-1.2 3.2H9.2z' } },
-                    { tag: 'path', attrs: { d: 'M9.5 17.2l-.8 3M12 17.2v3.3M14.5 17.2l.8 3' } },
-                    { tag: 'path', attrs: { d: 'M4 21.5h3M17 21.5h3' } }
+                    { tag: 'path', attrs: { d: 'M12 2.4 V10.8', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.8' } },
+                    { tag: 'path', attrs: { d: 'M7.4 10.8 H16.6 L15.3 14 H8.7 Z', fill: 'currentColor', stroke: 'none' } },
+                    { tag: 'path', attrs: { d: 'M9.3 14 Q8.9 16.2 8.4 18.2 M10.7 14 Q10.5 16.6 10.3 19 M12 14 V19.4 M13.3 14 Q13.5 16.6 13.7 19 M14.7 14 Q15.1 16.2 15.6 18.2', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.4' } }
                 ]
             },
             {
                 id: 'squeegee',
                 key: 'iconSqueegee',
                 elements: [
-                    { tag: 'path', attrs: { d: 'M12 3.5V11' } },
-                    { tag: 'path', attrs: { d: 'M9.5 3.5h5' } },
-                    { tag: 'path', attrs: { d: 'M4 11h16v2.2H4z' } },
-                    { tag: 'path', attrs: { d: 'M6.5 16.5c1.3 1.6 1.3 3.2 0 4.8M11.5 17c1.3 1.6 1.3 3.2 0 4.8' } }
+                    { tag: 'path', attrs: { d: 'M12 2.6 V6.6', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.8' } },
+                    { tag: 'path', attrs: { d: 'M9.6 2.6 H14.4', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.8' } },
+                    { tag: 'path', attrs: { d: 'M7.6 6.6 H16.4 V8.4 H7.6 Z', fill: 'currentColor', stroke: 'none' } },
+                    { tag: 'path', attrs: { d: 'M4.6 8.4 H19.4 V10.4 Q12 11.8 4.6 10.4 Z', fill: 'currentColor', stroke: 'none' } },
+                    { tag: 'path', attrs: { d: 'M9.2 13.6 C10.2 14.9 10.2 16.3 9.2 17.4 C8.2 16.3 8.2 14.9 9.2 13.6 Z', fill: 'currentColor', stroke: 'none' } },
+                    { tag: 'path', attrs: { d: 'M14.8 15.4 C15.7 16.6 15.7 17.8 14.8 18.8 C13.9 17.8 13.9 16.6 14.8 15.4 Z', fill: 'currentColor', stroke: 'none' } },
+                    { tag: 'path', attrs: { d: 'M12.4 18.6 C13 19.4 13 20.2 12.4 20.8 C11.8 20.2 11.8 19.4 12.4 18.6 Z', fill: 'currentColor', stroke: 'none' } }
                 ]
             },
             {
                 id: 'duster',
                 key: 'iconDuster',
                 elements: [
-                    { tag: 'path', attrs: { d: 'M6 6.5c3.5-2.6 8.5-2.6 12 0v9c-3.5 2.6-8.5 2.6-12 0z' } },
-                    { tag: 'path', attrs: { d: 'M6 10.5c3.5 2 8.5 2 12 0' } },
-                    { tag: 'path', attrs: { d: 'M18.5 3.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z' } }
+                    { tag: 'path', attrs: { d: 'M3.2 6.6 H20.8 M3.2 5.2 V8 M20.8 5.2 V8', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5' } },
+                    { tag: 'path', attrs: { d: 'M7.4 6.6 C7.2 9.6 7 12.6 7.4 15.4 C7.8 16.8 8.8 17.4 9.8 17 C10.6 16.7 11.4 17.2 12.2 17 C13 16.8 13.6 17.4 14.4 17.1 C15.2 16.8 16 16.4 16.2 15.2 C16.6 12.4 16.4 9.4 16.2 6.6 Z', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.6' } },
+                    { tag: 'path', attrs: { d: 'M9.6 8.6 C10.4 10.6 10.4 13 9.9 15.4', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.2' } },
+                    { tag: 'path', attrs: { d: 'M19.4 2.6 l.5 1.25 1.25.5 -1.25.5 -.5 1.25 -.5 -1.25 -1.25 -.5 1.25 -.5 Z', fill: 'currentColor', stroke: 'none' } },
+                    { tag: 'path', attrs: { d: 'M4 10.8 l.4.9 .9.4 -.9.4 -.4.9 -.4 -.9 -.9 -.4 .9 -.4 Z', fill: 'currentColor', stroke: 'none' } }
                 ]
             },
             {
                 id: 'car',
                 key: 'iconCar',
                 elements: [
-                    { tag: 'path', attrs: { d: 'M7.4 8.4 9 5.5h6l1.6 2.9' } },
-                    { tag: 'path', attrs: { d: 'M4 14.2 5.8 9.6A1.6 1.6 0 0 1 7.3 8.5h9.4a1.6 1.6 0 0 1 1.5 1.1L20 14.2v3.3H4z' } },
-                    { tag: 'circle', attrs: { cx: '8.2', cy: '17.5', r: '1.6' } },
-                    { tag: 'circle', attrs: { cx: '15.8', cy: '17.5', r: '1.6' } },
-                    { tag: 'path', attrs: { d: 'M3 21h18' } }
+                    { tag: 'path', attrs: { d: 'M3.4 16.4 V15.2 C3.4 14.4 4 13.8 4.9 13.7 L6.5 13.5 L8.4 9.7 C8.8 9 9.5 8.6 10.3 8.6 H13.7 C14.5 8.6 15.2 9 15.6 9.7 L17.5 13.5 L19.1 13.7 C20 13.8 20.6 14.4 20.6 15.2 V16.4', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.7' } },
+                    { tag: 'path', attrs: { d: 'M9.6 9.6 L8.8 13.4 M14.4 9.6 L15.2 13.4', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.4' } },
+                    { tag: 'path', attrs: { d: 'M4.6 16.4 H19.4', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.7' } },
+                    { tag: 'circle', attrs: { cx: '8', cy: '16.6', r: '1.9', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.7' } },
+                    { tag: 'circle', attrs: { cx: '16', cy: '16.6', r: '1.9', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.7' } },
+                    { tag: 'circle', attrs: { cx: '8', cy: '16.6', r: '0.6', fill: 'currentColor', stroke: 'none' } },
+                    { tag: 'circle', attrs: { cx: '16', cy: '16.6', r: '0.6', fill: 'currentColor', stroke: 'none' } }
                 ]
             }
         ];
