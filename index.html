@@ -41,6 +41,12 @@
         <!-- Main screen -->
         <div id="mainScreen" class="screen active">
             <div class="safe-area-top"></div>
+            <div id="missingDataWarning" class="review-suspicious-banner" role="alert" style="display: none;">
+                <div class="review-suspicious-title" data-i18n="missingDataWarningTitle">No TimerHub data found on this device</div>
+                <p data-i18n="missingDataWarningBody">Data was stored on this device before, but nothing was found now. Browser storage may have been cleared. Restore a backup file if you have one.</p>
+                <button id="missingDataRestoreBtn" class="settings-btn btn-primary-green" type="button" data-i18n="missingDataRestore">Restore from backup file</button>
+                <button id="missingDataDismissBtn" class="settings-btn" type="button" data-i18n="missingDataDismiss">Dismiss</button>
+            </div>
             <div id="timerRunningStatus" class="timer-running-status" role="status" aria-live="polite"></div>
             <div id="canvasToolbar" class="canvas-toolbar" role="toolbar" aria-label="Canvas actions" data-i18n-aria-label="canvasToolbar">
                 <button id="addActivityBtn" class="canvas-tool-btn" aria-label="Add new activity" data-i18n-aria-label="addActivity">+</button>
@@ -279,16 +285,27 @@
                         <p class="settings-help" data-i18n="backupCredentialNote">Clockodo credentials, including the API key, are never included.</p>
                         <button id="backupBtn" class="settings-btn btn-primary-green" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 16V3m-5 5 5-5 5 5M4 14v6h16v-6"/></svg><span data-i18n="backupData">Create backup</span></button>
                         <button id="restoreBtn" class="settings-btn" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 8v13m-5-5 5 5 5-5M4 4h16v5H4z"/></svg><span data-i18n="restoreFromFile">Restore from backup file</span></button>
+                        <p id="lastBackupStatus" class="backup-status" role="status" aria-live="polite"></p>
                     </div>
                     <div class="backup-panel">
                         <h4 data-i18n="automaticSnapshotsTitle">Automatic local snapshots</h4>
                         <p data-i18n="automaticSnapshotsDescription">TimerHub keeps the 20 most recent safety snapshots on this device after saved changes.</p>
+                        <p class="settings-help" data-i18n="snapshotsSameDatabaseNote">Snapshots are stored in the same browser database as your data. If that database is deleted, snapshots are deleted with it. Export a backup file for protection outside the browser.</p>
                         <p id="automaticBackupStatus" class="backup-status" role="status" aria-live="polite" data-i18n="automaticSnapshotsNone">No automatic snapshots yet.</p>
                         <label for="automaticSnapshotSelect" data-i18n="selectSnapshot">Choose a local snapshot</label>
                         <select id="automaticSnapshotSelect" class="setting-select" aria-label="Choose a local snapshot" data-i18n-aria-label="selectSnapshot">
                             <option value="" data-i18n="automaticSnapshotsNone">No automatic snapshots yet.</option>
                         </select>
                         <button id="restoreSnapshotBtn" class="settings-btn" type="button" disabled><span data-i18n="restoreSnapshot">Restore selected snapshot</span></button>
+                    </div>
+                    <div class="backup-panel">
+                        <h4 data-i18n="persistentStorageTitle">Storage durability</h4>
+                        <p class="settings-help" data-i18n="persistentStorageDescription">Persistent storage asks Chrome to protect TimerHub data from automatic cleanup. It cannot prevent manual clearing of browsing data or app storage.</p>
+                        <p id="storagePersistenceStatus" class="backup-status" role="status" aria-live="polite"></p>
+                    </div>
+                    <div class="backup-panel">
+                        <h4 data-i18n="diagnosticsTitle">Local diagnostics</h4>
+                        <p id="backupDiagnostics" class="settings-help"></p>
                     </div>
                 </section>
                 <section class="backup-area" aria-labelledby="assignmentSectionTitle">
@@ -317,6 +334,10 @@
                 </div>
                 <div class="modal-body">
                     <p id="backupRestoreDescription" data-i18n="restoreConfirmDesc">Choose whether to merge this backup with current data or replace current data. Clockodo credentials are not included.</p>
+                    <div id="backupRestoreEmptyWarning" class="backup-panel" hidden>
+                        <p data-i18n="backupEmptyWarning">This backup contains no activities, time entries, or groups. Replacing will clear the data currently stored on this device.</p>
+                        <label for="backupRestoreEmptyConfirm"><input type="checkbox" id="backupRestoreEmptyConfirm"> <span data-i18n="backupEmptyConfirmLabel">I understand that replacing will clear the current data.</span></label>
+                    </div>
                 </div>
                 <div class="modal-footer backup-restore-actions">
                     <button id="backupRestoreCancelBtn" class="btn-secondary" type="button" data-i18n="cancel">Cancel</button>

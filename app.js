@@ -59,7 +59,7 @@ const translations = {
         undo: 'Undo',
         deleted: 'Deleted',
         restoreSuccess: 'Data restored successfully',
-        backupSuccess: 'Backup file created successfully',
+        backupSuccess: 'Backup file prepared. Check that it was saved outside TimerHub, usually in Downloads.',
     },
     de: {
         timerRunning: 'Timer läuft',
@@ -112,7 +112,7 @@ const translations = {
         undo: 'Rückgängig',
         deleted: 'Gelöscht',
         restoreSuccess: 'Daten erfolgreich wiederhergestellt',
-        backupSuccess: 'Sicherungsdatei wurde erstellt',
+        backupSuccess: 'Sicherungsdatei vorbereitet. Prüfen Sie, ob sie außerhalb von TimerHub gespeichert wurde (normalerweise in Downloads).',
     },
     ru: {
         timerRunning: 'Таймер запущен',
@@ -165,7 +165,7 @@ const translations = {
         undo: 'Отменить',
         deleted: 'Удалено',
         restoreSuccess: 'Данные успешно восстановлены',
-        backupSuccess: 'Файл резервной копии создан',
+        backupSuccess: 'Файл резервной копии подготовлен. Проверьте, что он сохранён вне TimerHub (обычно в папке «Загрузки»).',
     }
 };
 
@@ -212,6 +212,25 @@ const extendedTranslations = {
         restoreConfirmDesc: 'Choose whether to merge this backup with current data or replace current data. Clockodo credentials are not included.',
         restoreMergeAction: 'Merge data', restoreReplaceAction: 'Replace current data',
         snapshotDateFormat: '{date}',
+        backupEmptyWarning: 'This backup contains no activities, time entries, or groups. Replacing will clear the data currently stored on this device.',
+        backupEmptyConfirmLabel: 'I understand that replacing will clear the current data.',
+        backupEmptyNeedsConfirmation: 'Confirm that you want to replace current data with an empty backup.',
+        snapshotsSameDatabaseNote: 'Snapshots are stored in the same browser database as your data. If that database is deleted, snapshots are deleted with it. Export a backup file for protection outside the browser.',
+        persistentStorageTitle: 'Storage durability',
+        persistentStorageDescription: 'Persistent storage asks Chrome to protect TimerHub data from automatic cleanup. It cannot prevent manual clearing of browsing data or app storage.',
+        persistentStorageGranted: 'Persistent storage: granted by the browser.',
+        persistentStorageDenied: 'Persistent storage: not granted. The browser may clear TimerHub data when storage is low.',
+        persistentStorageUnsupported: 'Persistent storage: not supported by this browser.',
+        persistentStorageUnknown: 'Persistent storage: status unknown.',
+        lastBackupNever: 'No backup file exported yet. Browser-stored data and snapshots can be lost together.',
+        lastBackupAt: 'Last backup file export: {date}',
+        lastBackupOverdue: 'Export a new backup file to keep a copy outside browser storage.',
+        missingDataWarningTitle: 'No TimerHub data found on this device',
+        missingDataWarningBody: 'Data was stored on this device before, but nothing was found now. Browser storage may have been cleared. Restore a backup file if you have one.',
+        missingDataRestore: 'Restore from backup file',
+        missingDataDismiss: 'Dismiss',
+        diagnosticsTitle: 'Local diagnostics',
+        diagnosticsSummary: 'Database {name} v{version} · {activities} activities · {entries} time entries · {groups} groups',
         initFailed: 'TimerHub could not start. Reload the page or restore a backup.',
         notificationOffStatus: 'Notifications are off.', notificationUnsupported: 'Notifications are not supported by this browser.',
         notificationsEnabled: 'Notifications enabled', notificationsBlocked: 'Notifications blocked',
@@ -503,6 +522,25 @@ const extendedTranslations = {
         restoreConfirmDesc: 'Wähle, ob du diese Sicherung mit den aktuellen Daten zusammenführen oder sie ersetzen möchtest. Clockodo-Zugangsdaten sind nicht enthalten.',
         restoreMergeAction: 'Daten zusammenführen', restoreReplaceAction: 'Aktuelle Daten ersetzen',
         snapshotDateFormat: '{date}',
+        backupEmptyWarning: 'Diese Sicherung enthält keine Aktivitäten, Zeiteinträge oder Gruppen. Beim Ersetzen werden die aktuell auf diesem Gerät gespeicherten Daten gelöscht.',
+        backupEmptyConfirmLabel: 'Ich verstehe, dass beim Ersetzen die aktuellen Daten gelöscht werden.',
+        backupEmptyNeedsConfirmation: 'Bitte bestätigen Sie, dass die aktuellen Daten durch eine leere Sicherung ersetzt werden sollen.',
+        snapshotsSameDatabaseNote: 'Sicherungen liegen in derselben Browser-Datenbank wie Ihre Daten. Wird diese Datenbank gelöscht, werden die Sicherungen mitgelöscht. Exportieren Sie eine Sicherungsdatei, um sie außerhalb des Browsers zu schützen.',
+        persistentStorageTitle: 'Speicherbeständigkeit',
+        persistentStorageDescription: 'Persistenter Speicher bittet Chrome, TimerHub-Daten vor automatischer Bereinigung zu schützen. Manuelles Löschen von Browser- oder App-Daten verhindert das nicht.',
+        persistentStorageGranted: 'Persistenter Speicher: vom Browser gewährt.',
+        persistentStorageDenied: 'Persistenter Speicher: nicht gewährt. Der Browser kann TimerHub-Daten bei Speicherknappheit löschen.',
+        persistentStorageUnsupported: 'Persistenter Speicher: von diesem Browser nicht unterstützt.',
+        persistentStorageUnknown: 'Persistenter Speicher: Status unbekannt.',
+        lastBackupNever: 'Noch keine Sicherungsdatei exportiert. Im Browser gespeicherte Daten und Sicherungen können gemeinsam verloren gehen.',
+        lastBackupAt: 'Letzter Sicherungsdatei-Export: {date}',
+        lastBackupOverdue: 'Exportieren Sie eine neue Sicherungsdatei, um eine Kopie außerhalb des Browsers zu behalten.',
+        missingDataWarningTitle: 'Keine TimerHub-Daten auf diesem Gerät gefunden',
+        missingDataWarningBody: 'Auf diesem Gerät waren zuvor Daten gespeichert, jetzt wurde nichts gefunden. Möglicherweise wurde der Browserspeicher gelöscht. Stellen Sie eine Sicherungsdatei wieder her, falls vorhanden.',
+        missingDataRestore: 'Aus Sicherungsdatei wiederherstellen',
+        missingDataDismiss: 'Ausblenden',
+        diagnosticsTitle: 'Lokale Diagnose',
+        diagnosticsSummary: 'Datenbank {name} v{version} · {activities} Aktivitäten · {entries} Zeiteinträge · {groups} Gruppen',
         initFailed: 'TimerHub konnte nicht gestartet werden. Lade die Seite neu oder stelle eine Sicherung wieder her.',
         notificationOffStatus: 'Benachrichtigungen sind ausgeschaltet.', notificationUnsupported: 'Dieser Browser unterstützt keine Benachrichtigungen.',
         notificationsEnabled: 'Benachrichtigungen aktiviert', notificationsBlocked: 'Benachrichtigungen blockiert',
@@ -794,6 +832,25 @@ const extendedTranslations = {
         restoreConfirmDesc: 'Выберите, объединить эту копию с текущими данными или заменить их. Данные Clockodo не включены.',
         restoreMergeAction: 'Объединить данные', restoreReplaceAction: 'Заменить текущие данные',
         snapshotDateFormat: '{date}',
+        backupEmptyWarning: 'Эта резервная копия не содержит занятий, записей времени или групп. При замене данные, сохранённые на этом устройстве, будут удалены.',
+        backupEmptyConfirmLabel: 'Я понимаю, что при замене текущие данные будут удалены.',
+        backupEmptyNeedsConfirmation: 'Подтвердите замену текущих данных пустой резервной копией.',
+        snapshotsSameDatabaseNote: 'Копии хранятся в той же базе браузера, что и ваши данные. Если база будет удалена, копии удалятся вместе с ней. Экспортируйте файл резервной копии для защиты вне браузера.',
+        persistentStorageTitle: 'Долговечность хранилища',
+        persistentStorageDescription: 'Постоянное хранилище просит Chrome защитить данные TimerHub от автоматической очистки. Это не предотвращает ручное удаление данных браузера или приложения.',
+        persistentStorageGranted: 'Постоянное хранилище: предоставлено браузером.',
+        persistentStorageDenied: 'Постоянное хранилище: не предоставлено. Браузер может удалить данные TimerHub при нехватке места.',
+        persistentStorageUnsupported: 'Постоянное хранилище: не поддерживается этим браузером.',
+        persistentStorageUnknown: 'Постоянное хранилище: статус неизвестен.',
+        lastBackupNever: 'Файл резервной копии ещё не экспортировался. Данные в браузере и локальные копии могут быть потеряны вместе.',
+        lastBackupAt: 'Последний экспорт файла копии: {date}',
+        lastBackupOverdue: 'Экспортируйте новый файл резервной копии, чтобы иметь копию вне браузера.',
+        missingDataWarningTitle: 'Данные TimerHub на этом устройстве не найдены',
+        missingDataWarningBody: 'Ранее на этом устройстве были сохранены данные, но сейчас ничего не найдено. Возможно, хранилище браузера было очищено. Восстановите данные из файла резервной копии, если он есть.',
+        missingDataRestore: 'Восстановить из файла копии',
+        missingDataDismiss: 'Скрыть',
+        diagnosticsTitle: 'Локальная диагностика',
+        diagnosticsSummary: 'База {name} v{version} · занятий: {activities} · записей: {entries} · групп: {groups}',
         initFailed: 'Не удалось запустить TimerHub. Перезагрузите страницу или восстановите резервную копию.',
         notificationOffStatus: 'Уведомления выключены.', notificationUnsupported: 'Этот браузер не поддерживает уведомления.',
         notificationsEnabled: 'Уведомления включены', notificationsBlocked: 'Уведомления заблокированы',
@@ -1103,10 +1160,29 @@ class StorageRepository {
     async init() {
         return new Promise((resolve, reject) => {
             const request = indexedDB.open(this.dbName, this.version);
+            this.blockedDuringInit = false;
 
             request.onerror = () => reject(request.error);
+            // Another TimerHub window can hold an older schema connection and
+            // block a required upgrade. Fail loudly instead of silently waiting
+            // or continuing against a database that was never upgraded.
+            request.onblocked = () => {
+                this.blockedDuringInit = true;
+                reject(new Error('storage_blocked'));
+            };
             request.onsuccess = () => {
+                if (this.blockedDuringInit) {
+                    try { request.result.close(); } catch { /* ignore */ }
+                    return;
+                }
                 this.db = request.result;
+                // Release this connection when a newer app version needs to
+                // upgrade the schema, so future upgrades cannot be blocked.
+                try {
+                    this.db.onversionchange = () => {
+                        try { this.db.close(); } catch { /* ignore */ }
+                    };
+                } catch { /* ignore engines without writable handlers */ }
                 resolve();
             };
 
@@ -1456,36 +1532,150 @@ class StorageRepository {
             (data.settings !== undefined && !isRecord(data.settings))) {
             throw new Error('invalid_backup');
         }
+        // Every record is checked before any database write so a malformed
+        // backup can never clear or partially replace existing data.
+        const invalid = () => { throw new Error('invalid_backup'); };
+        const requireKey = (record, field) => {
+            if (!isRecord(record) || typeof record[field] !== 'string' || !record[field]) invalid();
+        };
+        const optionalString = (record, field) => {
+            if (record[field] !== undefined && typeof record[field] !== 'string') invalid();
+        };
+        const optionalNullableString = (record, field) => {
+            if (record[field] !== undefined && record[field] !== null && typeof record[field] !== 'string') invalid();
+        };
+        const optionalNumber = (record, field) => {
+            if (record[field] !== undefined && record[field] !== null && !Number.isFinite(record[field])) invalid();
+        };
+        const optionalBoolean = (record, field) => {
+            if (record[field] !== undefined && record[field] !== null && typeof record[field] !== 'boolean') invalid();
+        };
+        const requireUnique = (records, field) => {
+            const seen = new Set();
+            for (const record of records) {
+                if (seen.has(record?.[field])) invalid();
+                seen.add(record?.[field]);
+            }
+        };
+
+        requireUnique(data.activities, 'id');
+        requireUnique(data.timeEntries, 'id');
+        requireUnique(data.syncBatches || [], 'id');
+        requireUnique(data.layout || [], 'activityId');
+        requireUnique(data.groups || [], 'id');
+
+        for (const activity of data.activities) {
+            requireKey(activity, 'id');
+            optionalString(activity, 'name');
+            optionalNumber(activity, 'position');
+            optionalBoolean(activity, 'archived');
+            optionalNullableString(activity, 'groupId');
+        }
+        for (const entry of data.timeEntries) {
+            requireKey(entry, 'id');
+            requireKey(entry, 'activityId');
+            if (!Number.isFinite(entry.startTimestamp)) invalid();
+            if (entry.endTimestamp !== null && !Number.isFinite(entry.endTimestamp)) invalid();
+            optionalNumber(entry, 'createdAt');
+            optionalNumber(entry, 'updatedAt');
+        }
+        for (const batch of data.syncBatches || []) {
+            requireKey(batch, 'id');
+            optionalString(batch, 'date');
+        }
+        for (const item of data.layout || []) {
+            requireKey(item, 'activityId');
+            optionalNumber(item, 'x');
+            optionalNumber(item, 'y');
+            optionalNumber(item, 'width');
+            optionalNumber(item, 'height');
+        }
+        for (const group of data.groups || []) {
+            requireKey(group, 'id');
+            optionalString(group, 'name');
+            optionalNumber(group, 'x');
+            optionalNumber(group, 'y');
+            optionalBoolean(group, 'collapsed');
+            optionalNullableString(group, 'parentId');
+            optionalNumber(group, 'collapsedWidth');
+            optionalNumber(group, 'collapsedHeight');
+        }
         return data;
     }
 
     async importAll(data, merge = false) {
         this.validateBackupData(data);
         const stores = ['activities', 'timeEntries', 'settings', 'syncBatches', 'layout', 'groups'];
-        return this.persistMutation(stores, tx => {
-            const activities = tx.objectStore('activities');
-            const timeEntries = tx.objectStore('timeEntries');
-            const syncBatches = tx.objectStore('syncBatches');
-            const layout = tx.objectStore('layout');
-            const groups = tx.objectStore('groups');
-            const settings = tx.objectStore('settings');
-            if (!merge) {
-                activities.clear();
-                timeEntries.clear();
-                syncBatches.clear();
-                layout.clear();
-                groups.clear();
-            }
-            data.activities.forEach(item => activities.put(this.stripSensitiveBackupFields(item)));
-            data.timeEntries.forEach(item => timeEntries.put(this.stripSensitiveBackupFields(item)));
-            (data.syncBatches || []).forEach(item => syncBatches.put(this.stripSensitiveBackupFields(item)));
-            (data.layout || []).forEach(item => layout.put(this.stripSensitiveBackupFields(item)));
-            (data.groups || []).forEach(item => groups.put(this.stripSensitiveBackupFields(item)));
-            for (const [key, value] of Object.entries(data.settings || {})) {
-                if (/(clockodo|api.?key|token|secret|password|credential|auth)/i.test(key)) continue;
-                settings.put({ key, value: this.stripSensitiveBackupFields(value) });
+        const result = await this.persistMutation(stores, tx => {
+            try {
+                const activities = tx.objectStore('activities');
+                const timeEntries = tx.objectStore('timeEntries');
+                const syncBatches = tx.objectStore('syncBatches');
+                const layout = tx.objectStore('layout');
+                const groups = tx.objectStore('groups');
+                const settings = tx.objectStore('settings');
+                if (!merge) {
+                    activities.clear();
+                    timeEntries.clear();
+                    syncBatches.clear();
+                    layout.clear();
+                    groups.clear();
+                }
+                data.activities.forEach(item => activities.put(this.stripSensitiveBackupFields(item)));
+                data.timeEntries.forEach(item => timeEntries.put(this.stripSensitiveBackupFields(item)));
+                (data.syncBatches || []).forEach(item => syncBatches.put(this.stripSensitiveBackupFields(item)));
+                (data.layout || []).forEach(item => layout.put(this.stripSensitiveBackupFields(item)));
+                (data.groups || []).forEach(item => groups.put(this.stripSensitiveBackupFields(item)));
+                for (const [key, value] of Object.entries(data.settings || {})) {
+                    if (/(clockodo|api.?key|token|secret|password|credential|auth)/i.test(key)) continue;
+                    settings.put({ key, value: this.stripSensitiveBackupFields(value) });
+                }
+                return true;
+            } catch (error) {
+                // Abort explicitly so queued clears and puts roll back instead
+                // of committing a partially imported database.
+                try { tx.abort(); } catch { /* ignore already-aborted transactions */ }
+                throw error;
             }
         });
+        await this.verifyImportedData(data, merge);
+        return result;
+    }
+
+    async verifyImportedData(data, merge) {
+        const settings = await new Promise((resolve, reject) => {
+            const request = this.db.transaction(['settings'], 'readonly')
+                .objectStore('settings').getAll();
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+        const [activities, timeEntries, syncBatches, layout, groups] = await Promise.all([
+            this.getActivities(),
+            this.getTimeEntries(),
+            this.getSyncBatches(),
+            this.getLayout(),
+            this.getGroups()
+        ]);
+        const missingKeys = (records, field, expected) => {
+            const keys = new Set(records.map(record => record?.[field]));
+            return expected.filter(key => !keys.has(key));
+        };
+        const problems = [];
+        if (missingKeys(activities, 'id', data.activities.map(item => item.id)).length) problems.push('activities');
+        if (missingKeys(timeEntries, 'id', data.timeEntries.map(item => item.id)).length) problems.push('timeEntries');
+        if (missingKeys(settings, 'key', Object.keys(data.settings || {})).length) problems.push('settings');
+        if (missingKeys(syncBatches, 'id', (data.syncBatches || []).map(item => item.id)).length) problems.push('syncBatches');
+        if (missingKeys(layout, 'activityId', (data.layout || []).map(item => item.activityId)).length) problems.push('layout');
+        if (missingKeys(groups, 'id', (data.groups || []).map(item => item.id)).length) problems.push('groups');
+        if (!merge) {
+            if (activities.length !== data.activities.length) problems.push('activities_count');
+            if (timeEntries.length !== data.timeEntries.length) problems.push('timeEntries_count');
+            if (syncBatches.length !== (data.syncBatches || []).length) problems.push('syncBatches_count');
+            if (layout.length !== (data.layout || []).length) problems.push('layout_count');
+            if (groups.length !== (data.groups || []).length) problems.push('groups_count');
+        }
+        if (problems.length) throw new Error('restore_verification_failed');
+        return true;
     }
 }
 
@@ -1501,6 +1691,10 @@ class TimerHubApp {
     constructor() {
         this.storage = new StorageRepository();
         this.pendingRestoreData = null;
+        this.pendingRestoreIsEmpty = false;
+        this.pendingRestoreEmptyConfirmed = false;
+        this.missingDataSuspected = false;
+        this.storagePersistenceStatus = 'unknown';
         this.backupSnapshots = [];
         this.activities = [];
         this.archivedActivities = [];
@@ -1737,12 +1931,15 @@ class TimerHubApp {
             await this.loadGroups();
             await this.migrateMissingGroupLayouts();
             await this.loadTimeEntries();
+            this.evaluateSuspiciousEmptyState();
+            this.updateDataPresenceMarker();
             this.applyTranslations();
             this.setupUI();
             this.applyTheme();
             this.syncServiceWorkerLocale();
             this.startUIUpdateLoop();
             this.renderMain();
+            this.refreshStoragePersistenceStatus().catch(() => {});
             const loading = document.getElementById('appLoading');
             if (loading) loading.hidden = true;
 
@@ -1759,8 +1956,8 @@ class TimerHubApp {
             if (this.activities.length === 0) {
                 this.showOnboarding();
             }
-        } catch {
-            console.error('TimerHub initialization failed');
+        } catch (error) {
+            console.error('TimerHub initialization failed:', error?.name || error?.message || 'unknown');
             const loading = document.getElementById('appLoading');
             if (loading) loading.hidden = true;
             const panel = document.getElementById('initErrorPanel');
@@ -2543,6 +2740,9 @@ class TimerHubApp {
         sel('restoreSnapshotBtn')?.addEventListener('click', () => this.restoreSelectedSnapshot());
         sel('backupRestoreCloseBtn')?.addEventListener('click', () => this.cancelPendingRestore());
         sel('backupRestoreCancelBtn')?.addEventListener('click', () => this.cancelPendingRestore());
+        sel('backupRestoreEmptyConfirm')?.addEventListener('change', event => this.setEmptyRestoreConfirmation(event.target.checked));
+        sel('missingDataRestoreBtn')?.addEventListener('click', () => this.restoreData());
+        sel('missingDataDismissBtn')?.addEventListener('click', () => this.dismissMissingDataWarning());
         sel('backupRestoreMergeBtn')?.addEventListener('click', () => this.restorePendingData(true));
         sel('backupRestoreReplaceBtn')?.addEventListener('click', () => this.restorePendingData(false));
         this.storage.onSnapshotStatus = () => this.refreshAutomaticBackupStatus();
@@ -3427,6 +3627,7 @@ class TimerHubApp {
     }
 
     renderMain() {
+        this.updateDataPresenceMarker();
         const grid = document.getElementById('activitiesGrid');
         this.updateTimerStatus();
         if (!grid) return;
@@ -9046,7 +9247,11 @@ class TimerHubApp {
     async backupData() {
         try {
             const data = await this.storage.exportAll();
+            // Validate the payload before offering it as a backup so a broken
+            // export is never presented as a valid recovery file.
+            this.storage.validateBackupData?.(data);
             const json = JSON.stringify(data, null, 2);
+            JSON.parse(json);
             const blob = new Blob([json], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -9065,6 +9270,8 @@ class TimerHubApp {
             document.body.removeChild(a);
             // Mobile browsers may consume the Blob URL asynchronously after click.
             setTimeout(() => URL.revokeObjectURL(url), 60_000);
+            try { localStorage.setItem('timerhubLastBackupAt', String(Date.now())); } catch { /* ignore */ }
+            this.updateBackupStatusTexts();
             this.showToast(this.t('backupSuccess'));
         } catch (error) {
             this.showToast(this.t('backupFailed'));
@@ -9080,32 +9287,141 @@ class TimerHubApp {
     async refreshAutomaticBackupStatus() {
         const status = document.getElementById('automaticBackupStatus');
         const select = document.getElementById('automaticSnapshotSelect');
-        if (!status || !select) return;
-        try {
-            this.backupSnapshots = await this.storage.getAutomaticSnapshots();
-            const selectedId = select.value;
-            select.replaceChildren();
-            const placeholder = document.createElement('option');
-            placeholder.value = '';
-            placeholder.textContent = this.t('selectSnapshot');
-            select.appendChild(placeholder);
-            for (const snapshot of this.backupSnapshots) {
-                const option = document.createElement('option');
-                option.value = snapshot.id;
-                option.textContent = this.t('snapshotDateFormat', { date: this.formatSnapshotDate(snapshot.createdAt) });
-                select.appendChild(option);
+        if (status && select) {
+            try {
+                this.backupSnapshots = await this.storage.getAutomaticSnapshots();
+                const selectedId = select.value;
+                select.replaceChildren();
+                const placeholder = document.createElement('option');
+                placeholder.value = '';
+                placeholder.textContent = this.t('selectSnapshot');
+                select.appendChild(placeholder);
+                for (const snapshot of this.backupSnapshots) {
+                    const option = document.createElement('option');
+                    option.value = snapshot.id;
+                    option.textContent = this.t('snapshotDateFormat', { date: this.formatSnapshotDate(snapshot.createdAt) });
+                    select.appendChild(option);
+                }
+                if (this.backupSnapshots.some(snapshot => snapshot.id === selectedId)) select.value = selectedId;
+                const latest = this.backupSnapshots[0];
+                status.textContent = this.storage.snapshotStatus === 'failed'
+                    ? this.t('automaticSnapshotsFailed')
+                    : latest
+                        ? this.t('automaticSnapshotsLatest', { date: this.formatSnapshotDate(latest.createdAt) })
+                        : this.t('automaticSnapshotsNone');
+                const restoreButton = document.getElementById('restoreSnapshotBtn');
+                if (restoreButton) restoreButton.disabled = !select.value;
+            } catch {
+                status.textContent = this.t('automaticSnapshotsFailed');
             }
-            if (this.backupSnapshots.some(snapshot => snapshot.id === selectedId)) select.value = selectedId;
-            const latest = this.backupSnapshots[0];
-            status.textContent = this.storage.snapshotStatus === 'failed'
-                ? this.t('automaticSnapshotsFailed')
-                : latest
-                    ? this.t('automaticSnapshotsLatest', { date: this.formatSnapshotDate(latest.createdAt) })
-                    : this.t('automaticSnapshotsNone');
-            const restoreButton = document.getElementById('restoreSnapshotBtn');
-            if (restoreButton) restoreButton.disabled = !select.value;
-        } catch {
-            status.textContent = this.t('automaticSnapshotsFailed');
+        }
+        this.updateBackupStatusTexts();
+    }
+
+    hasLocalWorkData() {
+        return this.activities.length > 0 || this.archivedActivities.length > 0 ||
+            this.timeEntries.length > 0 || this.groups.length > 0;
+    }
+
+    isBackupPayloadEmpty(data) {
+        const count = value => (Array.isArray(value) ? value.length : 0);
+        return count(data?.activities) === 0 && count(data?.timeEntries) === 0 && count(data?.groups) === 0;
+    }
+
+    updateDataPresenceMarker() {
+        if (this.missingDataSuspected && this.hasLocalWorkData()) {
+            // Data appeared again (created or restored) after the warning was
+            // shown; the warning no longer applies.
+            this.missingDataSuspected = false;
+            const warning = document.getElementById('missingDataWarning');
+            if (warning) warning.style.display = 'none';
+        }
+        if (this.missingDataSuspected) return;
+        try {
+            const now = Date.now();
+            if (this.hasLocalWorkData()) {
+                const stored = Number(localStorage.getItem('timerhubLastDataSeenAt') || 0);
+                if (!Number.isFinite(stored) || now - stored > 60 * 60 * 1000) {
+                    localStorage.setItem('timerhubLastDataSeenAt', String(now));
+                }
+            } else {
+                localStorage.removeItem('timerhubLastDataSeenAt');
+            }
+        } catch { /* storage unavailable */ }
+    }
+
+    evaluateSuspiciousEmptyState() {
+        let marker = 0;
+        try { marker = Number(localStorage.getItem('timerhubLastDataSeenAt') || 0); } catch { marker = 0; }
+        const suspicious = !this.hasLocalWorkData() && Number.isFinite(marker) && marker > 0;
+        this.missingDataSuspected = suspicious;
+        const warning = document.getElementById('missingDataWarning');
+        if (warning) warning.style.display = suspicious ? 'block' : 'none';
+        return suspicious;
+    }
+
+    dismissMissingDataWarning() {
+        this.missingDataSuspected = false;
+        try { localStorage.removeItem('timerhubLastDataSeenAt'); } catch { /* ignore */ }
+        const warning = document.getElementById('missingDataWarning');
+        if (warning) warning.style.display = 'none';
+    }
+
+    async refreshStoragePersistenceStatus() {
+        let status = 'unsupported';
+        try {
+            const storage = navigator?.storage;
+            if (storage?.persisted) {
+                let persisted = await storage.persisted();
+                if (!persisted && typeof storage.persist === 'function') {
+                    let previouslyRequested = false;
+                    try { previouslyRequested = localStorage.getItem('timerhubPersistRequested') === '1'; } catch { /* ignore */ }
+                    if (!previouslyRequested) {
+                        try { localStorage.setItem('timerhubPersistRequested', '1'); } catch { /* ignore */ }
+                        persisted = await storage.persist();
+                    }
+                }
+                status = persisted ? 'granted' : 'denied';
+            }
+        } catch { status = 'unknown'; }
+        this.storagePersistenceStatus = status;
+        this.updateBackupStatusTexts();
+        return status;
+    }
+
+    updateBackupStatusTexts() {
+        const lastBackupElement = document.getElementById('lastBackupStatus');
+        let lastBackupAt = 0;
+        try { lastBackupAt = Number(localStorage.getItem('timerhubLastBackupAt') || 0); } catch { lastBackupAt = 0; }
+        if (lastBackupElement) {
+            if (!Number.isFinite(lastBackupAt) || lastBackupAt <= 0) {
+                lastBackupElement.textContent = this.t('lastBackupNever');
+            } else {
+                const overdue = Date.now() - lastBackupAt > 7 * 24 * 60 * 60 * 1000;
+                lastBackupElement.textContent = overdue
+                    ? `${this.t('lastBackupAt', { date: this.formatSnapshotDate(lastBackupAt) })} ${this.t('lastBackupOverdue')}`
+                    : this.t('lastBackupAt', { date: this.formatSnapshotDate(lastBackupAt) });
+            }
+        }
+        const persistenceElement = document.getElementById('storagePersistenceStatus');
+        if (persistenceElement) {
+            persistenceElement.textContent = this.storagePersistenceStatus === 'granted'
+                ? this.t('persistentStorageGranted')
+                : this.storagePersistenceStatus === 'denied'
+                    ? this.t('persistentStorageDenied')
+                    : this.storagePersistenceStatus === 'unsupported'
+                        ? this.t('persistentStorageUnsupported')
+                        : this.t('persistentStorageUnknown');
+        }
+        const diagnosticsElement = document.getElementById('backupDiagnostics');
+        if (diagnosticsElement) {
+            diagnosticsElement.textContent = this.t('diagnosticsSummary', {
+                name: this.storage?.dbName || 'TimerHubDB',
+                version: Number(this.storage?.version) || 0,
+                activities: this.activities.length + this.archivedActivities.length,
+                entries: this.timeEntries.length,
+                groups: this.groups.length
+            });
         }
     }
 
@@ -9152,16 +9468,40 @@ class TimerHubApp {
 
     openRestoreConfirmation(data) {
         this.pendingRestoreData = data;
+        this.pendingRestoreIsEmpty = this.isBackupPayloadEmpty(data);
+        this.pendingRestoreEmptyConfirmed = false;
+        const needsEmptyConfirmation = this.pendingRestoreIsEmpty && this.hasLocalWorkData();
+        const warning = document.getElementById('backupRestoreEmptyWarning');
+        if (warning) warning.hidden = !needsEmptyConfirmation;
+        const checkbox = document.getElementById('backupRestoreEmptyConfirm');
+        if (checkbox) checkbox.checked = false;
+        const replaceButton = document.getElementById('backupRestoreReplaceBtn');
+        if (replaceButton) replaceButton.disabled = needsEmptyConfirmation;
         document.getElementById('backupRestoreModal')?.classList.add('active');
+    }
+
+    setEmptyRestoreConfirmation(confirmed) {
+        this.pendingRestoreEmptyConfirmed = Boolean(confirmed);
+        const needsEmptyConfirmation = this.pendingRestoreIsEmpty && this.hasLocalWorkData();
+        const replaceButton = document.getElementById('backupRestoreReplaceBtn');
+        if (replaceButton && needsEmptyConfirmation) replaceButton.disabled = !this.pendingRestoreEmptyConfirmed;
     }
 
     cancelPendingRestore() {
         this.pendingRestoreData = null;
+        this.pendingRestoreIsEmpty = false;
+        this.pendingRestoreEmptyConfirmed = false;
+        const warning = document.getElementById('backupRestoreEmptyWarning');
+        if (warning) warning.hidden = true;
         document.getElementById('backupRestoreModal')?.classList.remove('active');
     }
 
     async restorePendingData(merge) {
         if (!this.pendingRestoreData) return false;
+        if (!merge && this.pendingRestoreIsEmpty && this.hasLocalWorkData() && !this.pendingRestoreEmptyConfirmed) {
+            this.showToast(this.t('backupEmptyNeedsConfirmation'));
+            return false;
+        }
         const buttons = ['backupRestoreMergeBtn', 'backupRestoreReplaceBtn'];
         buttons.forEach(id => { const button = document.getElementById(id); if (button) button.disabled = true; });
         try {
@@ -9171,6 +9511,8 @@ class TimerHubApp {
             await this.loadGroups();
             await this.migrateMissingGroupLayouts();
             await this.loadTimeEntries();
+            this.missingDataSuspected = false;
+            this.updateDataPresenceMarker();
             this.renderAll();
             await this.refreshAutomaticBackupStatus();
             this.showToast(this.t('restoreSuccess'));
@@ -9180,6 +9522,7 @@ class TimerHubApp {
             return false;
         } finally {
             buttons.forEach(id => { const button = document.getElementById(id); if (button) button.disabled = false; });
+            if (!merge && this.pendingRestoreData) this.setEmptyRestoreConfirmation(this.pendingRestoreEmptyConfirmed);
         }
     }
 

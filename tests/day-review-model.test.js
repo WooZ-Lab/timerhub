@@ -160,6 +160,8 @@ function createTestApp(initialData = {}) {
         'clockodoBillableSelect', 'clockodoTestBtn', 'clockodoRemoveBtn', 'clockodoStatusValue', 'clockodoToggleKeyBtn',
         'automaticBackupStatus', 'automaticSnapshotSelect', 'restoreSnapshotBtn', 'backupRestoreModal',
         'backupRestoreMergeBtn', 'backupRestoreReplaceBtn', 'backupRestoreCancelBtn', 'backupRestoreCloseBtn',
+        'lastBackupStatus', 'storagePersistenceStatus', 'backupDiagnostics', 'backupRestoreEmptyWarning',
+        'backupRestoreEmptyConfirm', 'missingDataWarning', 'missingDataRestoreBtn', 'missingDataDismissBtn',
         'reviewExportDayBtn', 'reviewImportDayBtn', 'reviewShareDayBtn', 'dayExportModal', 'dayExportModalTitle', 'exchangeCodeDisplay',
         'exchangeCopyCodeBtn', 'exchangeShowQrBtn', 'dayExportCloseBtn',
         'dayImportModal', 'dayImportModalTitle', 'exchangeFileInput', 'exchangeChooseFileBtn', 'exchangeFileName',
@@ -294,13 +296,29 @@ function createIndexedDbHarness() {
         transaction(storeNames, mode) {
             if (mode === 'readwrite' && storeNames.includes('snapshots')) stats.snapshotTransactions += 1;
             const fail = mode === 'readwrite' && (storeNames.includes('snapshots') ? stats.failSnapshot : stats.failMutation);
-            const tx = { error: null, oncomplete: null, onerror: null, onabort: null, pending: 0, failed: false, completionQueued: false };
+            // Copy-on-write snapshot so a failed or aborted transaction restores
+            // the exact previous state, matching IndexedDB atomicity.
+            const backups = new Map(storeNames.map(name => [name, new Map([...data[name]].map(([key, value]) => [key, structuredClone(value)]))]));
+            const tx = {
+                error: null, oncomplete: null, onerror: null, onabort: null,
+                pending: 0, failed: false, aborted: false, completionQueued: false
+            };
+            const rollback = () => {
+                for (const [name, records] of backups) data[name] = records;
+            };
+            tx.abort = () => {
+                if (tx.aborted || tx.failed) return;
+                tx.aborted = true;
+                tx.error = tx.error || new Error('indexeddb_transaction_aborted');
+                rollback();
+                tx.onabort?.();
+            };
             const finishIfReady = () => {
-                if (tx.pending || tx.failed || tx.completionQueued) return;
+                if (tx.pending || tx.failed || tx.aborted || tx.completionQueued) return;
                 tx.completionQueued = true;
                 queueMicrotask(() => {
                     tx.completionQueued = false;
-                    if (!tx.pending && !tx.failed) tx.oncomplete?.();
+                    if (!tx.pending && !tx.failed && !tx.aborted) tx.oncomplete?.();
                 });
             };
             const makeRequest = operation => {
@@ -308,6 +326,7 @@ function createIndexedDbHarness() {
                 tx.pending += 1;
                 queueMicrotask(() => {
                     try {
+                        if (tx.aborted) return;
                         if (fail) throw new Error('indexeddb_write_failed');
                         request.result = operation();
                         request.onsuccess?.();
@@ -315,6 +334,7 @@ function createIndexedDbHarness() {
                         request.error = error;
                         tx.error = error;
                         tx.failed = true;
+                        rollback();
                         request.onerror?.();
                         tx.onerror?.();
                         tx.onabort?.();
@@ -8301,4 +8321,262 @@ test('root siblings follow the same downward-only sequence rule', async () => {
     assert.deepEqual({ ...app.groupDisplayOffset('root-b') }, { x: 0, y: b.top - 164 }, 'the overlapping root sibling moves straight down');
     assert.equal(b.left, a.left, 'the root sibling never moves sideways');
     assert.equal(groupOverlaps(a, b), false, 'the root siblings do not overlap');
+});
+
+test('backup validation rejects malformed records before touching the database', async () => {
+    const { context } = createTestApp();
+    const repository = vm.runInContext('new StorageRepository()', context);
+    const harness = createIndexedDbHarness();
+    repository.db = harness.db;
+    harness.data.activities.set('keep', { id: 'keep', name: 'Keep' });
+    harness.data.timeEntries.set('keep-entry', { id: 'keep-entry', activityId: 'keep', startTimestamp: 1, endTimestamp: 2 });
+    const base = { format: 'timerhub-backup', version: 1, activities: [], timeEntries: [], settings: {} };
+    const cases = [
+        ['null activity', { ...base, activities: [null] }],
+        ['missing id', { ...base, activities: [{ name: 'No id' }] }],
+        ['wrong position type', { ...base, activities: [{ id: 'a', position: 'first' }] }],
+        ['entry without activity', { ...base, timeEntries: [{ id: 'e', startTimestamp: 1, endTimestamp: 2 }] }],
+        ['entry with bad timestamp', { ...base, timeEntries: [{ id: 'e', activityId: 'a', startTimestamp: 'soon', endTimestamp: 2 }] }],
+        ['layout without key', { ...base, layout: [{ x: 1 }] }],
+        ['group with bad coordinates', { ...base, groups: [{ id: 'g', x: 'left' }] }],
+        ['invalid settings map', { ...base, settings: [] }],
+        ['unsupported version', { ...base, version: 2 }],
+        ['unknown format', { ...base, format: 'some-other-format' }],
+        ['duplicate activity ids', { ...base, activities: [{ id: 'dup', name: 'One' }, { id: 'dup', name: 'Two' }] }],
+        ['duplicate entry ids', { ...base, timeEntries: [{ id: 'e', activityId: 'a', startTimestamp: 1, endTimestamp: 2 }, { id: 'e', activityId: 'a', startTimestamp: 3, endTimestamp: 4 }] }],
+        ['not an object', JSON.stringify({ activities: [], timeEntries: [] })]
+    ];
+    for (const [label, payload] of cases) {
+        await assert.rejects(() => repository.importAll(payload, false), /invalid_backup/, label);
+        assert.equal(harness.data.activities.has('keep'), true, `${label}: activities untouched`);
+        assert.equal(harness.data.timeEntries.has('keep-entry'), true, `${label}: entries untouched`);
+    }
+    assert.doesNotThrow(() => repository.validateBackupData({ activities: [{ id: 'ok', name: 'Legacy' }], timeEntries: [] }));
+});
+
+test('failed replace import rolls back and keeps the original database intact', async () => {
+    const { context } = createTestApp();
+    const repository = vm.runInContext('new StorageRepository()', context);
+    const harness = createIndexedDbHarness();
+    repository.db = harness.db;
+    harness.data.activities.set('keep', { id: 'keep', name: 'Keep' });
+    harness.data.timeEntries.set('keep-entry', { id: 'keep-entry', activityId: 'keep', startTimestamp: 1, endTimestamp: 2 });
+    harness.data.groups.set('keep-group', { id: 'keep-group', name: 'Crew', x: 0, y: 0 });
+    harness.stats.failMutation = true;
+    const backup = {
+        format: 'timerhub-backup', version: 1,
+        activities: [{ id: 'new', name: 'New' }],
+        timeEntries: [],
+        settings: { theme: 'dark' }
+    };
+    await assert.rejects(() => repository.importAll(backup, false));
+    assert.equal(harness.data.activities.has('keep'), true, 'original activities survive a failed replace');
+    assert.equal(harness.data.activities.has('new'), false, 'imported activities are not partially committed');
+    assert.equal(harness.data.timeEntries.has('keep-entry'), true, 'original entries survive');
+    assert.equal(harness.data.groups.has('keep-group'), true, 'original groups survive');
+});
+
+test('merge imports update by stable id and never duplicate records', async () => {
+    const { context } = createTestApp();
+    const repository = vm.runInContext('new StorageRepository()', context);
+    const harness = createIndexedDbHarness();
+    repository.db = harness.db;
+    harness.data.activities.set('shared', { id: 'shared', name: 'Old' });
+    const backup = {
+        format: 'timerhub-backup', version: 1,
+        activities: [{ id: 'shared', name: 'New' }, { id: 'added', name: 'Added' }],
+        timeEntries: [],
+        settings: {}
+    };
+    await repository.importAll(backup, true);
+    await repository.importAll(backup, true);
+    const activities = await repository.getActivities();
+    assert.equal(activities.length, 2, 'merge never duplicates records');
+    assert.equal(activities.find(item => item.id === 'shared').name, 'New');
+    assert.equal(activities.find(item => item.id === 'added').name, 'Added');
+});
+
+test('replace import verifies store counts before reporting success', async () => {
+    const { context } = createTestApp();
+    const repository = vm.runInContext('new StorageRepository()', context);
+    const harness = createIndexedDbHarness();
+    repository.db = harness.db;
+    harness.data.activities.set('stale', { id: 'stale', name: 'Stale' });
+    const backup = {
+        format: 'timerhub-backup', version: 1,
+        activities: [{ id: 'a1', name: 'A' }, { id: 'a2', name: 'B', archived: true }],
+        timeEntries: [{ id: 'e1', activityId: 'a1', startTimestamp: 1, endTimestamp: 2 }],
+        layout: [{ activityId: 'a1', x: 0, y: 0, width: 260, height: 150 }],
+        groups: [{ id: 'g1', name: 'Crew', x: 0, y: 0, collapsed: false }],
+        settings: { theme: 'dark' }
+    };
+    await repository.importAll(backup, false);
+    assert.equal((await repository.getActivities()).length, 2);
+    assert.equal((await repository.getTimeEntries()).length, 1);
+    assert.equal((await repository.getGroups()).length, 1);
+    assert.equal((await repository.getLayout()).length, 1);
+    assert.equal(await repository.getSetting('theme', ''), 'dark');
+    assert.equal(harness.data.activities.has('stale'), false, 'replace removes records outside the backup');
+});
+
+test('restore verification rejects when a store is missing imported records', async () => {
+    const { context } = createTestApp();
+    const repository = vm.runInContext('new StorageRepository()', context);
+    const harness = createIndexedDbHarness();
+    repository.db = harness.db;
+    const backup = {
+        format: 'timerhub-backup', version: 1,
+        activities: [{ id: 'a1', name: 'A' }],
+        timeEntries: [],
+        settings: {}
+    };
+    const originalGetActivities = repository.getActivities.bind(repository);
+    repository.getActivities = async () => [];
+    await assert.rejects(() => repository.importAll(backup, false), /restore_verification_failed/);
+    repository.getActivities = originalGetActivities;
+    assert.equal((await repository.getActivities()).length, 1, 'the commit itself succeeded; only the check failed');
+});
+
+test('empty backup replacement requires deliberate confirmation', async () => {
+    const { app, document, toasts } = createTestApp({ activities: [{ id: 'a1', name: 'Existing' }] });
+    app.activities = [{ id: 'a1', name: 'Existing' }];
+    const calls = [];
+    app.storage.validateBackupData = data => data;
+    app.storage.importAll = async (_data, merge) => { calls.push(merge); };
+    app.loadActivities = async () => {};
+    app.loadGroups = async () => {};
+    app.loadTimeEntries = async () => {};
+    app.migrateMissingGroupLayouts = async () => {};
+    app.renderAll = () => {};
+    app.refreshAutomaticBackupStatus = async () => {};
+    const emptyBackup = { format: 'timerhub-backup', version: 1, activities: [], timeEntries: [], groups: [], settings: {} };
+
+    app.openRestoreConfirmation(emptyBackup);
+    assert.equal(document.getElementById('backupRestoreEmptyWarning').hidden, false, 'the warning is shown');
+    assert.equal(document.getElementById('backupRestoreReplaceBtn').disabled, true, 'replace stays disabled until confirmed');
+    assert.equal(await app.restorePendingData(false), false, 'the guard blocks an unconfirmed empty replace');
+    assert.deepEqual(calls, [], 'nothing was imported');
+    assert.equal(toasts.at(-1), app.t('backupEmptyNeedsConfirmation'));
+
+    app.setEmptyRestoreConfirmation(true);
+    assert.equal(document.getElementById('backupRestoreReplaceBtn').disabled, false, 'confirmation enables replace');
+    assert.equal(await app.restorePendingData(false), true, 'explicit confirmation allows the replace');
+    assert.deepEqual(calls, [false]);
+    assert.equal(document.getElementById('backupRestoreEmptyWarning').hidden, true, 'the warning resets after the restore');
+});
+
+test('a non-empty backup never triggers the empty-replacement guard', async () => {
+    const { app, document } = createTestApp({ activities: [{ id: 'a1', name: 'Existing' }] });
+    app.activities = [{ id: 'a1', name: 'Existing' }];
+    app.storage.validateBackupData = data => data;
+    app.storage.importAll = async () => {};
+    app.loadActivities = async () => {};
+    app.loadGroups = async () => {};
+    app.loadTimeEntries = async () => {};
+    app.migrateMissingGroupLayouts = async () => {};
+    app.renderAll = () => {};
+    app.refreshAutomaticBackupStatus = async () => {};
+    app.openRestoreConfirmation({ format: 'timerhub-backup', version: 1, activities: [{ id: 'a2', name: 'Incoming' }], timeEntries: [], settings: {} });
+    assert.equal(document.getElementById('backupRestoreEmptyWarning').hidden, true);
+    assert.equal(document.getElementById('backupRestoreReplaceBtn').disabled, false);
+    assert.equal(await app.restorePendingData(false), true);
+});
+
+test('storage persistence status is reported and degrades gracefully', async () => {
+    const { app, context, document } = createTestApp();
+    assert.equal(await app.refreshStoragePersistenceStatus(), 'unsupported');
+    context.navigator.storage = { persisted: async () => true };
+    assert.equal(await app.refreshStoragePersistenceStatus(), 'granted');
+    context.navigator.storage = { persisted: async () => false, persist: async () => true };
+    assert.equal(await app.refreshStoragePersistenceStatus(), 'granted');
+    context.navigator.storage = { persisted: async () => false, persist: async () => false };
+    assert.equal(await app.refreshStoragePersistenceStatus(), 'denied');
+    context.navigator.storage = { persisted: async () => { throw new Error('nope'); } };
+    assert.equal(await app.refreshStoragePersistenceStatus(), 'unknown');
+    assert.match(document.getElementById('storagePersistenceStatus').textContent, /status unknown/i);
+});
+
+test('an unexpectedly empty database raises a recovery warning without false alarms', () => {
+    const { app, localStorageData, document } = createTestApp();
+    localStorageData.set('timerhubLastDataSeenAt', String(Date.now() - 2 * 24 * 60 * 60 * 1000));
+    assert.equal(app.evaluateSuspiciousEmptyState(), true, 'previously stored data plus an empty database is suspicious');
+    assert.equal(document.getElementById('missingDataWarning').style.display, 'block');
+
+    app.activities = [{ id: 'a1', name: 'Back' }];
+    assert.equal(app.evaluateSuspiciousEmptyState(), false, 'present data removes the warning');
+    assert.equal(document.getElementById('missingDataWarning').style.display, 'none');
+
+    localStorageData.set('timerhubLastDataSeenAt', '');
+    app.activities = [];
+    assert.equal(app.evaluateSuspiciousEmptyState(), false, 'a never-used device is not suspicious');
+
+    localStorageData.set('timerhubLastDataSeenAt', String(Date.now() - 1000));
+    app.activities = [];
+    app.archivedActivities = [];
+    app.timeEntries = [];
+    app.groups = [];
+    assert.equal(app.evaluateSuspiciousEmptyState(), true);
+    app.activities = [{ id: 'a1', name: 'Recovered' }];
+    app.updateDataPresenceMarker();
+    assert.equal(app.missingDataSuspected, false, 'creating data clears the warning in the same session');
+    assert.equal(document.getElementById('missingDataWarning').style.display, 'none');
+    app.activities = [];
+    localStorageData.set('timerhubLastDataSeenAt', String(Date.now() - 1000));
+    assert.equal(app.evaluateSuspiciousEmptyState(), true);
+    app.dismissMissingDataWarning();
+    assert.equal(app.missingDataSuspected, false);
+    assert.equal(localStorageData.has('timerhubLastDataSeenAt'), false, 'dismissal does not nag on every start');
+    assert.equal(app.evaluateSuspiciousEmptyState(), false);
+
+    app.activities = [{ id: 'a1', name: 'Back' }];
+    app.updateDataPresenceMarker();
+    assert.ok(Number(localStorageData.get('timerhubLastDataSeenAt')) > 0, 'data presence is recorded for the next start');
+    app.activities = [];
+    app.updateDataPresenceMarker();
+    assert.equal(localStorageData.has('timerhubLastDataSeenAt'), false, 'a deliberately emptied database clears the marker');
+});
+
+test('manual backup records the export time and reports it in the backup status', async () => {
+    const { app, backupCapture, localStorageData, document } = createTestApp({ activities: [{ id: 'a1', name: 'A' }] });
+    await app.backupData();
+    assert.equal(backupCapture.clicks, 1);
+    assert.ok(Number(localStorageData.get('timerhubLastBackupAt')) > 0, 'the export time is remembered outside the database');
+    assert.match(document.getElementById('lastBackupStatus').textContent, /Last backup file export/);
+    const exported = JSON.parse(await backupCapture.blob.text());
+    assert.equal(exported.format, 'timerhub-backup');
+    assert.equal(exported.activities[0].id, 'a1');
+});
+
+test('database initialization reports blocked upgrades and releases stale connections', async () => {
+    const { context } = createTestApp();
+    const blockedRequest = { error: null, onerror: null, onsuccess: null, onupgradeneeded: null, onblocked: null, result: null };
+    context.indexedDB = { open: () => blockedRequest };
+    const blockedRepository = vm.runInContext('new StorageRepository()', context);
+    const blockedInit = blockedRepository.init();
+    await Promise.resolve();
+    blockedRequest.onblocked?.();
+    await assert.rejects(() => blockedInit, /storage_blocked/);
+
+    let closed = false;
+    const versionRequest = {
+        error: null, onerror: null, onsuccess: null, onupgradeneeded: null, onblocked: null,
+        result: { onversionchange: null, close() { closed = true; } }
+    };
+    context.indexedDB = { open: () => versionRequest };
+    const repository = vm.runInContext('new StorageRepository()', context);
+    const opened = repository.init();
+    await Promise.resolve();
+    versionRequest.onsuccess?.();
+    await opened;
+    versionRequest.result.onversionchange?.();
+    assert.equal(closed, true, 'stale connections close when a newer version is requested');
+});
+
+test('backup and restore stay fully local without remote endpoints', () => {
+    const repositorySection = source.slice(source.indexOf('class StorageRepository'), source.indexOf('// MAIN APPLICATION'));
+    assert.doesNotMatch(repositorySection, /https?:\/\//, 'the storage repository must not reference remote endpoints');
+    const exportSection = source.slice(source.indexOf('async backupData()'), source.indexOf('formatSnapshotDate('));
+    assert.doesNotMatch(exportSection, /fetch\(|XMLHttpRequest|showSaveFilePicker|showDirectoryPicker/, 'the manual export must use browser-supported local download only');
+    const restoreSection = source.slice(source.indexOf('async restoreData()'), source.indexOf('async loadDemoData()'));
+    assert.doesNotMatch(restoreSection, /fetch\(|XMLHttpRequest|showOpenFilePicker/, 'restore must read a user-selected local file only');
 });
