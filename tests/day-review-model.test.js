@@ -3,11 +3,13 @@ import { readFile } from 'node:fs/promises';
 import { webcrypto } from 'node:crypto';
 import test from 'node:test';
 import vm from 'node:vm';
+import worker, { TimerHubDurableObject } from '../worker/index.js';
 
 const source = await readFile(new URL('../app.js', import.meta.url), 'utf8');
 const clockodoClientSource = await readFile(new URL('../clockodo-client.js', import.meta.url), 'utf8');
 const exchangeSource = await readFile(new URL('../exchange.js', import.meta.url), 'utf8');
 const assignmentSource = await readFile(new URL('../assignment.js', import.meta.url), 'utf8');
+const shareLinkSource = await readFile(new URL('../share-link.js', import.meta.url), 'utf8');
 
 function createTestApp(initialData = {}) {
     const storageData = {
@@ -162,6 +164,11 @@ function createTestApp(initialData = {}) {
         'backupRestoreMergeBtn', 'backupRestoreReplaceBtn', 'backupRestoreCancelBtn', 'backupRestoreCloseBtn',
         'lastBackupStatus', 'storagePersistenceStatus', 'backupDiagnostics', 'backupRestoreEmptyWarning',
         'backupRestoreEmptyConfirm', 'missingDataWarning', 'missingDataRestoreBtn', 'missingDataDismissBtn',
+        'reviewShareLinkBtn', 'shareLinkModal', 'shareLinkExpirySelect', 'shareLinkSummary', 'shareLinkEntryList',
+        'shareLinkStatus', 'shareLinkResult', 'shareLinkActions', 'shareLinkCreateBtn', 'shareLinkCopyBtn',
+        'shareLinkSendBtn', 'shareLinkCloseBtn', 'shareLinkCancelBtn',
+        'sharedDayModal', 'sharedDayPreviewSummary', 'sharedDayPreviewWarnings', 'sharedDayPreviewList',
+        'sharedDayStatus', 'sharedDayImportBtn', 'sharedDayRetryBtn', 'sharedDayConfigureBtn', 'sharedDayCloseBtn',
         'reviewExportDayBtn', 'reviewImportDayBtn', 'reviewShareDayBtn', 'dayExportModal', 'dayExportModalTitle', 'exchangeCodeDisplay',
         'exchangeCopyCodeBtn', 'exchangeShowQrBtn', 'dayExportCloseBtn',
         'dayImportModal', 'dayImportModalTitle', 'exchangeFileInput', 'exchangeChooseFileBtn', 'exchangeFileName',
@@ -237,16 +244,24 @@ function createTestApp(initialData = {}) {
 
     const context = vm.createContext({
         window: {
-            location: { hostname: 'localhost' },
+            location: {
+                hostname: 'localhost',
+                origin: 'https://timerhub.example.test',
+                pathname: '/',
+                search: '',
+                hash: ''
+            },
+            history: { replaceState() {} },
             addEventListener() {}
         },
         document: testDocument,
+        fetch: initialData.fetch || null,
         Blob,
         File,
-        URL: {
+        URL: Object.assign(function TimerHubTestURL(...args) { return new globalThis.URL(...args); }, {
             createObjectURL(blob) { backupCapture.blob = blob; return 'blob:timerhub-test'; },
             revokeObjectURL(url) { backupCapture.revoked.push(url); }
-        },
+        }),
         navigator: {},
         localStorage: {
             getItem: key => localStorageData.get(key) || null,
@@ -278,13 +293,14 @@ function createTestApp(initialData = {}) {
     vm.runInContext(clockodoClientSource, context, { filename: 'clockodo-client.js' });
     vm.runInContext(exchangeSource, context, { filename: 'exchange.js' });
     vm.runInContext(assignmentSource, context, { filename: 'assignment.js' });
+    vm.runInContext(shareLinkSource, context, { filename: 'share-link.js' });
     vm.runInContext(source, context, { filename: 'app.js' });
     const app = vm.runInContext('new TimerHubApp()', context);
     app.storage = mockStorage;
     app.clockodoClient = initialData.clockodoClient || null;
     const toasts = [];
     app.showToast = message => toasts.push(message);
-    return { app, storageData, document: testDocument, localStorageData, toasts, backupCapture, context };
+    return { app, storageData, document: testDocument, localStorageData, toasts, backupCapture, context, window: context.window };
 }
 
 function createIndexedDbHarness() {
@@ -8579,4 +8595,353 @@ test('backup and restore stay fully local without remote endpoints', () => {
     assert.doesNotMatch(exportSection, /fetch\(|XMLHttpRequest|showSaveFilePicker|showDirectoryPicker/, 'the manual export must use browser-supported local download only');
     const restoreSection = source.slice(source.indexOf('async restoreData()'), source.indexOf('async loadDemoData()'));
     assert.doesNotMatch(restoreSection, /fetch\(|XMLHttpRequest|showOpenFilePicker/, 'restore must read a user-selected local file only');
+});
+
+function makeShareBackend() {
+    const records = new Map();
+    const alarmTimes = new Map();
+    const objects = new Map();
+    const env = {
+        ASSETS: { fetch: async () => new Response('TimerHub asset') },
+        TIMER_HUB: {
+            idFromName: name => name,
+            get: id => ({ fetch: request => getObject(id).fetch(request) })
+        }
+    };
+    function getObject(id) {
+        if (!objects.has(id)) {
+            const values = records.get(id) || new Map();
+            records.set(id, values);
+            const state = {
+                storage: {
+                    put: async (key, value) => values.set(key, structuredClone(value)),
+                    get: async key => structuredClone(values.get(key)),
+                    delete: async key => values.delete(key),
+                    list: async () => new Map(),
+                    setAlarm: async timestamp => alarmTimes.set(id, timestamp),
+                    deleteAlarm: async () => alarmTimes.delete(id)
+                }
+            };
+            objects.set(id, new TimerHubDurableObject(state, env));
+        }
+        return objects.get(id);
+    }
+    return {
+        records,
+        alarmTimes,
+        request: (path, init = {}) => worker.fetch(new Request(new URL(path, 'https://timerhub.example.test'), init), env),
+        fireAlarm: async id => {
+            alarmTimes.delete(id);
+            await getObject(id).alarm();
+        }
+    };
+}
+
+function makeShareRecipientHarness(backend) {
+    const harness = createTestApp({ fetch: (path, init) => backend.request(path, init) });
+    const { app, context } = harness;
+    app.clockodoClient = vm.runInContext('new ClockodoClient()', context);
+    app.getPushClientId = () => 'client_1234567890abcdef';
+    return harness;
+}
+
+function stubClockodoUpstream(t, { customers = [{ id: 1, name: 'Customer A' }], services = [{ id: 9, name: 'Service X' }], entryHandler = null } = {}) {
+    const originalFetch = globalThis.fetch;
+    const calls = [];
+    globalThis.fetch = async (url, init = {}) => {
+        const href = String(url);
+        const headers = init.headers || {};
+        const record = {
+            url: href,
+            method: init.method || 'GET',
+            key: headers['Idempotency-Key'] || null,
+            body: init.body ? JSON.parse(init.body) : null
+        };
+        calls.push(record);
+        if (href.includes('/v4/users/me')) return Response.json({ data: { id: 7 } });
+        if (href.includes('/v3/customers')) return Response.json({ data: customers });
+        if (href.includes('/v4/services')) return Response.json({ data: services });
+        if (href.includes('/v2/entries')) {
+            if (entryHandler) {
+                const custom = entryHandler(record, calls);
+                if (custom) return custom;
+            }
+            return Response.json({ entry: { id: 7000 + calls.length } });
+        }
+        return Response.json({ error: 'unexpected_upstream_call' }, { status: 500 });
+    };
+    t.after(() => { globalThis.fetch = originalFetch; });
+    return calls;
+}
+
+async function configureRecipientClockodo(app, document, backend) {
+    document.getElementById('clockodoEmailInput').value = 'worker@example.test';
+    document.getElementById('clockodoApiKeyInput').value = 'test-key-only';
+    document.getElementById('clockodoCustomerIdInput').value = '1';
+    document.getElementById('clockodoProjectIdInput').value = '4';
+    document.getElementById('clockodoServiceIdInput').value = '9';
+    document.getElementById('clockodoBillableSelect').value = 'true';
+    const saved = await app.saveClockodoSettings();
+    assert.equal(saved, true, 'Clockodo settings save through the protected Worker integration');
+    await app.loadClockodoReferenceData({ force: true });
+    return saved;
+}
+
+async function publishSharedDay(app, backend, { entries, date }) {
+    const Exchange = app.getExchange();
+    const ShareLink = app.getShareLinkModule();
+    const payload = Exchange.buildDayPayload({ entries, date, exportId: `share-export-${Date.now()}` });
+    const secret = Exchange.generateSecret();
+    const envelope = await Exchange.encryptPayload(payload, secret);
+    const shareId = ShareLink.generateShareId();
+    const expiresAt = Date.now() + 60 * 60 * 1000;
+    const response = await backend.request('/api/share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shareId, envelope, expiresAt })
+    });
+    assert.equal(response.status, 200, 'the encrypted share uploads');
+    return { shareId, secret, expiresAt, payload };
+}
+
+test('share link sender selects all day entries by default and can exclude entries', () => {
+    const { app, document } = createTestApp();
+    const dayStart = new Date(2026, 8, 28, 8, 0, 0, 0).getTime();
+    app.reviewDate = app.toDateString(new Date(dayStart));
+    app.timeEntries = [
+        { id: 'share-a', activityId: 'act-a', activityNameSnapshot: 'Painting', startTimestamp: dayStart, endTimestamp: dayStart + 3600000 },
+        { id: 'share-b', activityId: 'act-b', activityNameSnapshot: 'Taping', startTimestamp: dayStart + 7200000, endTimestamp: dayStart + 10800000 }
+    ];
+    assert.equal(app.openShareLinkModal(), true);
+    assert.equal(app.shareLinkEntries.length, 2);
+    assert.deepEqual([...app.shareLinkSelection].sort(), [0, 1], 'all entries are selected by default');
+    assert.equal(app.setShareLinkEntrySelected(1, false), true);
+    assert.deepEqual([...app.shareLinkSelection], [0], 'individual entries can be excluded');
+    assert.equal(app.setShareLinkEntrySelected(0, false), true);
+    assert.deepEqual([...app.shareLinkSelection], []);
+    assert.equal(app.updateShareLinkSummary(), 0);
+    assert.equal(document.getElementById('shareLinkCreateBtn').disabled, true, 'create is blocked with nothing selected');
+});
+
+test('share link creation encrypts the selected day and stores only ciphertext', async () => {
+    const backend = makeShareBackend();
+    const posts = [];
+    const { app, document } = createTestApp({
+        fetch: (path, init) => {
+            if (init?.method === 'POST' && String(path).endsWith('/api/share')) posts.push(JSON.parse(init.body));
+            return backend.request(path, init);
+        }
+    });
+    const dayStart = new Date(2026, 8, 28, 8, 0, 0, 0).getTime();
+    app.reviewDate = app.toDateString(new Date(dayStart));
+    app.timeEntries = [
+        { id: 'share-a', activityId: 'act-a', activityNameSnapshot: 'Painting', startTimestamp: dayStart, endTimestamp: dayStart + 3600000, notes: 'First coat' },
+        { id: 'share-b', activityId: 'act-b', activityNameSnapshot: 'Taping', startTimestamp: dayStart + 7200000, endTimestamp: dayStart + 10800000 }
+    ];
+    assert.equal(app.openShareLinkModal(), true);
+    app.setShareLinkEntrySelected(1, false);
+    document.getElementById('shareLinkExpirySelect').value = 'hour';
+    const before = Date.now();
+    assert.equal(await app.createShareLink(), true, `${app.shareLinkErrorCode}: ${app.shareLinkStatus}`);
+    assert.equal(posts.length, 1, 'exactly one upload happens');
+    const upload = posts[0];
+    assert.deepEqual(Object.keys(upload).sort(), ['envelope', 'expiresAt', 'shareId']);
+    assert.equal(upload.envelope.algorithm, 'AES-256-GCM');
+    assert.ok(upload.expiresAt - before >= 59 * 60 * 1000 && upload.expiresAt - before <= 61 * 60 * 1000, 'the chosen one-hour expiry is honored');
+    const link = app.getShareLinkModule().parseShareUrl(app.lastShareLink.url);
+    assert.ok(link, 'the link exposes the key in the fragment');
+    assert.equal(app.lastShareLink.url.includes('?share='), true);
+    assert.equal(app.lastShareLink.url.includes(`#key=${link.secret}`), true);
+    const uploaded = JSON.stringify(upload);
+    assert.equal(uploaded.includes(link.secret), false, 'the encryption key never leaves the URL fragment');
+    assert.equal(uploaded.includes('Painting'), false, 'entry names are not uploaded in plaintext');
+    assert.equal(uploaded.includes('apiKey'), false);
+    const fetched = await backend.request(`/api/share/${link.shareId}`);
+    assert.equal(fetched.status, 200);
+    const { envelope } = await fetched.json();
+    const payload = await app.getExchange().decryptPayload(envelope, link.secret);
+    assert.equal(payload.entries.length, 1, 'only the selected entry is shared');
+    assert.equal(payload.entries[0].activityName, 'Painting');
+    assert.equal(payload.entries[0].notes, 'First coat');
+});
+
+test('shared day preview shows every entry, including entries the sender synced', async () => {
+    const backend = makeShareBackend();
+    const { app, document } = makeShareRecipientHarness(backend);
+    const dayStart = new Date(2026, 8, 28, 8, 0, 0, 0).getTime();
+    const date = app.toDateString(new Date(dayStart));
+    const entries = [
+        { id: 'share-a', activityId: 'act-a', activityNameSnapshot: 'Painting', startTimestamp: dayStart, endTimestamp: dayStart + 3600000, syncStatus: 'synced', customerId: '1', serviceId: '9' },
+        { id: 'share-b', activityId: 'act-b', activityNameSnapshot: 'Taping', startTimestamp: dayStart + 7200000, endTimestamp: dayStart + 10800000, syncStatus: 'unsynced', customerId: '1', serviceId: '9' }
+    ];
+    const published = await publishSharedDay(app, backend, { entries, date });
+    assert.equal(await app.openSharedDay({ shareId: published.shareId, secret: published.secret }), true);
+    assert.equal(app.pendingSharedDay.payload.entries.length, 2, 'synced and unsynced sender entries are both included');
+    const list = document.getElementById('sharedDayPreviewList').innerHTML;
+    assert.equal(list.includes('Painting'), true);
+    assert.equal(list.includes('Taping'), true);
+    assert.equal(app.sharedDayStatusMessage, '', 'a valid link opens without an error message');
+});
+
+test('shared import without Clockodo guides configuration and resumes after saving', async t => {
+    const backend = makeShareBackend();
+    stubClockodoUpstream(t);
+    const { app, document } = makeShareRecipientHarness(backend);
+    const dayStart = new Date(2026, 8, 28, 8, 0, 0, 0).getTime();
+    const date = app.toDateString(new Date(dayStart));
+    const published = await publishSharedDay(app, backend, {
+        entries: [{ id: 'share-a', activityId: 'act-a', activityNameSnapshot: 'Painting', startTimestamp: dayStart, endTimestamp: dayStart + 3600000, customerId: '1', serviceId: '9' }],
+        date
+    });
+    app.switchScreen = screen => { app.currentScreen = screen; };
+    assert.equal(await app.openSharedDay({ shareId: published.shareId, secret: published.secret }), true);
+    assert.equal(await app.initiateSharedImport(), false, 'import is guided through configuration first');
+    assert.equal(app.sharedImportNeedsConfig, true);
+    assert.equal(app.sharedDayStatusMessage, app.t('sharedImportConfigRequired'));
+    assert.equal(app.currentScreen, 'settings', 'the app guides the user to the Clockodo settings');
+
+    let resumed = false;
+    app.resumeSharedDayAfterConfig = async () => { resumed = true; return true; };
+    await configureRecipientClockodo(app, document, backend);
+    assert.equal(resumed, true, 'saving Clockodo settings resumes the pending shared import');
+    assert.equal(app.sharedImportNeedsConfig, false);
+});
+
+test('shared import stops when a customer or service mapping is missing', async t => {
+    const backend = makeShareBackend();
+    const calls = stubClockodoUpstream(t, { customers: [{ id: 1, name: 'Customer A' }], services: [{ id: 9, name: 'Service X' }] });
+    const { app, document } = makeShareRecipientHarness(backend);
+    const dayStart = new Date(2026, 8, 28, 8, 0, 0, 0).getTime();
+    const date = app.toDateString(new Date(dayStart));
+    const published = await publishSharedDay(app, backend, {
+        entries: [{ id: 'share-a', activityId: 'act-a', activityNameSnapshot: 'Painting', startTimestamp: dayStart, endTimestamp: dayStart + 3600000, customerId: '99', serviceId: '9' }],
+        date
+    });
+    assert.equal(await app.openSharedDay({ shareId: published.shareId, secret: published.secret }), true);
+    await configureRecipientClockodo(app, document, backend);
+    const entriesBefore = calls.filter(call => call.url.includes('/v2/entries')).length;
+    assert.equal(await app.performSharedImport(), false, 'the import stops instead of sending unmapped entries');
+    assert.equal(app.sharedImportStatus, 'missing_mapping');
+    assert.match(app.sharedDayStatusMessage, /missing customers: 1/);
+    assert.equal(calls.filter(call => call.url.includes('/v2/entries')).length, entriesBefore, 'nothing is sent to Clockodo');
+    assert.equal((await backend.request(`/api/share/${published.shareId}`)).status, 200, 'the link stays open for a corrected retry');
+});
+
+test('shared import creates Clockodo entries once, retries failures, and closes the link', async t => {
+    const backend = makeShareBackend();
+    const calls = stubClockodoUpstream(t, {
+        entryHandler: (record, allCalls) => {
+            const entryCalls = allCalls.filter(call => call.url.includes('/v2/entries'));
+            if (entryCalls.length === 1) return Response.json({ error: 'rejected once' }, { status: 422 });
+            return null;
+        }
+    });
+    const { app, document } = makeShareRecipientHarness(backend);
+    const dayStart = new Date(2026, 8, 28, 8, 0, 0, 0).getTime();
+    const date = app.toDateString(new Date(dayStart));
+    const published = await publishSharedDay(app, backend, {
+        entries: [
+            { id: 'share-a', activityId: 'act-a', activityNameSnapshot: 'Painting', startTimestamp: dayStart, endTimestamp: dayStart + 3600000, notes: 'First coat', customerId: '1', serviceId: '9' },
+            { id: 'share-b', activityId: 'act-b', activityNameSnapshot: 'Taping', startTimestamp: dayStart + 7200000, endTimestamp: dayStart + 10800000, customerId: '1', serviceId: '9' }
+        ],
+        date
+    });
+    assert.equal(await app.openSharedDay({ shareId: published.shareId, secret: published.secret }), true);
+    await configureRecipientClockodo(app, document, backend);
+
+    assert.equal(await app.performSharedImport(), false, 'a rejected entry keeps the import incomplete');
+    assert.equal(app.sharedImportStatus, 'partial');
+    assert.equal(app.sharedImport.entries[0].status, 'failed');
+    assert.equal(app.sharedImport.entries[1].status, 'synced');
+    assert.equal(app.hasRetryableSharedEntries(), true);
+    assert.equal((await backend.request(`/api/share/${published.shareId}`)).status, 200, 'the link stays open for retries');
+
+    assert.equal(await app.performSharedImport(), true, 'retrying the failed entry completes the import');
+    assert.equal(app.sharedImportStatus, 'success');
+    assert.equal(app.sharedImport.entries.every(row => row.status === 'synced'), true);
+    assert.equal((await backend.request(`/api/share/${published.shareId}`)).status, 404, 'the link is invalidated after success');
+    const recorded = await app.storage.getSetting('exchangeImports', []);
+    assert.equal(recorded.some(item => item.exportId === published.payload.exportId), true, 'the share import is recorded locally');
+
+    const entryCalls = calls.filter(call => call.url.includes('/v2/entries'));
+    assert.equal(entryCalls.length, 3, 'two entries plus one retry reach Clockodo');
+    const clockodoRecords = backend.records.get('client_1234567890abcdef');
+    const operationKeys = [...clockodoRecords.keys()].filter(key => key.startsWith('clockodo-operation:timerhub-share:'));
+    assert.equal(operationKeys.length, 2, 'each shared entry uses exactly one stable operation key');
+    const retriedOperation = clockodoRecords.get(operationKeys.find(key => key.endsWith(':0')));
+    assert.equal(retriedOperation.state, 'succeeded', 'the retry completes the same idempotent operation');
+    assert.equal(entryCalls[0].body.customers_id, 1);
+    assert.equal(entryCalls[0].body.services_id, 9);
+    assert.equal(entryCalls[0].body.projects_id, 4);
+    assert.equal(entryCalls[0].body.text, 'First coat');
+    assert.equal(app.timeEntries.length, 0, 'nothing is duplicated into the local log');
+});
+
+test('shared import treats uncertain outcomes as non-retryable and never duplicates', async t => {
+    const backend = makeShareBackend();
+    const calls = stubClockodoUpstream(t, {
+        entryHandler: (record, allCalls) => {
+            const entryCalls = allCalls.filter(call => call.url.includes('/v2/entries'));
+            if (entryCalls.length === 1) return Response.json({ error: 'upstream broke' }, { status: 503 });
+            return null;
+        }
+    });
+    const { app, document } = makeShareRecipientHarness(backend);
+    const dayStart = new Date(2026, 8, 28, 8, 0, 0, 0).getTime();
+    const date = app.toDateString(new Date(dayStart));
+    const published = await publishSharedDay(app, backend, {
+        entries: [
+            { id: 'share-a', activityId: 'act-a', activityNameSnapshot: 'Painting', startTimestamp: dayStart, endTimestamp: dayStart + 3600000, customerId: '1', serviceId: '9' },
+            { id: 'share-b', activityId: 'act-b', activityNameSnapshot: 'Taping', startTimestamp: dayStart + 7200000, endTimestamp: dayStart + 10800000, customerId: '1', serviceId: '9' }
+        ],
+        date
+    });
+    assert.equal(await app.openSharedDay({ shareId: published.shareId, secret: published.secret }), true);
+    await configureRecipientClockodo(app, document, backend);
+
+    assert.equal(await app.performSharedImport(), false);
+    assert.equal(app.sharedImport.entries[0].status, 'unknown', 'an uncertain outcome is never marked as safe to retry');
+    assert.equal(app.hasRetryableSharedEntries(), false);
+    assert.equal(await app.performSharedImport(), false, 'the uncertain entry is not sent again');
+    assert.equal(calls.filter(call => call.url.includes('/v2/entries')).length, 2, 'the uncertain entry is never sent a second time');
+    const clockodoRecords = backend.records.get('client_1234567890abcdef');
+    const operationKey = [...clockodoRecords.keys()].find(key => key.startsWith('clockodo-operation:timerhub-share:') && key.endsWith(':0'));
+    assert.equal(clockodoRecords.get(operationKey).state, 'unknown', 'the uncertain operation stays permanently protected');
+    assert.equal((await backend.request(`/api/share/${published.shareId}`)).status, 200, 'the link remains until the outcome is resolved');
+});
+
+test('closed or expired share links are reported instead of importing', async () => {
+    const backend = makeShareBackend();
+    const { app } = makeShareRecipientHarness(backend);
+    const dayStart = new Date(2026, 8, 28, 8, 0, 0, 0).getTime();
+    const date = app.toDateString(new Date(dayStart));
+    const entries = [{ id: 'share-a', activityId: 'act-a', activityNameSnapshot: 'Painting', startTimestamp: dayStart, endTimestamp: dayStart + 3600000, customerId: '1', serviceId: '9' }];
+
+    const closed = await publishSharedDay(app, backend, { entries, date });
+    const completed = await backend.request(`/api/share/${closed.shareId}/complete`, { method: 'POST', body: '{}' });
+    assert.equal(completed.status, 200);
+    assert.equal(await app.openSharedDay({ shareId: closed.shareId, secret: closed.secret }), false);
+    assert.equal(app.sharedDayStatusMessage, app.t('shareLinkNotFound'));
+    assert.equal(app.pendingSharedDay, null);
+
+    const expired = await publishSharedDay(app, backend, { entries, date });
+    const stored = backend.records.get(`share:${expired.shareId}`).get('share');
+    stored.expiresAt = Date.now() - 1000;
+    assert.equal(await app.openSharedDay({ shareId: expired.shareId, secret: expired.secret }), false);
+    assert.equal(app.sharedDayStatusMessage, app.t('shareLinkExpired'));
+});
+
+test('a share link URL in the address bar is captured and cleaned', () => {
+    const backend = makeShareBackend();
+    const { app, window } = createTestApp({ fetch: (path, init) => backend.request(path, init) });
+    const secret = app.getExchange().generateSecret();
+    const shareId = app.getShareLinkModule().generateShareId();
+    window.location.search = `?share=${shareId}`;
+    window.location.hash = `#key=${secret}`;
+    const captured = app.captureSharedLinkFromLocation();
+    assert.equal(captured.shareId, shareId);
+    assert.equal(captured.secret, secret);
+    assert.equal(app.pendingShareLink.shareId, shareId);
+    assert.equal(app.pendingShareLink.secret, secret);
+    assert.equal(String(window.location.search).includes('share='), true, 'the mock location keeps its value; real browsers are cleaned via replaceState');
 });

@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'timerhub-v17';
+const CACHE_VERSION = 'timerhub-v18';
 const LOCALE_CACHE_KEY = '/__timerhub_locale__';
 const PUSH_COPY = {
     en: { title: 'TimerHub', body: 'Timer reminder' },
@@ -13,6 +13,7 @@ const CACHE_FILES = [
     '/clockodo-client.js',
     '/exchange.js',
     '/assignment.js',
+    '/share-link.js',
     '/vendor/qrcode.min.js',
     '/vendor/jsQR.min.js',
     '/manifest.json'

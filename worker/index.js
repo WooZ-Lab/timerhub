@@ -31,6 +31,45 @@ function jsonError(error, status) {
     return Response.json({ error }, { status });
 }
 
+const SHARE_ID_PATTERN = /^[A-Za-z0-9_-]{16,64}$/;
+const SHARE_MAX_CIPHERTEXT_CHARS = 2_000_000;
+const SHARE_MAX_EXPIRY_MS = 32 * 24 * 60 * 60 * 1000;
+
+function normalizeShareRecord(body, now = Date.now()) {
+    if (!body || typeof body !== "object" || Array.isArray(body)) return { error: "invalid_share_payload", status: 400 };
+    const envelope = body.envelope;
+    if (!envelope || typeof envelope !== "object" || Array.isArray(envelope) ||
+        envelope.format !== "timerhub-exchange" || Number(envelope.version) !== 1 ||
+        envelope.algorithm !== "AES-256-GCM") {
+        return { error: "invalid_share_payload", status: 400 };
+    }
+    if (typeof envelope.iv !== "string" || !/^[A-Za-z0-9_-]{1,64}$/.test(envelope.iv) ||
+        typeof envelope.ciphertext !== "string" ||
+        !/^[A-Za-z0-9_-]+$/.test(envelope.ciphertext) ||
+        envelope.ciphertext.length > SHARE_MAX_CIPHERTEXT_CHARS ||
+        !Number.isFinite(Number(envelope.createdAt)) || Number(envelope.createdAt) <= 0) {
+        return { error: "invalid_share_payload", status: 400 };
+    }
+    const expiresAt = Number(body.expiresAt);
+    if (!Number.isFinite(expiresAt) || expiresAt <= now || expiresAt - now > SHARE_MAX_EXPIRY_MS) {
+        return { error: "invalid_share", status: 400 };
+    }
+    return {
+        value: {
+            envelope: {
+                format: envelope.format,
+                version: Number(envelope.version),
+                algorithm: envelope.algorithm,
+                iv: envelope.iv,
+                ciphertext: envelope.ciphertext,
+                createdAt: Number(envelope.createdAt)
+            },
+            expiresAt,
+            createdAt: now
+        }
+    };
+}
+
 export class TimerHubDurableObject {
     constructor(state, env) {
         this.state = state;
@@ -39,6 +78,10 @@ export class TimerHubDurableObject {
 
     async fetch(request) {
         const url = new URL(request.url);
+
+        if (url.pathname === "/share" || url.pathname === "/share/complete") {
+            return this.handleShare(request, url);
+        }
 
         if (url.pathname.startsWith("/clockodo/")) {
             return this.handleClockodo(request, url);
@@ -433,7 +476,58 @@ export class TimerHubDurableObject {
         return jsonError("not_found", 404);
     }
 
+    async handleShare(request, url) {
+        const stored = await this.state.storage.get("share");
+
+        if (request.method === "POST" && url.pathname === "/share") {
+            const body = await request.json().catch(() => null);
+            const record = normalizeShareRecord(body);
+            if (record.error) return jsonError(record.error, record.status);
+            if (stored && Number(stored.expiresAt) > Date.now()) {
+                return jsonError("share_exists", 409);
+            }
+            await this.state.storage.put("share", record.value);
+            await this.state.storage.setAlarm(record.value.expiresAt);
+            return Response.json({ ok: true, expiresAt: record.value.expiresAt });
+        }
+
+        if (request.method === "GET" && url.pathname === "/share") {
+            if (!stored) return jsonError("share_not_found", 404);
+            if (Date.now() >= Number(stored.expiresAt)) {
+                await this.state.storage.delete("share");
+                return jsonError("share_expired", 410);
+            }
+            return Response.json({ envelope: stored.envelope, expiresAt: stored.expiresAt });
+        }
+
+        if (request.method === "POST" && url.pathname === "/share/complete") {
+            if (!stored) return jsonError("share_not_found", 404);
+            if (Date.now() >= Number(stored.expiresAt)) {
+                await this.state.storage.delete("share");
+                return jsonError("share_expired", 410);
+            }
+            await this.state.storage.delete("share");
+            await this.state.storage.deleteAlarm();
+            return Response.json({ ok: true });
+        }
+
+        return jsonError("not_found", 404);
+    }
+
     async alarm() {
+        const share = await this.state.storage.get("share");
+        if (share) {
+            if (Date.now() >= Number(share.expiresAt)) {
+                await this.state.storage.delete("share");
+                await this.state.storage.deleteAlarm();
+            } else {
+                // An early wake-up (or a rescheduled alarm) must still purge the
+                // share at its real expiry time.
+                await this.state.storage.setAlarm(Number(share.expiresAt));
+            }
+            return;
+        }
+
         const alarm = await this.state.storage.get("alarm");
         if (!alarm) return;
 
@@ -591,6 +685,37 @@ export default {
             return stub.fetch(
                 new Request(targetUrl, request)
             );
+        }
+
+        const shareCompleteMatch = /^\/api\/share\/([A-Za-z0-9_-]{16,64})\/complete$/.exec(url.pathname);
+        const shareItemMatch = /^\/api\/share\/([A-Za-z0-9_-]{16,64})$/.exec(url.pathname);
+        if (url.pathname === "/api/share" || shareItemMatch || shareCompleteMatch) {
+            const forwardShare = (shareId, path, body, method) => {
+                const id = env.TIMER_HUB.idFromName(`share:${shareId}`);
+                const stub = env.TIMER_HUB.get(id);
+                const targetUrl = new URL(request.url);
+                targetUrl.pathname = path;
+                targetUrl.search = "";
+                const init = { method };
+                if (body !== null) {
+                    init.headers = { "Content-Type": "application/json" };
+                    init.body = JSON.stringify(body);
+                }
+                return stub.fetch(new Request(targetUrl, init));
+            };
+            if (url.pathname === "/api/share") {
+                if (request.method !== "POST") return jsonError("method_not_allowed", 405);
+                const body = await request.json().catch(() => null);
+                const shareId = body && typeof body.shareId === "string" ? body.shareId : "";
+                if (!SHARE_ID_PATTERN.test(shareId)) return jsonError("invalid_share", 400);
+                return forwardShare(shareId, "/share", body, "POST");
+            }
+            if (shareItemMatch) {
+                if (request.method !== "GET") return jsonError("method_not_allowed", 405);
+                return forwardShare(shareItemMatch[1], "/share", null, "GET");
+            }
+            if (request.method !== "POST") return jsonError("method_not_allowed", 405);
+            return forwardShare(shareCompleteMatch[1], "/share/complete", null, "POST");
         }
 
         return env.ASSETS.fetch(request);

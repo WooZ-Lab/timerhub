@@ -231,6 +231,50 @@ const extendedTranslations = {
         missingDataDismiss: 'Dismiss',
         diagnosticsTitle: 'Local diagnostics',
         diagnosticsSummary: 'Database {name} v{version} · {activities} activities · {entries} time entries · {groups} groups',
+        shareLinkBtn: 'Share link',
+        shareLinkTitle: 'Share day as a link',
+        shareLinkDesc: 'Selected entries are encrypted on this device before upload. Only encrypted data is stored temporarily, and the link expires automatically.',
+        shareLinkExpiryLabel: 'Link expires after',
+        shareLinkExpiryHour: '1 hour',
+        shareLinkExpiryDay: '24 hours',
+        shareLinkExpiryWeek: '7 days',
+        shareLinkExpiryMonth: '30 days',
+        shareLinkCreate: 'Create share link',
+        shareLinkSelected: '{count} entries selected · {total}',
+        shareLinkNoEntries: 'Select at least one entry to share.',
+        shareLinkCreated: 'Share link ready for {count} entries.',
+        shareLinkResultLabel: 'Share link',
+        shareLinkCopy: 'Copy link',
+        shareLinkSend: 'Send link',
+        shareLinkCopied: 'Share link copied',
+        shareLinkLoading: 'Fetching the shared day…',
+        shareLinkNotFound: 'This share link does not exist or was already used.',
+        shareLinkExpired: 'This share link has expired.',
+        shareLinkExists: 'This share link already exists. Create a new one.',
+        shareLinkInvalid: 'This share link or its data is not valid.',
+        shareLinkUnavailable: 'The share link service is currently unavailable. Try again later.',
+        sharedDayTitle: 'Shared day',
+        sharedDayPreviewNote: 'Preview the entries below. Nothing is sent until you start the import.',
+        sharedDayImport: 'Import to Clockodo',
+        sharedDayRetry: 'Retry failed entries',
+        sharedDayConfigure: 'Configure Clockodo',
+        sharedDayExpires: 'Link expires: {date}',
+        sharedDayConfigRequired: 'Clockodo is not configured on this device. Configure it to import.',
+        sharedDayMissingCustomer: 'Some entries use customers that are missing in your Clockodo.',
+        sharedDayMissingService: 'Some entries use services that are missing in your Clockodo.',
+        sharedImportConfigRequired: 'Configure Clockodo to continue the shared import.',
+        sharedImportConfigReady: 'Clockodo configuration saved. You can start the import now.',
+        sharedImportFailed: 'The import could not start.',
+        sharedImportReferenceFailed: 'Customers and services could not be loaded from Clockodo. Check the connection and try again.',
+        sharedImportMissingMapping: 'Import stopped: missing customers: {customers}, missing services: {services}. Add them in Clockodo or correct the assignments, then retry.',
+        sharedImportSuccess: '{count} entries were created in your Clockodo. The share link is now closed.',
+        sharedImportSuccessLinkOpen: '{count} entries were created in your Clockodo. The link could not be closed and will expire automatically.',
+        sharedImportPartial: 'Import incomplete: {failed} failed, {unknown} with unknown outcome. Retry the failed entries; successfully created entries are never duplicated.',
+        sharedImportBadgePending: 'Ready',
+        sharedImportBadgeSending: 'Sending…',
+        sharedImportBadgeSynced: 'Imported',
+        sharedImportBadgeFailed: 'Failed',
+        sharedImportBadgeUnknown: 'Outcome unknown',
         initFailed: 'TimerHub could not start. Reload the page or restore a backup.',
         notificationOffStatus: 'Notifications are off.', notificationUnsupported: 'Notifications are not supported by this browser.',
         notificationsEnabled: 'Notifications enabled', notificationsBlocked: 'Notifications blocked',
@@ -541,6 +585,50 @@ const extendedTranslations = {
         missingDataDismiss: 'Ausblenden',
         diagnosticsTitle: 'Lokale Diagnose',
         diagnosticsSummary: 'Datenbank {name} v{version} · {activities} Aktivitäten · {entries} Zeiteinträge · {groups} Gruppen',
+        shareLinkBtn: 'Link teilen',
+        shareLinkTitle: 'Tag als Link teilen',
+        shareLinkDesc: 'Ausgewählte Einträge werden vor dem Hochladen auf diesem Gerät verschlüsselt. Es werden nur verschlüsselte Daten vorübergehend gespeichert, und der Link läuft automatisch ab.',
+        shareLinkExpiryLabel: 'Link läuft ab nach',
+        shareLinkExpiryHour: '1 Stunde',
+        shareLinkExpiryDay: '24 Stunden',
+        shareLinkExpiryWeek: '7 Tagen',
+        shareLinkExpiryMonth: '30 Tagen',
+        shareLinkCreate: 'Link erstellen',
+        shareLinkSelected: '{count} Einträge ausgewählt · {total}',
+        shareLinkNoEntries: 'Wähle mindestens einen Eintrag zum Teilen aus.',
+        shareLinkCreated: 'Link für {count} Einträge ist bereit.',
+        shareLinkResultLabel: 'Freigabelink',
+        shareLinkCopy: 'Link kopieren',
+        shareLinkSend: 'Link senden',
+        shareLinkCopied: 'Link kopiert',
+        shareLinkLoading: 'Geteilter Tag wird geladen…',
+        shareLinkNotFound: 'Dieser Link existiert nicht oder wurde bereits verwendet.',
+        shareLinkExpired: 'Dieser Link ist abgelaufen.',
+        shareLinkExists: 'Dieser Link existiert bereits. Erstelle einen neuen.',
+        shareLinkInvalid: 'Dieser Link oder seine Daten ist nicht gültig.',
+        shareLinkUnavailable: 'Der Linkdienst ist derzeit nicht verfügbar. Versuche es später erneut.',
+        sharedDayTitle: 'Geteilter Tag',
+        sharedDayPreviewNote: 'Prüfe die Einträge unten. Es wird nichts gesendet, bis du den Import startest.',
+        sharedDayImport: 'In Clockodo importieren',
+        sharedDayRetry: 'Fehlgeschlagene Einträge erneut versuchen',
+        sharedDayConfigure: 'Clockodo einrichten',
+        sharedDayExpires: 'Link läuft ab: {date}',
+        sharedDayConfigRequired: 'Clockodo ist auf diesem Gerät nicht eingerichtet. Richte es ein, um zu importieren.',
+        sharedDayMissingCustomer: 'Einige Einträge verwenden Kunden, die in deinem Clockodo fehlen.',
+        sharedDayMissingService: 'Einige Einträge verwenden Leistungen, die in deinem Clockodo fehlen.',
+        sharedImportConfigRequired: 'Richte Clockodo ein, um den geteilten Import fortzusetzen.',
+        sharedImportConfigReady: 'Clockodo-Konfiguration gespeichert. Du kannst den Import jetzt starten.',
+        sharedImportFailed: 'Der Import konnte nicht gestartet werden.',
+        sharedImportReferenceFailed: 'Kunden und Leistungen konnten nicht aus Clockodo geladen werden. Prüfe die Verbindung und versuche es erneut.',
+        sharedImportMissingMapping: 'Import gestoppt: fehlende Kunden: {customers}, fehlende Leistungen: {services}. Ergänze sie in Clockodo oder korrigiere die Zuordnungen und versuche es erneut.',
+        sharedImportSuccess: '{count} Einträge wurden in deinem Clockodo erstellt. Der Link ist jetzt geschlossen.',
+        sharedImportSuccessLinkOpen: '{count} Einträge wurden in deinem Clockodo erstellt. Der Link konnte nicht geschlossen werden und läuft automatisch ab.',
+        sharedImportPartial: 'Import unvollständig: {failed} fehlgeschlagen, {unknown} mit unbekanntem Ergebnis. Versuche die fehlgeschlagenen Einträge erneut; erfolgreich erstellte Einträge werden nie dupliziert.',
+        sharedImportBadgePending: 'Bereit',
+        sharedImportBadgeSending: 'Sendet…',
+        sharedImportBadgeSynced: 'Importiert',
+        sharedImportBadgeFailed: 'Fehlgeschlagen',
+        sharedImportBadgeUnknown: 'Ergebnis unbekannt',
         initFailed: 'TimerHub konnte nicht gestartet werden. Lade die Seite neu oder stelle eine Sicherung wieder her.',
         notificationOffStatus: 'Benachrichtigungen sind ausgeschaltet.', notificationUnsupported: 'Dieser Browser unterstützt keine Benachrichtigungen.',
         notificationsEnabled: 'Benachrichtigungen aktiviert', notificationsBlocked: 'Benachrichtigungen blockiert',
@@ -851,6 +939,50 @@ const extendedTranslations = {
         missingDataDismiss: 'Скрыть',
         diagnosticsTitle: 'Локальная диагностика',
         diagnosticsSummary: 'База {name} v{version} · занятий: {activities} · записей: {entries} · групп: {groups}',
+        shareLinkBtn: 'Поделиться ссылкой',
+        shareLinkTitle: 'Поделиться днём по ссылке',
+        shareLinkDesc: 'Выбранные записи шифруются на этом устройстве перед загрузкой. На сервере временно хранятся только зашифрованные данные, а ссылка автоматически истекает.',
+        shareLinkExpiryLabel: 'Ссылка действует',
+        shareLinkExpiryHour: '1 час',
+        shareLinkExpiryDay: '24 часа',
+        shareLinkExpiryWeek: '7 дней',
+        shareLinkExpiryMonth: '30 дней',
+        shareLinkCreate: 'Создать ссылку',
+        shareLinkSelected: 'Выбрано записей: {count} · {total}',
+        shareLinkNoEntries: 'Выберите хотя бы одну запись.',
+        shareLinkCreated: 'Ссылка для {count} записей готова.',
+        shareLinkResultLabel: 'Ссылка',
+        shareLinkCopy: 'Копировать ссылку',
+        shareLinkSend: 'Отправить ссылку',
+        shareLinkCopied: 'Ссылка скопирована',
+        shareLinkLoading: 'Загрузка общего дня…',
+        shareLinkNotFound: 'Эта ссылка не существует или уже использована.',
+        shareLinkExpired: 'Срок действия ссылки истёк.',
+        shareLinkExists: 'Эта ссылка уже существует. Создайте новую.',
+        shareLinkInvalid: 'Ссылка или её данные недействительны.',
+        shareLinkUnavailable: 'Сервис ссылок сейчас недоступен. Попробуйте позже.',
+        sharedDayTitle: 'Общий день',
+        sharedDayPreviewNote: 'Проверьте записи ниже. Ничего не отправляется, пока вы не начнёте импорт.',
+        sharedDayImport: 'Импортировать в Clockodo',
+        sharedDayRetry: 'Повторить неудачные записи',
+        sharedDayConfigure: 'Настроить Clockodo',
+        sharedDayExpires: 'Ссылка истекает: {date}',
+        sharedDayConfigRequired: 'Clockodo не настроен на этом устройстве. Настройте его для импорта.',
+        sharedDayMissingCustomer: 'Некоторые записи используют заказчиков, отсутствующих в вашем Clockodo.',
+        sharedDayMissingService: 'Некоторые записи используют услуги, отсутствующие в вашем Clockodo.',
+        sharedImportConfigRequired: 'Настройте Clockodo, чтобы продолжить общий импорт.',
+        sharedImportConfigReady: 'Настройки Clockodo сохранены. Теперь можно начать импорт.',
+        sharedImportFailed: 'Не удалось начать импорт.',
+        sharedImportReferenceFailed: 'Не удалось загрузить заказчиков и услуги из Clockodo. Проверьте подключение и повторите.',
+        sharedImportMissingMapping: 'Импорт остановлен: нет заказчиков: {customers}, нет услуг: {services}. Добавьте их в Clockodo или исправьте назначения и повторите.',
+        sharedImportSuccess: 'В вашем Clockodo создано записей: {count}. Ссылка закрыта.',
+        sharedImportSuccessLinkOpen: 'В вашем Clockodo создано записей: {count}. Не удалось закрыть ссылку; она истечёт автоматически.',
+        sharedImportPartial: 'Импорт не завершён: ошибок — {failed}, с неизвестным результатом — {unknown}. Повторите неудачные записи; успешно созданные не дублируются.',
+        sharedImportBadgePending: 'Готово',
+        sharedImportBadgeSending: 'Отправка…',
+        sharedImportBadgeSynced: 'Импортировано',
+        sharedImportBadgeFailed: 'Ошибка',
+        sharedImportBadgeUnknown: 'Результат неизвестен',
         initFailed: 'Не удалось запустить TimerHub. Перезагрузите страницу или восстановите резервную копию.',
         notificationOffStatus: 'Уведомления выключены.', notificationUnsupported: 'Этот браузер не поддерживает уведомления.',
         notificationsEnabled: 'Уведомления включены', notificationsBlocked: 'Уведомления заблокированы',
@@ -1757,6 +1889,18 @@ class TimerHubApp {
         this.renderedExchangeQr = null;
         this.pendingExchange = null;
         this.pendingAssignment = null;
+        this.pendingShareLink = null;
+        this.pendingSharedDay = null;
+        this.sharedImport = null;
+        this.sharedImportNeedsConfig = false;
+        this.sharedImportStatus = 'idle';
+        this.shareLinkEntries = [];
+        this.shareLinkSelection = new Set();
+        this.shareLinkInProgress = false;
+        this.shareLinkStatus = '';
+        this.shareLinkErrorCode = '';
+        this.shareLinkResultUrl = '';
+        this.sharedDayStatusMessage = '';
         this.exchangeFile = null;
         this.exchangeScanOperation = null;
         this.syncBatches = [];
@@ -1939,6 +2083,8 @@ class TimerHubApp {
             this.syncServiceWorkerLocale();
             this.startUIUpdateLoop();
             this.renderMain();
+            const sharedLink = this.captureSharedLinkFromLocation();
+            if (sharedLink) this.openSharedDay(sharedLink).catch(() => {});
             this.refreshStoragePersistenceStatus().catch(() => {});
             const loading = document.getElementById('appLoading');
             if (loading) loading.hidden = true;
@@ -2460,6 +2606,22 @@ class TimerHubApp {
         // Secure day exchange
         sel('reviewImportDayBtn')?.addEventListener('click', () => this.showDayImportModal());
         sel('reviewShareDayBtn')?.addEventListener('click', () => this.shareDayExchange());
+        sel('reviewShareLinkBtn')?.addEventListener('click', () => this.openShareLinkModal());
+        sel('shareLinkCloseBtn')?.addEventListener('click', () => this.closeShareLinkModal());
+        sel('shareLinkCancelBtn')?.addEventListener('click', () => this.closeShareLinkModal());
+        sel('shareLinkCreateBtn')?.addEventListener('click', () => this.createShareLink());
+        sel('shareLinkCopyBtn')?.addEventListener('click', () => this.copyShareLink());
+        sel('shareLinkSendBtn')?.addEventListener('click', () => this.sendShareLink());
+        sel('shareLinkExpirySelect')?.addEventListener('change', () => this.updateShareLinkSummary());
+        sel('shareLinkEntryList')?.addEventListener('change', event => {
+            const input = event.target;
+            if (!input?.dataset?.shareEntry) return;
+            this.setShareLinkEntrySelected(Number(input.dataset.shareEntry), input.checked);
+        });
+        sel('sharedDayCloseBtn')?.addEventListener('click', () => this.closeSharedDayModal());
+        sel('sharedDayImportBtn')?.addEventListener('click', () => this.initiateSharedImport());
+        sel('sharedDayRetryBtn')?.addEventListener('click', () => this.initiateSharedImport());
+        sel('sharedDayConfigureBtn')?.addEventListener('click', () => this.initiateSharedImport());
         sel('dayExportCloseBtn')?.addEventListener('click', () => this.closeDayExportModal());
         sel('exchangeCopyCodeBtn')?.addEventListener('click', () => this.copyTransferCode());
         sel('exchangeShowQrBtn')?.addEventListener('click', () => this.showExchangeQr());
@@ -8029,6 +8191,10 @@ class TimerHubApp {
             this.clockodoReferenceStatus = 'idle';
             this.clockodoReferencePromise = null;
             this.loadClockodoReferenceData();
+            if (this.sharedImportNeedsConfig && this.pendingSharedDay) {
+                this.sharedImportNeedsConfig = false;
+                this.resumeSharedDayAfterConfig().catch(() => {});
+            }
             return true;
         } catch (error) {
             this.clockodoStatus = 'failed';
@@ -8634,6 +8800,482 @@ class TimerHubApp {
         const imports = (await this.getExchangeImports()).filter(item => item?.exportId !== exportId);
         imports.push({ exportId, importedAt: Date.now() });
         await this.storage.setSetting('exchangeImports', imports.slice(-100));
+    }
+
+    getShareLinkModule() {
+        const api = (typeof window !== 'undefined' && window.TimerHubShareLink) || globalThis.TimerHubShareLink;
+        if (!api) throw Object.assign(new Error('share_link_unavailable'), { code: 'share_link_unavailable' });
+        return api;
+    }
+
+    getFetchImpl() {
+        return typeof globalThis.fetch === 'function' ? globalThis.fetch.bind(globalThis) : null;
+    }
+
+    locationOrigin() {
+        return window.location?.origin || '';
+    }
+
+    locationPathname() {
+        return window.location?.pathname || '/';
+    }
+
+    captureSharedLinkFromLocation() {
+        try {
+            const location = window.location || {};
+            const href = location.href ||
+                `${location.origin || ''}${location.pathname || '/'}${location.search || ''}${location.hash || ''}`;
+            const parsed = this.getShareLinkModule().parseShareUrl(href);
+            if (!parsed) return null;
+            this.pendingShareLink = parsed;
+            if (window.history?.replaceState) {
+                try {
+                    const clean = new URL(href);
+                    clean.searchParams.delete('share');
+                    clean.hash = '';
+                    window.history.replaceState({}, '', clean.toString());
+                } catch { /* keep the original URL */ }
+            }
+            return parsed;
+        } catch {
+            return null;
+        }
+    }
+
+    openShareLinkModal() {
+        const entries = this.getDayExchangeEntries(this.reviewDate);
+        if (!entries.length) {
+            this.showToast(this.t('exchangeNoEntries'));
+            return false;
+        }
+        this.shareLinkEntries = entries;
+        this.shareLinkSelection = new Set(entries.map((unused, index) => index));
+        this.lastShareLink = null;
+        this.setShareLinkStatus('');
+        this.setShareLinkResult('');
+        this.renderShareLinkEntries();
+        const select = document.getElementById('shareLinkExpirySelect');
+        if (select && !select.value) select.value = 'day';
+        document.getElementById('shareLinkModal')?.classList.add('active');
+        return true;
+    }
+
+    closeShareLinkModal() {
+        document.getElementById('shareLinkModal')?.classList.remove('active');
+    }
+
+    setShareLinkEntrySelected(index, selected) {
+        const position = Number(index);
+        if (!Number.isInteger(position) || position < 0 || position >= this.shareLinkEntries.length) return false;
+        if (selected) this.shareLinkSelection.add(position);
+        else this.shareLinkSelection.delete(position);
+        this.updateShareLinkSummary();
+        return true;
+    }
+
+    updateShareLinkSummary() {
+        const selected = this.shareLinkEntries.filter((unused, index) => this.shareLinkSelection.has(index));
+        const total = selected.reduce((sum, entry) => sum + (Number(entry.endTimestamp) - Number(entry.startTimestamp)), 0);
+        const summary = document.getElementById('shareLinkSummary');
+        if (summary) {
+            summary.textContent = this.t('shareLinkSelected', { count: selected.length, total: this.formatDuration(total) });
+        }
+        const button = document.getElementById('shareLinkCreateBtn');
+        if (button) button.disabled = selected.length === 0;
+        return selected.length;
+    }
+
+    renderShareLinkEntries() {
+        const list = document.getElementById('shareLinkEntryList');
+        if (!list) return false;
+        list.innerHTML = this.shareLinkEntries.map((entry, index) => `
+            <label class="share-link-entry">
+                <input type="checkbox" data-share-entry="${index}" ${this.shareLinkSelection.has(index) ? 'checked' : ''}>
+                <span class="exchange-preview-item">
+                    <span class="exchange-preview-times"><strong>${this.escapeHtml(this.formatTime(entry.startTimestamp))}</strong><span>–</span><strong>${this.escapeHtml(this.formatTime(entry.endTimestamp))}</strong><span class="exchange-preview-duration">${this.escapeHtml(this.formatDuration(entry.endTimestamp - entry.startTimestamp))}</span></span>
+                    <span class="exchange-preview-activity">${this.escapeHtml(entry.activityNameSnapshot || '')}</span>
+                </span>
+            </label>`).join('');
+        this.updateShareLinkSummary();
+        return true;
+    }
+
+    setShareLinkStatus(message) {
+        this.shareLinkStatus = message || '';
+        const node = document.getElementById('shareLinkStatus');
+        if (node) {
+            node.textContent = this.shareLinkStatus;
+            node.style.display = this.shareLinkStatus ? '' : 'none';
+        }
+    }
+
+    setShareLinkResult(url) {
+        this.shareLinkResultUrl = url || '';
+        const node = document.getElementById('shareLinkResult');
+        if (node) {
+            node.textContent = this.shareLinkResultUrl;
+            node.style.display = this.shareLinkResultUrl ? '' : 'none';
+        }
+        const actions = document.getElementById('shareLinkActions');
+        if (actions) actions.style.display = this.shareLinkResultUrl ? '' : 'none';
+    }
+
+    getShareLinkExpiryMinutes() {
+        const ShareLink = this.getShareLinkModule();
+        const selected = document.getElementById('shareLinkExpirySelect')?.value || 'day';
+        const option = ShareLink.EXPIRY_OPTIONS.find(item => item.id === selected) || ShareLink.EXPIRY_OPTIONS[1];
+        return option.minutes;
+    }
+
+    async createShareLink() {
+        if (this.shareLinkInProgress) return false;
+        const entries = this.shareLinkEntries.filter((unused, index) => this.shareLinkSelection.has(index));
+        if (!entries.length) {
+            this.setShareLinkStatus(this.t('shareLinkNoEntries'));
+            return false;
+        }
+        this.shareLinkInProgress = true;
+        try {
+            const ShareLink = this.getShareLinkModule();
+            const Exchange = this.getExchange();
+            const payload = Exchange.buildDayPayload({ entries, date: this.reviewDate, exportId: this.generateId() });
+            const secret = Exchange.generateSecret();
+            const envelope = await Exchange.encryptPayload(payload, secret);
+            const expiresAt = Date.now() + ShareLink.normalizeExpiryMs(this.getShareLinkExpiryMinutes());
+            const shareId = ShareLink.generateShareId();
+            await ShareLink.createShare(this.getFetchImpl(), this.locationOrigin(), { shareId, envelope, expiresAt });
+            const url = ShareLink.buildShareUrl({
+                origin: this.locationOrigin(),
+                pathname: this.locationPathname(),
+                shareId,
+                secret
+            });
+            this.lastShareLink = { shareId, secret, url, expiresAt, payload };
+            this.setShareLinkResult(url);
+            this.setShareLinkStatus(this.t('shareLinkCreated', { count: payload.entries.length }));
+            return true;
+        } catch (error) {
+            this.shareLinkErrorCode = error?.code || 'unknown';
+            this.setShareLinkStatus(this.shareLinkErrorMessage(error?.code));
+            return false;
+        } finally {
+            this.shareLinkInProgress = false;
+        }
+    }
+
+    async copyShareLink() {
+        const url = this.lastShareLink?.url;
+        if (!url) return false;
+        try {
+            await navigator.clipboard.writeText(url);
+            this.showToast(this.t('shareLinkCopied'));
+            return true;
+        } catch (error) {
+            this.showToast(this.t('failedToCopy'));
+            return false;
+        }
+    }
+
+    async sendShareLink() {
+        const url = this.lastShareLink?.url;
+        if (!url) return false;
+        if (typeof navigator.share === 'function') {
+            try {
+                await navigator.share({ title: this.t('shareLinkTitle'), text: url, url });
+                return true;
+            } catch (error) {
+                if (error?.name === 'AbortError') return false;
+            }
+        }
+        return this.copyShareLink();
+    }
+
+    shareLinkErrorMessage(code) {
+        const messages = {
+            share_not_found: this.t('shareLinkNotFound'),
+            share_expired: this.t('shareLinkExpired'),
+            share_exists: this.t('shareLinkExists'),
+            invalid_share_payload: this.t('shareLinkInvalid'),
+            invalid_share: this.t('shareLinkInvalid'),
+            invalid_share_request: this.t('shareLinkInvalid'),
+            invalid_expiry: this.t('shareLinkInvalid'),
+            share_unavailable: this.t('shareLinkUnavailable'),
+            network_error: this.t('shareLinkUnavailable'),
+            share_storage_failed: this.t('shareLinkUnavailable'),
+            share_link_unavailable: this.t('shareLinkUnavailable'),
+            secure_crypto_unavailable: this.t('exchangeCryptoUnavailable')
+        };
+        return messages[code] || this.t('shareLinkUnavailable');
+    }
+
+    setSharedDayStatus(message) {
+        this.sharedDayStatusMessage = message || '';
+        const node = document.getElementById('sharedDayStatus');
+        if (node) {
+            node.textContent = this.sharedDayStatusMessage;
+            node.style.display = this.sharedDayStatusMessage ? '' : 'none';
+        }
+    }
+
+    analyzeSharedPayload(payload) {
+        const customerIds = new Set((this.clockodoCustomers || []).map(customer => String(customer.id)));
+        const serviceIds = new Set((this.clockodoServices || []).map(service => String(service.id)));
+        const hasReferenceData = this.clockodoConfigured && this.clockodoReferenceStatus === 'ready';
+        const rows = payload.entries.map(entry => {
+            const customerId = String(entry.customerId || this.clockodoCustomerId || '');
+            const serviceId = String(entry.serviceId || this.clockodoServiceId || '');
+            return {
+                entry,
+                customerId,
+                serviceId,
+                missingCustomer: hasReferenceData ? (!customerId || !customerIds.has(customerId)) : false,
+                missingService: hasReferenceData ? (!serviceId || !serviceIds.has(serviceId)) : false
+            };
+        });
+        return { rows, hasReferenceData };
+    }
+
+    sharedEntryBadge(status) {
+        return {
+            synced: this.t('sharedImportBadgeSynced'),
+            failed: this.t('sharedImportBadgeFailed'),
+            unknown: this.t('sharedImportBadgeUnknown'),
+            sending: this.t('sharedImportBadgeSending'),
+            pending: this.t('sharedImportBadgePending')
+        }[status] || '';
+    }
+
+    renderSharedDayPreview() {
+        const state = this.pendingSharedDay;
+        if (!state) return false;
+        state.analysis = this.analyzeSharedPayload(state.payload);
+        const { rows } = state.analysis;
+        const total = state.payload.entries.reduce((sum, entry) => sum + (entry.endTimestamp - entry.startTimestamp), 0);
+        const summary = document.getElementById('sharedDayPreviewSummary');
+        if (summary) {
+            summary.innerHTML = `<strong>${this.escapeHtml(this.t('exchangeSourceDate'))}: ${this.escapeHtml(state.payload.date)}</strong>`
+                + `<span>${this.escapeHtml(this.t('entriesCount', { count: rows.length }))}</span>`
+                + `<span>${this.escapeHtml(this.t('total'))}: ${this.escapeHtml(this.formatDuration(total))}</span>`
+                + `<span>${this.escapeHtml(this.t('sharedDayExpires', { date: this.formatSnapshotDate(state.expiresAt) }))}</span>`;
+        }
+        const warnings = document.getElementById('sharedDayPreviewWarnings');
+        if (warnings) {
+            const warningKeys = [];
+            if (state.repeat) warningKeys.push({ key: 'exchangeWarningRepeat' });
+            if (!this.clockodoConfigured) warningKeys.push({ key: 'sharedDayConfigRequired' });
+            if (rows.some(row => row.missingCustomer)) warningKeys.push({ key: 'sharedDayMissingCustomer' });
+            if (rows.some(row => row.missingService)) warningKeys.push({ key: 'sharedDayMissingService' });
+            warnings.innerHTML = warningKeys.length
+                ? `<div class="warning" style="display:block;">${warningKeys.map(item => `<div>${this.escapeHtml(this.t(item.key))}</div>`).join('')}</div>`
+                : '';
+        }
+        const list = document.getElementById('sharedDayPreviewList');
+        if (list) {
+            list.innerHTML = rows.map((row, index) => {
+                const entry = row.entry;
+                const customer = entry.customerName || entry.customerId || '—';
+                const service = entry.serviceName || entry.serviceId || '—';
+                const notes = entry.notes ? `<div class="exchange-preview-notes">${this.escapeHtml(entry.notes)}</div>` : '';
+                const status = this.sharedImport?.entries?.[index];
+                return `<div class="exchange-preview-item">
+                    <div class="exchange-preview-times"><strong>${this.escapeHtml(this.formatTime(entry.startTimestamp))}</strong><span>–</span><strong>${this.escapeHtml(this.formatTime(entry.endTimestamp))}</strong><span class="exchange-preview-duration">${this.escapeHtml(this.formatDuration(entry.endTimestamp - entry.startTimestamp))}</span></div>
+                    <div class="exchange-preview-activity">${this.escapeHtml(entry.activityName)} <span class="shared-import-badge" data-share-import-index="${index}">${this.escapeHtml(status ? this.sharedEntryBadge(status.status) : '')}</span></div>
+                    <div class="exchange-preview-meta">${this.escapeHtml(this.t('customer'))}: ${this.escapeHtml(customer)} · ${this.escapeHtml(this.t('service'))}: ${this.escapeHtml(service)}</div>
+                    ${notes}
+                </div>`;
+            }).join('');
+        }
+        const importButton = document.getElementById('sharedDayImportBtn');
+        if (importButton) importButton.disabled = Boolean(this.sharedImport?.completed);
+        const retryButton = document.getElementById('sharedDayRetryBtn');
+        if (retryButton) retryButton.style.display = this.hasRetryableSharedEntries() ? '' : 'none';
+        return true;
+    }
+
+    async openSharedDay(link = this.pendingShareLink) {
+        if (!link?.shareId || !link?.secret) return false;
+        this.pendingShareLink = link;
+        this.setSharedDayStatus(this.t('shareLinkLoading'));
+        try {
+            const ShareLink = this.getShareLinkModule();
+            const { envelope, expiresAt } = await ShareLink.fetchShare(this.getFetchImpl(), this.locationOrigin(), link.shareId);
+            const payload = await this.getExchange().decryptPayload(envelope, link.secret);
+            const repeat = await this.wasExchangeImported(payload.exportId);
+            this.pendingSharedDay = { shareId: link.shareId, secret: link.secret, payload, expiresAt, repeat, analysis: null };
+            this.sharedImport = null;
+            this.sharedImportNeedsConfig = false;
+            this.sharedImportStatus = 'idle';
+            this.renderSharedDayPreview();
+            this.setSharedDayStatus('');
+            document.getElementById('sharedDayModal')?.classList.add('active');
+            return true;
+        } catch (error) {
+            this.pendingSharedDay = null;
+            const message = this.sharedLinkErrorMessage(error?.code);
+            this.setSharedDayStatus(message);
+            this.showToast(message);
+            return false;
+        }
+    }
+
+    sharedLinkErrorMessage(code) {
+        const messages = {
+            share_not_found: this.t('shareLinkNotFound'),
+            share_expired: this.t('shareLinkExpired'),
+            network_error: this.t('shareLinkUnavailable'),
+            share_unavailable: this.t('shareLinkUnavailable'),
+            invalid_exchange_file: this.t('exchangeInvalidFile'),
+            unsupported_exchange_version: this.t('exchangeUnsupportedFormat'),
+            exchange_decrypt_failed: this.t('exchangeDecryptFailed'),
+            invalid_exchange_payload: this.t('exchangeInvalidPayload'),
+            invalid_share_payload: this.t('shareLinkInvalid'),
+            secure_crypto_unavailable: this.t('exchangeCryptoUnavailable')
+        };
+        return messages[code] || this.t('shareLinkUnavailable');
+    }
+
+    closeSharedDayModal() {
+        document.getElementById('sharedDayModal')?.classList.remove('active');
+    }
+
+    hasRetryableSharedEntries() {
+        return Boolean(this.sharedImport?.entries?.some(row => row.status === 'pending' || row.status === 'failed'));
+    }
+
+    async initiateSharedImport() {
+        if (!this.pendingSharedDay) return false;
+        if (!this.clockodoConfigured) {
+            this.sharedImportNeedsConfig = true;
+            this.setSharedDayStatus(this.t('sharedImportConfigRequired'));
+            this.showToast(this.t('sharedImportConfigRequired'));
+            this.closeSharedDayModal();
+            this.switchScreen('settings');
+            return false;
+        }
+        return this.performSharedImport();
+    }
+
+    async resumeSharedDayAfterConfig() {
+        if (!this.pendingSharedDay) return false;
+        await this.loadClockodoReferenceData({ force: true }).catch(() => false);
+        this.renderSharedDayPreview();
+        document.getElementById('sharedDayModal')?.classList.add('active');
+        this.setSharedDayStatus(this.t('sharedImportConfigReady'));
+        return true;
+    }
+
+    renderSharedDayImportProgress() {
+        const entries = this.sharedImport?.entries || [];
+        document.querySelectorAll?.('[data-share-import-index]').forEach(node => {
+            const row = entries[Number(node?.dataset?.shareImportIndex)];
+            if (row) node.textContent = this.sharedEntryBadge(row.status);
+        });
+        return true;
+    }
+
+    async performSharedImport() {
+        const state = this.pendingSharedDay;
+        if (!state || !this.clockodoClient) {
+            this.setSharedDayStatus(this.t('sharedImportFailed'));
+            return false;
+        }
+        if (this.sharedImport?.completed) return true;
+        let ready = this.clockodoReferenceStatus === 'ready';
+        if (!ready) {
+            ready = await this.loadClockodoReferenceData({ force: true }).catch(() => false);
+        }
+        if (!ready) {
+            this.sharedImportStatus = 'reference_failed';
+            this.setSharedDayStatus(this.t('sharedImportReferenceFailed'));
+            return false;
+        }
+        state.analysis = this.analyzeSharedPayload(state.payload);
+        const missing = state.analysis.rows.filter(row => row.missingCustomer || row.missingService);
+        if (missing.length) {
+            this.sharedImportStatus = 'missing_mapping';
+            this.setSharedDayStatus(this.t('sharedImportMissingMapping', {
+                customers: missing.filter(row => row.missingCustomer).length,
+                services: missing.filter(row => row.missingService).length
+            }));
+            return false;
+        }
+        if (!this.sharedImport) {
+            this.sharedImport = {
+                entries: state.payload.entries.map((entry, index) => ({ index, entry, status: 'pending', error: null, errorDetails: null, clockodoEntryId: null })),
+                completed: false
+            };
+        }
+        const accessToken = this.getClockodoAccessToken();
+        const clientId = this.getPushClientId();
+        const config = {
+            customerId: this.clockodoCustomerId,
+            serviceId: this.clockodoServiceId,
+            projectId: this.clockodoProjectId,
+            billable: this.clockodoBillable
+        };
+        const uncertainCodes = new Set([
+            'network_error', 'timeout', 'malformed_response', 'network_outcome_unknown',
+            'timeout_outcome_unknown', 'operation_outcome_unknown', 'clockodo_outcome_unknown'
+        ]);
+        for (const row of this.sharedImport.entries) {
+            if (row.status === 'synced' || row.status === 'unknown') continue;
+            row.status = 'sending';
+            row.error = null;
+            row.errorDetails = null;
+            this.renderSharedDayImportProgress();
+            try {
+                const entryPayload = this.clockodoClient.buildEntryPayload({
+                    startTimestamp: row.entry.startTimestamp,
+                    endTimestamp: row.entry.endTimestamp,
+                    notes: row.entry.notes,
+                    customerId: row.entry.customerId || this.clockodoCustomerId,
+                    serviceId: row.entry.serviceId || this.clockodoServiceId,
+                    project: this.clockodoProjectId
+                }, config);
+                const idempotencyKey = `timerhub-share:${state.shareId}:${row.index}`;
+                const result = await this.clockodoClient.createEntry(clientId, accessToken, entryPayload, idempotencyKey);
+                if (result?.created === true && Number.isSafeInteger(Number(result.entryId)) && Number(result.entryId) > 0) {
+                    row.status = 'synced';
+                    row.clockodoEntryId = Number(result.entryId);
+                } else {
+                    row.status = 'unknown';
+                    row.error = 'malformed_response';
+                }
+            } catch (error) {
+                const uncertain = uncertainCodes.has(error?.code);
+                row.status = uncertain ? 'unknown' : 'failed';
+                row.error = error?.code || 'request_rejected';
+                row.errorDetails = uncertain ? null : this.normalizeClockodoErrorDetails(error?.details);
+            }
+            this.renderSharedDayImportProgress();
+        }
+        const rows = this.sharedImport.entries;
+        if (rows.every(row => row.status === 'synced')) {
+            this.sharedImport.completed = true;
+            this.sharedImportStatus = 'success';
+            let linkInvalidated = false;
+            try {
+                await this.getShareLinkModule().completeShare(this.getFetchImpl(), this.locationOrigin(), state.shareId);
+                linkInvalidated = true;
+            } catch {
+                linkInvalidated = false;
+            }
+            await this.recordExchangeImport(state.payload.exportId);
+            const message = linkInvalidated
+                ? this.t('sharedImportSuccess', { count: rows.length })
+                : this.t('sharedImportSuccessLinkOpen', { count: rows.length });
+            this.setSharedDayStatus(message);
+            this.renderSharedDayPreview();
+            this.showToast(message);
+            return true;
+        }
+        this.sharedImportStatus = 'partial';
+        this.setSharedDayStatus(this.t('sharedImportPartial', {
+            failed: rows.filter(row => row.status === 'failed').length,
+            unknown: rows.filter(row => row.status === 'unknown').length
+        }));
+        this.renderSharedDayPreview();
+        return false;
     }
 
     exchangeErrorMessage(code) {
