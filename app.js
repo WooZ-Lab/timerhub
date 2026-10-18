@@ -399,6 +399,9 @@ const extendedTranslations = {
         clockodoAssignmentHelp: 'Type to search. Leave empty for no Clockodo assignment.',
         clockodoProjectNotAllowedForCustomer: 'The selected project does not belong to this customer. Choose a project of the selected customer.',
         clockodoProjectLoadFailed: 'Customers and services loaded, but projects could not be loaded. Retry or check project access in Clockodo.',
+        clockodoProjectChooseCustomer: 'Choose a customer first, then pick one of their projects.',
+        clockodoNoProjects: 'Clockodo returned no projects for this account. Check project access and whether projects are enabled in Clockodo.',
+        clockodoNoProjectsForCustomer: 'The selected customer has no projects in Clockodo.',
         clockodoServiceNotAllowedForCustomer: 'The selected service is not allowed for this customer. Choose a valid service.',
         showSecret: 'Show', hideSecret: 'Hide',
         syncSuccessToast: 'Successfully synchronized {count} entries to Clockodo',
@@ -756,6 +759,9 @@ const extendedTranslations = {
         clockodoAssignmentHelp: 'Tippen zum Suchen. Leer lassen für keine Clockodo-Zuordnung.',
         clockodoProjectNotAllowedForCustomer: 'Das gewählte Projekt gehört nicht zu diesem Kunden. Wähle ein Projekt des ausgewählten Kunden.',
         clockodoProjectLoadFailed: 'Kunden und Leistungen wurden geladen, aber Projekte konnten nicht geladen werden. Erneut versuchen oder Projektzugriff in Clockodo prüfen.',
+        clockodoProjectChooseCustomer: 'Wähle zuerst einen Kunden und dann eines seiner Projekte.',
+        clockodoNoProjects: 'Clockodo hat für dieses Konto keine Projekte geliefert. Prüfe den Projektzugriff und ob Projekte in Clockodo aktiviert sind.',
+        clockodoNoProjectsForCustomer: 'Der ausgewählte Kunde hat keine Projekte in Clockodo.',
         clockodoServiceNotAllowedForCustomer: 'Die gewählte Leistung ist für diesen Kunden nicht zulässig. Wähle eine gültige Leistung.',
         showSecret: 'Anzeigen', hideSecret: 'Verbergen',
         syncSuccessToast: '{count} Einträge erfolgreich nach Clockodo synchronisiert',
@@ -1113,6 +1119,9 @@ const extendedTranslations = {
         clockodoAssignmentHelp: 'Введите текст для поиска. Оставьте пустым, чтобы не привязывать.',
         clockodoProjectNotAllowedForCustomer: 'Выбранный проект не принадлежит этому клиенту. Выберите проект выбранного клиента.',
         clockodoProjectLoadFailed: 'Клиенты и услуги загружены, но проекты загрузить не удалось. Повторите попытку или проверьте доступ к проектам в Clockodo.',
+        clockodoProjectChooseCustomer: 'Сначала выберите клиента, затем его проект.',
+        clockodoNoProjects: 'Clockodo не вернул проекты для этого аккаунта. Проверьте доступ к проектам и включены ли проекты в Clockodo.',
+        clockodoNoProjectsForCustomer: 'У выбранного клиента нет проектов в Clockodo.',
         clockodoServiceNotAllowedForCustomer: 'Выбранная услуга недоступна для этого клиента. Выберите допустимую услугу.',
         showSecret: 'Показать', hideSecret: 'Скрыть',
         syncSuccessToast: 'Успешно синхронизировано записей в Clockodo: {count}',
@@ -7818,13 +7827,23 @@ class TimerHubApp {
         }
         const hint = document.getElementById(ids.hint);
         if (hint) {
+            const selectedCustomerId = this.clockodoSelectedCustomerId(context);
+            const projectHint = ready && !serviceCleared && !projectCleared && !this.clockodoProjectError
+                ? this.clockodoProjects.length === 0
+                    ? this.t('clockodoNoProjects')
+                    : !selectedCustomerId
+                        ? this.t('clockodoProjectChooseCustomer')
+                        : this.clockodoAllowedProjects(selectedCustomerId).length === 0
+                            ? this.t('clockodoNoProjectsForCustomer')
+                            : null
+                : null;
             hint.textContent = serviceCleared
                 ? this.t('clockodoServiceNotAllowedForCustomer')
                 : projectCleared
                     ? this.t('clockodoProjectNotAllowedForCustomer')
                     : this.clockodoProjectError
                         ? this.t('clockodoProjectLoadFailed')
-                        : this.clockodoAssignmentHint();
+                        : projectHint || this.clockodoAssignmentHint();
         }
         const retry = document.getElementById(ids.retry);
         if (retry) retry.style.display = status === 'error' || this.clockodoProjectError ? '' : 'none';

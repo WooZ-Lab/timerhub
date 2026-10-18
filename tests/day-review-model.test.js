@@ -4283,6 +4283,10 @@ function makeCustomerServiceApp(app) {
         { id: 12, name: 'Service 2', active: true },
         { id: 13, name: 'Service 3', active: true }
     ];
+    app.clockodoProjects = [
+        { id: 21, name: 'Project A1', active: true, customerId: 1 },
+        { id: 22, name: 'Project B1', active: true, customerId: 2 }
+    ];
     app.activities = [{ id: 'act-1', name: 'Painting', customerId: '', serviceId: '', archived: false }];
     app.reviewDate = '2026-10-05';
     app.renderLog = () => {};
@@ -9148,4 +9152,25 @@ test('a project load failure does not block Clockodo customers and services', as
     app.populateClockodoAssignmentSelects('activity', '5', '9', 'Beta', 'Repair');
     assert.doesNotMatch(document.getElementById('activityClockodoHint').textContent, /projects could not be loaded/i);
     assert.equal(document.getElementById('activityClockodoRetryBtn').style.display, 'none');
+});
+
+test('project hints explain exactly why the project list is empty', () => {
+    const { app, document } = createTestApp();
+    app.clockodoReferenceStatus = 'ready';
+    app.clockodoCustomers = [{ id: 5, name: 'Beta' }, { id: 7, name: 'Gamma' }];
+    app.clockodoServices = [{ id: 9, name: 'Repair' }];
+    app.clockodoProjects = [];
+
+    app.populateClockodoAssignmentSelects('activity', '5');
+    assert.equal(document.getElementById('activityClockodoHint').textContent, app.t('clockodoNoProjects'));
+
+    app.clockodoProjects = [{ id: 4, name: 'Object A', active: true, customerId: 7 }];
+    app.populateClockodoAssignmentSelects('activity');
+    assert.equal(document.getElementById('activityClockodoHint').textContent, app.t('clockodoProjectChooseCustomer'));
+
+    app.populateClockodoAssignmentSelects('activity', '5');
+    assert.equal(document.getElementById('activityClockodoHint').textContent, app.t('clockodoNoProjectsForCustomer'));
+
+    app.populateClockodoAssignmentSelects('activity', '7');
+    assert.equal(document.getElementById('activityClockodoHint').textContent, app.clockodoAssignmentHint());
 });
