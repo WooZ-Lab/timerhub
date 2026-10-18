@@ -1579,7 +1579,7 @@ test('Clockodo Worker loads projects with their customer mapping and rejects mal
     });
     assert.equal(body.includes('private project note'), false);
     assert.equal(body.includes(apiKey), false);
-    assert.equal(requests[0].url.includes('/api/v2/projects'), true);
+    assert.equal(requests[0].url.includes('/api/v4/projects'), true);
     assert.ok(requests[0].url.includes('items_per_page=1000'));
     assert.equal(requests[0].init.method, 'GET');
     assert.equal(requests[0].init.headers['X-ClockodoApiUser'], 'person@example.test');

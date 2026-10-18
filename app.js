@@ -398,6 +398,7 @@ const extendedTranslations = {
         clockodoAssignmentReload: 'Reload',
         clockodoAssignmentHelp: 'Type to search. Leave empty for no Clockodo assignment.',
         clockodoProjectNotAllowedForCustomer: 'The selected project does not belong to this customer. Choose a project of the selected customer.',
+        clockodoProjectLoadFailed: 'Customers and services loaded, but projects could not be loaded. Retry or check project access in Clockodo.',
         clockodoServiceNotAllowedForCustomer: 'The selected service is not allowed for this customer. Choose a valid service.',
         showSecret: 'Show', hideSecret: 'Hide',
         syncSuccessToast: 'Successfully synchronized {count} entries to Clockodo',
@@ -754,6 +755,7 @@ const extendedTranslations = {
         clockodoAssignmentReload: 'Neu laden',
         clockodoAssignmentHelp: 'Tippen zum Suchen. Leer lassen für keine Clockodo-Zuordnung.',
         clockodoProjectNotAllowedForCustomer: 'Das gewählte Projekt gehört nicht zu diesem Kunden. Wähle ein Projekt des ausgewählten Kunden.',
+        clockodoProjectLoadFailed: 'Kunden und Leistungen wurden geladen, aber Projekte konnten nicht geladen werden. Erneut versuchen oder Projektzugriff in Clockodo prüfen.',
         clockodoServiceNotAllowedForCustomer: 'Die gewählte Leistung ist für diesen Kunden nicht zulässig. Wähle eine gültige Leistung.',
         showSecret: 'Anzeigen', hideSecret: 'Verbergen',
         syncSuccessToast: '{count} Einträge erfolgreich nach Clockodo synchronisiert',
@@ -1110,6 +1112,7 @@ const extendedTranslations = {
         clockodoAssignmentReload: 'Обновить',
         clockodoAssignmentHelp: 'Введите текст для поиска. Оставьте пустым, чтобы не привязывать.',
         clockodoProjectNotAllowedForCustomer: 'Выбранный проект не принадлежит этому клиенту. Выберите проект выбранного клиента.',
+        clockodoProjectLoadFailed: 'Клиенты и услуги загружены, но проекты загрузить не удалось. Повторите попытку или проверьте доступ к проектам в Clockodo.',
         clockodoServiceNotAllowedForCustomer: 'Выбранная услуга недоступна для этого клиента. Выберите допустимую услугу.',
         showSecret: 'Показать', hideSecret: 'Скрыть',
         syncSuccessToast: 'Успешно синхронизировано записей в Clockodo: {count}',
@@ -1915,6 +1918,7 @@ class TimerHubApp {
         this.clockodoCustomers = [];
         this.clockodoServices = [];
         this.clockodoProjects = [];
+        this.clockodoProjectError = null;
         this.clockodoReferenceStatus = 'idle';
         this.clockodoReferenceError = null;
         this.clockodoReferencePromise = null;
@@ -7818,10 +7822,12 @@ class TimerHubApp {
                 ? this.t('clockodoServiceNotAllowedForCustomer')
                 : projectCleared
                     ? this.t('clockodoProjectNotAllowedForCustomer')
-                    : this.clockodoAssignmentHint();
+                    : this.clockodoProjectError
+                        ? this.t('clockodoProjectLoadFailed')
+                        : this.clockodoAssignmentHint();
         }
         const retry = document.getElementById(ids.retry);
-        if (retry) retry.style.display = status === 'error' ? '' : 'none';
+        if (retry) retry.style.display = status === 'error' || this.clockodoProjectError ? '' : 'none';
     }
 
     applyClockodoAssignmentInput(context, fieldName) {
@@ -8135,6 +8141,7 @@ class TimerHubApp {
                 this.clockodoCustomers = [];
                 this.clockodoServices = [];
                 this.clockodoProjects = [];
+                this.clockodoProjectError = null;
                 this.clockodoReferenceStatus = 'unconfigured';
             }
             return false;
@@ -8148,7 +8155,9 @@ class TimerHubApp {
         const operation = (async () => {
             try {
                 const supportsProjects = typeof this.clockodoClient.getProjects === 'function';
-                const [customerResult, serviceResult, projectResult] = await Promise.all([
+                // Projects are optional for assignment. A project endpoint failure
+                // (permissions, plan, older API) must never block customers/services.
+                const results = await Promise.allSettled([
                     this.clockodoClient.getCustomers(this.getPushClientId(), this.getClockodoAccessToken()),
                     this.clockodoClient.getServices(this.getPushClientId(), this.getClockodoAccessToken()),
                     supportsProjects
@@ -8156,9 +8165,16 @@ class TimerHubApp {
                         : Promise.resolve({ projects: [] })
                 ]);
                 if (configVersion !== this.clockodoConfigVersion) return false;
-                this.clockodoCustomers = Array.isArray(customerResult?.customers) ? customerResult.customers : [];
-                this.clockodoServices = Array.isArray(serviceResult?.services) ? serviceResult.services : [];
-                this.clockodoProjects = Array.isArray(projectResult?.projects) ? projectResult.projects : [];
+                const [customerResult, serviceResult, projectResult] = results;
+                const requiredFailure = [customerResult, serviceResult].find(result => result.status === 'rejected');
+                if (requiredFailure) throw requiredFailure.reason;
+                this.clockodoCustomers = Array.isArray(customerResult.value?.customers) ? customerResult.value.customers : [];
+                this.clockodoServices = Array.isArray(serviceResult.value?.services) ? serviceResult.value.services : [];
+                const projectsLoaded = projectResult.status === 'fulfilled' && Array.isArray(projectResult.value?.projects);
+                this.clockodoProjects = projectsLoaded ? projectResult.value.projects : [];
+                this.clockodoProjectError = projectResult.status === 'rejected'
+                    ? (projectResult.reason?.code || 'request_rejected')
+                    : null;
                 this.clockodoReferenceStatus = 'ready';
                 return true;
             } catch (error) {
@@ -8258,6 +8274,7 @@ class TimerHubApp {
                 this.clockodoCustomers = [];
                 this.clockodoServices = [];
                 this.clockodoProjects = [];
+                this.clockodoProjectError = null;
                 this.clockodoReferenceStatus = 'unconfigured';
             }
         } catch (error) {
@@ -8310,6 +8327,7 @@ class TimerHubApp {
             this.clockodoCustomers = [];
             this.clockodoServices = [];
             this.clockodoProjects = [];
+            this.clockodoProjectError = null;
             this.clockodoReferenceStatus = 'idle';
             this.clockodoReferencePromise = null;
             this.loadClockodoReferenceData();
@@ -8379,6 +8397,7 @@ class TimerHubApp {
         this.clockodoCustomers = [];
         this.clockodoServices = [];
         this.clockodoProjects = [];
+        this.clockodoProjectError = null;
         this.clockodoReferenceStatus = 'unconfigured';
         this.clockodoReferencePromise = null;
         document.getElementById('clockodoEmailInput').value = '';

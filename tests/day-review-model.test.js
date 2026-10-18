@@ -2958,7 +2958,7 @@ test('Task 10: confirmation submit control invokes the guarded confirm-and-sync 
     assert.match(source, /async confirmAndSyncClockodo\(\)\s*\{\s*if \(!this\.syncConfirmationOpen\) return false;/);
 });
 
-function makeClockodoReferenceClient({ customers = [], services = [], projects = null, failCode = null } = {}) {
+function makeClockodoReferenceClient({ customers = [], services = [], projects = null, failCode = null, projectFailCode = null } = {}) {
     const state = { customerCalls: 0, serviceCalls: 0, projectCalls: 0 };
     const client = {
         state,
@@ -2977,6 +2977,7 @@ function makeClockodoReferenceClient({ customers = [], services = [], projects =
         client.getProjects = async () => {
             state.projectCalls += 1;
             if (failCode) throw Object.assign(new Error('safe failure'), { code: failCode });
+            if (projectFailCode) throw Object.assign(new Error('project failure'), { code: projectFailCode });
             return { projects };
         };
     }
@@ -8670,7 +8671,7 @@ function stubClockodoUpstream(t, { customers = [{ id: 1, name: 'Customer A' }], 
         if (href.includes('/v4/users/me')) return Response.json({ data: { id: 7 } });
         if (href.includes('/v3/customers')) return Response.json({ data: customers });
         if (href.includes('/v4/services')) return Response.json({ data: services });
-        if (href.includes('/v2/projects')) return Response.json({ data: projects });
+        if (href.includes('/v4/projects')) return Response.json({ data: projects });
         if (href.includes('/v2/entries')) {
             if (entryHandler) {
                 const custom = entryHandler(record, calls);
@@ -9119,4 +9120,32 @@ test('a legacy free-text project survives a reference-data refresh', () => {
     app.refreshClockodoAssignmentViews();
     assert.equal(document.getElementById('entryEditProject').value, 'Bridge', 'free text is not cleared by a refresh');
     assert.equal(document.getElementById('entryEditProjectSelect').value, '');
+});
+
+test('a project load failure does not block Clockodo customers and services', async () => {
+    const client = makeClockodoReferenceClient({
+        customers: [{ id: 5, name: 'Beta' }],
+        services: [{ id: 9, name: 'Repair' }],
+        projects: [{ id: 4, name: 'Object A', customerId: 5 }],
+        projectFailCode: 'clockodo_rejected'
+    });
+    const { app, document } = createTestApp({ clockodoClient: client });
+    app.clockodoConfigured = true;
+
+    assert.equal(await app.loadClockodoReferenceData(), true, 'the reference load still succeeds');
+    assert.equal(app.clockodoReferenceStatus, 'ready');
+    assert.deepEqual(app.clockodoCustomers.map(item => item.id), [5]);
+    assert.deepEqual(app.clockodoServices.map(item => item.id), [9]);
+    assert.equal(app.clockodoProjects.length, 0, 'projects fall back to an empty list');
+    assert.equal(app.clockodoProjectError, 'clockodo_rejected');
+    assert.equal(client.state.projectCalls, 1);
+
+    app.populateClockodoAssignmentSelects('activity', '5', '9', 'Beta', 'Repair');
+    assert.match(document.getElementById('activityClockodoHint').textContent, /projects could not be loaded/i);
+    assert.equal(document.getElementById('activityClockodoRetryBtn').style.display, '', 'the retry action stays available');
+
+    app.clockodoProjectError = null;
+    app.populateClockodoAssignmentSelects('activity', '5', '9', 'Beta', 'Repair');
+    assert.doesNotMatch(document.getElementById('activityClockodoHint').textContent, /projects could not be loaded/i);
+    assert.equal(document.getElementById('activityClockodoRetryBtn').style.display, 'none');
 });

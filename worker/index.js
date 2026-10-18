@@ -417,7 +417,7 @@ export class TimerHubDurableObject {
         }
 
         if (path === "/clockodo/projects" && request.method === "GET") {
-            return this.clockodoListResponse(token, credentials, "v2/projects", "projects");
+            return this.clockodoListResponse(token, credentials, "v4/projects", "projects");
         }
 
         if (path === "/clockodo/test" && request.method === "POST") {
