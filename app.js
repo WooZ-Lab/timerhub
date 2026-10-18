@@ -389,6 +389,7 @@ const extendedTranslations = {
         customerIdPlaceholder: 'Clockodo customer ID', projectIdPlaceholder: 'Clockodo project ID', serviceIdPlaceholder: 'Clockodo service ID',
         clockodoAssignment: 'Clockodo assignment',
         clockodoCustomerSelectLabel: 'Clockodo customer',
+        clockodoProjectSelectLabel: 'Clockodo project',
         clockodoServiceSelectLabel: 'Clockodo service',
         clockodoAssignmentNone: 'No Clockodo assignment',
         clockodoAssignmentLoading: 'Loading Clockodo data…',
@@ -396,6 +397,7 @@ const extendedTranslations = {
         clockodoAssignmentLoadFailed: 'Could not load Clockodo customers and services.',
         clockodoAssignmentReload: 'Reload',
         clockodoAssignmentHelp: 'Type to search. Leave empty for no Clockodo assignment.',
+        clockodoProjectNotAllowedForCustomer: 'The selected project does not belong to this customer. Choose a project of the selected customer.',
         clockodoServiceNotAllowedForCustomer: 'The selected service is not allowed for this customer. Choose a valid service.',
         showSecret: 'Show', hideSecret: 'Hide',
         syncSuccessToast: 'Successfully synchronized {count} entries to Clockodo',
@@ -743,6 +745,7 @@ const extendedTranslations = {
         customerIdPlaceholder: 'Clockodo-Kunden-ID', projectIdPlaceholder: 'Clockodo-Projekt-ID', serviceIdPlaceholder: 'Clockodo-Leistungs-ID',
         clockodoAssignment: 'Clockodo-Zuordnung',
         clockodoCustomerSelectLabel: 'Clockodo-Kunde',
+        clockodoProjectSelectLabel: 'Clockodo-Projekt',
         clockodoServiceSelectLabel: 'Clockodo-Leistung',
         clockodoAssignmentNone: 'Keine Clockodo-Zuordnung',
         clockodoAssignmentLoading: 'Clockodo-Daten werden geladen …',
@@ -750,6 +753,7 @@ const extendedTranslations = {
         clockodoAssignmentLoadFailed: 'Clockodo-Kunden und -Leistungen konnten nicht geladen werden.',
         clockodoAssignmentReload: 'Neu laden',
         clockodoAssignmentHelp: 'Tippen zum Suchen. Leer lassen für keine Clockodo-Zuordnung.',
+        clockodoProjectNotAllowedForCustomer: 'Das gewählte Projekt gehört nicht zu diesem Kunden. Wähle ein Projekt des ausgewählten Kunden.',
         clockodoServiceNotAllowedForCustomer: 'Die gewählte Leistung ist für diesen Kunden nicht zulässig. Wähle eine gültige Leistung.',
         showSecret: 'Anzeigen', hideSecret: 'Verbergen',
         syncSuccessToast: '{count} Einträge erfolgreich nach Clockodo synchronisiert',
@@ -1097,6 +1101,7 @@ const extendedTranslations = {
         customerIdPlaceholder: 'ID клиента Clockodo', projectIdPlaceholder: 'ID проекта Clockodo', serviceIdPlaceholder: 'ID услуги Clockodo',
         clockodoAssignment: 'Привязка Clockodo',
         clockodoCustomerSelectLabel: 'Клиент Clockodo',
+        clockodoProjectSelectLabel: 'Проект Clockodo',
         clockodoServiceSelectLabel: 'Услуга Clockodo',
         clockodoAssignmentNone: 'Без привязки к Clockodo',
         clockodoAssignmentLoading: 'Загрузка данных Clockodo…',
@@ -1104,6 +1109,7 @@ const extendedTranslations = {
         clockodoAssignmentLoadFailed: 'Не удалось загрузить клиентов и услуги Clockodo.',
         clockodoAssignmentReload: 'Обновить',
         clockodoAssignmentHelp: 'Введите текст для поиска. Оставьте пустым, чтобы не привязывать.',
+        clockodoProjectNotAllowedForCustomer: 'Выбранный проект не принадлежит этому клиенту. Выберите проект выбранного клиента.',
         clockodoServiceNotAllowedForCustomer: 'Выбранная услуга недоступна для этого клиента. Выберите допустимую услугу.',
         showSecret: 'Показать', hideSecret: 'Скрыть',
         syncSuccessToast: 'Успешно синхронизировано записей в Clockodo: {count}',
@@ -1908,6 +1914,7 @@ class TimerHubApp {
         this.clockodoClient = window.ClockodoClient ? new window.ClockodoClient() : null;
         this.clockodoCustomers = [];
         this.clockodoServices = [];
+        this.clockodoProjects = [];
         this.clockodoReferenceStatus = 'idle';
         this.clockodoReferenceError = null;
         this.clockodoReferencePromise = null;
@@ -2257,6 +2264,7 @@ class TimerHubApp {
             updatedAt: Number.isFinite(Number(raw.updatedAt)) ? Number(raw.updatedAt) : now,
             notes: typeof raw.notes === 'string' ? raw.notes : (typeof raw.note === 'string' ? raw.note : ''),
             project: typeof raw.project === 'string' ? raw.project : '',
+            projectId: this.normalizeClockodoId(raw.projectId),
             service: typeof raw.service === 'string' ? raw.service : '',
             customerId: this.normalizeClockodoId(raw.customerId),
             serviceId: this.normalizeClockodoId(raw.serviceId),
@@ -2286,6 +2294,7 @@ class TimerHubApp {
             updatedAt: data.updatedAt ? Number(data.updatedAt) : now,
             notes: data.notes || data.note || '',
             project: data.project || '',
+            projectId: this.normalizeClockodoId(data.projectId),
             service: data.service || '',
             customerId: this.normalizeClockodoId(data.customerId),
             serviceId: this.normalizeClockodoId(data.serviceId),
@@ -2453,6 +2462,9 @@ class TimerHubApp {
                 if (entryData.serviceId === undefined) entryData.serviceId = activity.serviceId || '';
                 if (entryData.customerName === undefined) entryData.customerName = activity.customerName || '';
                 if (entryData.serviceName === undefined) entryData.serviceName = activity.serviceName || '';
+                if (entryData.projectId === undefined) entryData.projectId = activity.projectId || '';
+                if (entryData.projectName === undefined) entryData.projectName = activity.projectName || '';
+                if (entryData.project === undefined) entryData.project = activity.projectName || '';
             }
         }
         const entry = this.createTimeEntry(entryData);
@@ -2481,6 +2493,7 @@ class TimerHubApp {
             merged.activityId !== existing.activityId ||
             merged.notes !== existing.notes ||
             merged.project !== existing.project ||
+            merged.projectId !== existing.projectId ||
             merged.service !== existing.service ||
             merged.customerId !== existing.customerId ||
             merged.serviceId !== existing.serviceId;
@@ -2721,13 +2734,21 @@ class TimerHubApp {
         sel('entryEditDeleteBtn')?.addEventListener('click', () => this.deleteTimeEntry());
         sel('entryEditActivity')?.addEventListener('change', (e) => {
             const activity = this.activities.find(item => item.id === e.target.value);
-            this.populateClockodoAssignmentSelects('entry', activity?.customerId, activity?.serviceId, activity?.customerName, activity?.serviceName);
+            this.populateClockodoAssignmentSelects(
+                'entry',
+                activity?.customerId,
+                activity?.serviceId,
+                activity?.customerName,
+                activity?.serviceName,
+                activity?.projectId,
+                activity?.projectName
+            );
         });
         sel('activityClockodoRetryBtn')?.addEventListener('click', () => this.reloadClockodoReferenceData());
         sel('entryEditClockodoRetryBtn')?.addEventListener('click', () => this.reloadClockodoReferenceData());
         for (const [context, fieldName] of [
-            ['activity', 'customer'], ['activity', 'service'],
-            ['entry', 'customer'], ['entry', 'service']
+            ['activity', 'customer'], ['activity', 'project'], ['activity', 'service'],
+            ['entry', 'customer'], ['entry', 'project'], ['entry', 'service']
         ]) {
             const combobox = this.clockodoComboboxIds(context, fieldName);
             sel(combobox.input)?.addEventListener('focus', () => this.openClockodoCombobox(context, fieldName));
@@ -3604,7 +3625,7 @@ class TimerHubApp {
                         || this.archivedActivities?.find(item => item.id === entry.activityId);
                     entry.clockodoPayload = this.clockodoClient.buildEntryPayload(entry, {
                         customerId: activity?.customerId || this.clockodoCustomerId,
-                        projectId: this.clockodoProjectId,
+                        projectId: activity?.projectId || this.clockodoProjectId,
                         serviceId: activity?.serviceId || this.clockodoServiceId,
                         billable: this.clockodoBillable
                     });
@@ -7100,7 +7121,9 @@ class TimerHubApp {
                 assignmentActivity?.customerId,
                 assignmentActivity?.serviceId,
                 assignmentActivity?.customerName,
-                assignmentActivity?.serviceName
+                assignmentActivity?.serviceName,
+                assignmentActivity?.projectId,
+                assignmentActivity?.projectName
             );
         } else {
             this.populateClockodoAssignmentSelects('activity');
@@ -7167,8 +7190,10 @@ class TimerHubApp {
                 activity.notes = notes;
                 activity.customerId = assignment.customerId;
                 activity.serviceId = assignment.serviceId;
+                activity.projectId = assignment.projectId;
                 activity.customerName = assignment.customerName;
                 activity.serviceName = assignment.serviceName;
+                activity.projectName = assignment.projectName;
                 if (icon) activity.icon = icon;
                 else delete activity.icon;
                 if (displayMode) activity.displayMode = displayMode;
@@ -7188,8 +7213,10 @@ class TimerHubApp {
                 notes: notes,
                 customerId: assignment.customerId,
                 serviceId: assignment.serviceId,
+                projectId: assignment.projectId,
                 customerName: assignment.customerName,
                 serviceName: assignment.serviceName,
+                projectName: assignment.projectName,
                 position: this.activities.length,
                 archived: false,
                 createdAt: now,
@@ -7353,10 +7380,21 @@ class TimerHubApp {
         document.getElementById('entryEditEnd').value = entry.endTimestamp === null
             ? ''
             : this.toTimeString(new Date(entry.endTimestamp));
-        document.getElementById('entryEditProject').value = entry.project || '';
+        this.populateClockodoAssignmentSelects(
+            'entry',
+            entry.customerId,
+            entry.serviceId,
+            entry.customerName,
+            entry.serviceName,
+            entry.projectId,
+            entry.project
+        );
+        if (entry.project && !entry.projectId) {
+            // Legacy entries stored a free-text project; keep it visible.
+            document.getElementById('entryEditProject').value = entry.project;
+        }
         document.getElementById('entryEditService').value = entry.service || '';
         document.getElementById('entryEditNotes').value = entry.notes || '';
-        this.populateClockodoAssignmentSelects('entry', entry.customerId, entry.serviceId, entry.customerName, entry.serviceName);
         this.loadClockodoReferenceData();
         document.getElementById('entryEditModalTitle').textContent = this.t('editEntry');
         const confirmed = [SYNC_STATUS.CONFIRMED, SYNC_STATUS.SYNCING].includes(entry.syncStatus);
@@ -7382,13 +7420,20 @@ class TimerHubApp {
         this.editingEntryId = null;
         this.populateEntryActivitySelect(this.activities[0]?.id || '');
         const defaultActivity = this.activities.find(item => item.id === document.getElementById('entryEditActivity').value);
-        this.populateClockodoAssignmentSelects('entry', defaultActivity?.customerId, defaultActivity?.serviceId, defaultActivity?.customerName, defaultActivity?.serviceName);
+        this.populateClockodoAssignmentSelects(
+            'entry',
+            defaultActivity?.customerId,
+            defaultActivity?.serviceId,
+            defaultActivity?.customerName,
+            defaultActivity?.serviceName,
+            defaultActivity?.projectId,
+            defaultActivity?.projectName
+        );
         this.loadClockodoReferenceData();
         document.getElementById('entryEditDate').value = this.reviewDate;
         document.getElementById('entryEditEndDate').value = this.reviewDate;
         document.getElementById('entryEditStart').value = '';
         document.getElementById('entryEditEnd').value = '';
-        document.getElementById('entryEditProject').value = '';
         document.getElementById('entryEditService').value = '';
         document.getElementById('entryEditNotes').value = '';
         document.getElementById('entryEditModalTitle').textContent = this.t('addEntry');
@@ -7490,6 +7535,7 @@ class TimerHubApp {
             startTimestamp: start,
             endTimestamp: end,
             project: document.getElementById('entryEditProject').value.trim(),
+            projectId: assignment.projectId,
             service: document.getElementById('entryEditService').value.trim(),
             customerId: assignment.customerId,
             serviceId: assignment.serviceId,
@@ -7554,17 +7600,22 @@ class TimerHubApp {
             ? {
                 customer: 'activityCustomerSelect', customerInput: 'activityCustomerInput', customerList: 'activityCustomerList',
                 service: 'activityServiceSelect', serviceInput: 'activityServiceInput', serviceList: 'activityServiceList',
+                project: 'activityProjectSelect', projectInput: 'activityProjectInput', projectList: 'activityProjectList',
                 hint: 'activityClockodoHint', retry: 'activityClockodoRetryBtn'
             }
             : {
                 customer: 'entryEditCustomerSelect', customerInput: 'entryEditCustomerInput', customerList: 'entryEditCustomerList',
                 service: 'entryEditServiceSelect', serviceInput: 'entryEditServiceInput', serviceList: 'entryEditServiceList',
+                project: 'entryEditProjectSelect', projectInput: 'entryEditProject', projectList: 'entryEditProjectList',
                 hint: 'entryEditClockodoHint', retry: 'entryEditClockodoRetryBtn'
             };
     }
 
     clockodoComboboxIds(context, fieldName) {
         const ids = this.clockodoAssignmentIds(context);
+        if (fieldName === 'project') {
+            return { input: ids.projectInput, hidden: ids.project, list: ids.projectList };
+        }
         return fieldName === 'customer'
             ? { input: ids.customerInput, hidden: ids.customer, list: ids.customerList }
             : { input: ids.serviceInput, hidden: ids.service, list: ids.serviceList };
@@ -7572,6 +7623,7 @@ class TimerHubApp {
 
     clockodoComboboxItems(context, fieldName) {
         if (fieldName === 'customer') return this.clockodoCustomers;
+        if (fieldName === 'project') return this.clockodoAllowedProjects(this.clockodoSelectedCustomerId(context));
         return this.clockodoAllowedServices(this.clockodoSelectedCustomerId(context));
     }
 
@@ -7589,6 +7641,13 @@ class TimerHubApp {
         if (!Array.isArray(assignments) || assignments.length === 0) return services;
         const allowed = new Set(assignments.map(String));
         return services.filter(service => allowed.has(String(service.id)));
+    }
+
+    clockodoAllowedProjects(customerId) {
+        const projects = Array.isArray(this.clockodoProjects) ? this.clockodoProjects : [];
+        const id = this.normalizeClockodoId(customerId);
+        if (!id) return [];
+        return projects.filter(project => String(project.customerId) === String(id));
     }
 
     clockodoSelectedCustomerId(context) {
@@ -7610,6 +7669,20 @@ class TimerHubApp {
         if (!selected) return false;
         const allowed = this.clockodoAllowedServices(this.clockodoSelectedCustomerId(context));
         if (allowed.some(service => String(service.id) === selected)) return false;
+        if (hiddenEl) hiddenEl.value = '';
+        const inputEl = document.getElementById(input);
+        if (inputEl) inputEl.value = '';
+        return true;
+    }
+
+    enforceClockodoProjectForCustomer(context) {
+        if (this.clockodoReferenceStatus !== 'ready') return false;
+        const { input, hidden } = this.clockodoComboboxIds(context, 'project');
+        const hiddenEl = document.getElementById(hidden);
+        const selected = this.normalizeClockodoId(hiddenEl?.value);
+        if (!selected) return false;
+        const allowed = this.clockodoAllowedProjects(this.clockodoSelectedCustomerId(context));
+        if (allowed.some(project => String(project.id) === selected)) return false;
         if (hiddenEl) hiddenEl.value = '';
         const inputEl = document.getElementById(input);
         if (inputEl) inputEl.value = '';
@@ -7698,7 +7771,7 @@ class TimerHubApp {
         }
     }
 
-    populateClockodoAssignmentSelects(context, selectedCustomerId = null, selectedServiceId = null, customerName = '', serviceName = '') {
+    populateClockodoAssignmentSelects(context, selectedCustomerId = null, selectedServiceId = null, customerName = '', serviceName = '', selectedProjectId = null, projectName = '') {
         const ids = this.clockodoAssignmentIds(context);
         const status = this.clockodoReferenceStatus;
         const ready = status === 'ready';
@@ -7709,15 +7782,23 @@ class TimerHubApp {
             customerName
         );
         this.populateClockodoAssignmentField(
+            { hidden: ids.project, input: ids.projectInput, list: ids.projectList },
+            ready ? this.clockodoAllowedProjects(this.clockodoSelectedCustomerId(context)) : [],
+            selectedProjectId,
+            projectName
+        );
+        this.populateClockodoAssignmentField(
             { hidden: ids.service, input: ids.serviceInput, list: ids.serviceList },
             ready ? this.clockodoAllowedServices(this.clockodoSelectedCustomerId(context)) : [],
             selectedServiceId,
             serviceName
         );
         const serviceCleared = this.enforceClockodoServiceForCustomer(context);
+        const projectCleared = this.enforceClockodoProjectForCustomer(context);
         const statePlaceholder = this.clockodoAssignmentPlaceholder();
         for (const [inputId, labelKey] of [
             [ids.customerInput, 'clockodoCustomerSelectLabel'],
+            [ids.projectInput, 'clockodoProjectSelectLabel'],
             [ids.serviceInput, 'clockodoServiceSelectLabel']
         ]) {
             const input = document.getElementById(inputId);
@@ -7735,7 +7816,9 @@ class TimerHubApp {
         if (hint) {
             hint.textContent = serviceCleared
                 ? this.t('clockodoServiceNotAllowedForCustomer')
-                : this.clockodoAssignmentHint();
+                : projectCleared
+                    ? this.t('clockodoProjectNotAllowedForCustomer')
+                    : this.clockodoAssignmentHint();
         }
         const retry = document.getElementById(ids.retry);
         if (retry) retry.style.display = status === 'error' ? '' : 'none';
@@ -7748,9 +7831,14 @@ class TimerHubApp {
         const match = this.findClockodoItem(this.clockodoComboboxItems(context, fieldName), inputEl?.value);
         if (hiddenEl) hiddenEl.value = match ? String(match.id) : '';
         const serviceCleared = fieldName === 'customer' ? this.enforceClockodoServiceForCustomer(context) : false;
+        const projectCleared = fieldName === 'customer' ? this.enforceClockodoProjectForCustomer(context) : false;
         this.setClockodoAssignmentHint(
             context,
-            serviceCleared ? this.t('clockodoServiceNotAllowedForCustomer') : null
+            serviceCleared
+                ? this.t('clockodoServiceNotAllowedForCustomer')
+                : projectCleared
+                    ? this.t('clockodoProjectNotAllowedForCustomer')
+                    : null
         );
         if (this.clockodoReferenceStatus === 'ready') this.openClockodoCombobox(context, fieldName, inputEl?.value || '');
         else this.closeClockodoCombobox();
@@ -7876,9 +7964,14 @@ class TimerHubApp {
         if (inputEl) inputEl.value = option.unassigned ? '' : option.label;
         this.closeClockodoCombobox();
         const serviceCleared = fieldName === 'customer' ? this.enforceClockodoServiceForCustomer(context) : false;
+        const projectCleared = fieldName === 'customer' ? this.enforceClockodoProjectForCustomer(context) : false;
         this.setClockodoAssignmentHint(
             context,
-            serviceCleared ? this.t('clockodoServiceNotAllowedForCustomer') : null
+            serviceCleared
+                ? this.t('clockodoServiceNotAllowedForCustomer')
+                : projectCleared
+                    ? this.t('clockodoProjectNotAllowedForCustomer')
+                    : null
         );
     }
 
@@ -7909,7 +8002,7 @@ class TimerHubApp {
         const match = this.findClockodoItem(items, inputEl.value);
         if (match) {
             inputEl.value = this.clockodoOptionLabel(match, this.clockodoNameCounts(items));
-        } else if (String(inputEl.value || '').trim()) {
+        } else if (fieldName !== 'project' && String(inputEl.value || '').trim()) {
             inputEl.value = '';
         }
     }
@@ -7979,36 +8072,57 @@ class TimerHubApp {
         const ids = this.clockodoAssignmentIds(context);
         const customerId = this.normalizeClockodoId(document.getElementById(ids.customer)?.value);
         const serviceId = this.normalizeClockodoId(document.getElementById(ids.service)?.value);
+        const projectId = this.normalizeClockodoId(document.getElementById(ids.project)?.value);
         const nameById = (items, id) => (Array.isArray(items) ? items : []).find(item => String(item.id) === String(id))?.name || '';
         const inputName = inputId => (inputId ? String(document.getElementById(inputId)?.value || '').trim() : '');
         return {
             customerId: customerId || '',
             serviceId: serviceId || '',
+            projectId: projectId || '',
             customerName: nameById(this.clockodoCustomers, customerId) || inputName(ids.customerInput),
-            serviceName: nameById(this.clockodoServices, serviceId) || inputName(ids.serviceInput)
+            serviceName: nameById(this.clockodoServices, serviceId) || inputName(ids.serviceInput),
+            projectName: nameById(this.clockodoProjects, projectId) || inputName(ids.projectInput)
         };
+    }
+
+    restoreProjectFreeText(context, previousText) {
+        if (!previousText) return false;
+        const { input, hidden } = this.clockodoComboboxIds(context, 'project');
+        const hiddenEl = document.getElementById(hidden);
+        const inputEl = document.getElementById(input);
+        if (!hiddenEl || !inputEl || hiddenEl.value) return false;
+        inputEl.value = previousText;
+        return true;
     }
 
     refreshClockodoAssignmentViews() {
         const activityModal = document.getElementById('activityModal');
         if (activityModal?.classList?.contains?.('active')) {
+            const projectText = document.getElementById('activityProjectInput')?.value || '';
             this.populateClockodoAssignmentSelects(
                 'activity',
                 document.getElementById('activityCustomerSelect')?.value,
                 document.getElementById('activityServiceSelect')?.value,
                 document.getElementById('activityCustomerInput')?.value,
-                document.getElementById('activityServiceInput')?.value
+                document.getElementById('activityServiceInput')?.value,
+                document.getElementById('activityProjectSelect')?.value,
+                projectText
             );
+            this.restoreProjectFreeText('activity', projectText);
         }
         const entryModal = document.getElementById('entryEditModal');
         if (entryModal?.classList?.contains?.('active')) {
+            const projectText = document.getElementById('entryEditProject')?.value || '';
             this.populateClockodoAssignmentSelects(
                 'entry',
                 document.getElementById('entryEditCustomerSelect')?.value,
                 document.getElementById('entryEditServiceSelect')?.value,
                 document.getElementById('entryEditCustomerInput')?.value,
-                document.getElementById('entryEditServiceInput')?.value
+                document.getElementById('entryEditServiceInput')?.value,
+                document.getElementById('entryEditProjectSelect')?.value,
+                projectText
             );
+            this.restoreProjectFreeText('entry', projectText);
         }
     }
 
@@ -8020,6 +8134,7 @@ class TimerHubApp {
             if (!this.clockodoConfigured) {
                 this.clockodoCustomers = [];
                 this.clockodoServices = [];
+                this.clockodoProjects = [];
                 this.clockodoReferenceStatus = 'unconfigured';
             }
             return false;
@@ -8032,13 +8147,18 @@ class TimerHubApp {
         this.refreshClockodoAssignmentViews();
         const operation = (async () => {
             try {
-                const [customerResult, serviceResult] = await Promise.all([
+                const supportsProjects = typeof this.clockodoClient.getProjects === 'function';
+                const [customerResult, serviceResult, projectResult] = await Promise.all([
                     this.clockodoClient.getCustomers(this.getPushClientId(), this.getClockodoAccessToken()),
-                    this.clockodoClient.getServices(this.getPushClientId(), this.getClockodoAccessToken())
+                    this.clockodoClient.getServices(this.getPushClientId(), this.getClockodoAccessToken()),
+                    supportsProjects
+                        ? this.clockodoClient.getProjects(this.getPushClientId(), this.getClockodoAccessToken())
+                        : Promise.resolve({ projects: [] })
                 ]);
                 if (configVersion !== this.clockodoConfigVersion) return false;
                 this.clockodoCustomers = Array.isArray(customerResult?.customers) ? customerResult.customers : [];
                 this.clockodoServices = Array.isArray(serviceResult?.services) ? serviceResult.services : [];
+                this.clockodoProjects = Array.isArray(projectResult?.projects) ? projectResult.projects : [];
                 this.clockodoReferenceStatus = 'ready';
                 return true;
             } catch (error) {
@@ -8137,6 +8257,7 @@ class TimerHubApp {
             } else {
                 this.clockodoCustomers = [];
                 this.clockodoServices = [];
+                this.clockodoProjects = [];
                 this.clockodoReferenceStatus = 'unconfigured';
             }
         } catch (error) {
@@ -8188,6 +8309,7 @@ class TimerHubApp {
             this.showToast(this.t('clockodoConfigSaved'));
             this.clockodoCustomers = [];
             this.clockodoServices = [];
+            this.clockodoProjects = [];
             this.clockodoReferenceStatus = 'idle';
             this.clockodoReferencePromise = null;
             this.loadClockodoReferenceData();
@@ -8256,6 +8378,7 @@ class TimerHubApp {
         this.clockodoConfigVersion += 1;
         this.clockodoCustomers = [];
         this.clockodoServices = [];
+        this.clockodoProjects = [];
         this.clockodoReferenceStatus = 'unconfigured';
         this.clockodoReferencePromise = null;
         document.getElementById('clockodoEmailInput').value = '';

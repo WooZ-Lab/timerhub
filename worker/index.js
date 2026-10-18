@@ -295,11 +295,18 @@ export class TimerHubDurableObject {
                     return jsonError(this.clockodoErrorCode(response.status), response.status);
                 }
                 const data = await response.json().catch(() => null);
-                if (!data || typeof data !== "object" || Array.isArray(data) ||
-                    !Array.isArray(data.data)) {
+                if (!data || typeof data !== "object" || Array.isArray(data)) {
                     return jsonError("malformed_response", 502);
                 }
-                for (const item of data.data) {
+                const itemsSource = Array.isArray(data.data)
+                    ? data.data
+                    : responseKey === "projects" && Array.isArray(data.projects)
+                        ? data.projects
+                        : null;
+                if (!itemsSource) {
+                    return jsonError("malformed_response", 502);
+                }
+                for (const item of itemsSource) {
                     if (!item || typeof item !== "object" ||
                         !Number.isSafeInteger(item.id) || item.id < 1 ||
                         typeof item.name !== "string" || !item.name.trim()) {
@@ -314,6 +321,12 @@ export class TimerHubDurableObject {
                         entry.serviceAssignments = item.service_assignments
                             .filter(value => Number.isSafeInteger(value) && value > 0)
                             .slice(0, 500);
+                    }
+                    if (responseKey === "projects") {
+                        if (!Number.isSafeInteger(item.customers_id) || item.customers_id < 1) {
+                            return jsonError("malformed_response", 502);
+                        }
+                        entry.customerId = item.customers_id;
                     }
                     items.push(entry);
                 }
@@ -401,6 +414,10 @@ export class TimerHubDurableObject {
 
         if (path === "/clockodo/services" && request.method === "GET") {
             return this.clockodoListResponse(token, credentials, "v4/services", "services");
+        }
+
+        if (path === "/clockodo/projects" && request.method === "GET") {
+            return this.clockodoListResponse(token, credentials, "v2/projects", "projects");
         }
 
         if (path === "/clockodo/test" && request.method === "POST") {
@@ -629,7 +646,8 @@ export default {
             ["/api/clockodo/test", { path: "/clockodo/test", methods: ["POST"] }],
             ["/api/clockodo/entries", { path: "/clockodo/entries", methods: ["POST"] }],
             ["/api/clockodo/customers", { path: "/clockodo/customers", methods: ["GET"] }],
-            ["/api/clockodo/services", { path: "/clockodo/services", methods: ["GET"] }]
+            ["/api/clockodo/services", { path: "/clockodo/services", methods: ["GET"] }],
+            ["/api/clockodo/projects", { path: "/clockodo/projects", methods: ["GET"] }]
         ]);
         const clockodoEntryMutation = /^\/api\/clockodo\/entries\/\d+$/.test(url.pathname);
         if (clockodoEntryMutation) return jsonError("method_not_allowed", 405);

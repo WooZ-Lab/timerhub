@@ -120,6 +120,12 @@
                         .filter(value => Number.isSafeInteger(value) && value > 0)
                         .slice(0, 500);
                 }
+                if (key === 'projects') {
+                    if (!Number.isSafeInteger(item.customerId) || item.customerId < 1) {
+                        throw new ClockodoClientError('malformed_response');
+                    }
+                    entry.customerId = item.customerId;
+                }
                 return entry;
             });
         }
@@ -132,6 +138,11 @@
         async getServices(clientId, accessToken) {
             const data = await this.request('/api/clockodo/services', { clientId, accessToken });
             return { services: this.validateReferenceList(data, 'services') };
+        }
+
+        async getProjects(clientId, accessToken) {
+            const data = await this.request('/api/clockodo/projects', { clientId, accessToken });
+            return { projects: this.validateReferenceList(data, 'projects') };
         }
 
         saveConfig(clientId, accessToken, credentials) {
@@ -191,7 +202,7 @@
             };
             const customerId = id(entry.customerId, id(config.customerId, null));
             const serviceId = id(entry.serviceId, id(entry.service, config.serviceId));
-            const projectId = id(entry.project, config.projectId);
+            const projectId = id(entry.projectId, id(entry.project, config.projectId));
             if (!Number.isInteger(customerId) || customerId < 0 || !Number.isInteger(serviceId) || serviceId < 0) {
                 throw new ClockodoClientError('missing_clockodo_assignment');
             }

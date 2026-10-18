@@ -294,3 +294,34 @@ test('Clockodo entry text is notes only and never the activity or project name',
     assert.equal(withNotes.time_since, '2026-10-05T12:40:00Z');
     assert.equal(withNotes.time_until, '2026-10-05T12:40:00Z');
 });
+
+test('Clockodo client validates projects and maps their customer', async () => {
+    const { client, Client } = makeClient(async () => Response.json({
+        projects: [
+            { id: 4, name: 'Object A', active: true, customerId: 5 },
+            { id: 6, name: 'Object B', active: false, customerId: 7 }
+        ]
+    }));
+    const result = await client.getProjects(clientOptions.clientId, clientOptions.accessToken);
+    assert.deepEqual(JSON.parse(JSON.stringify(result.projects)), [
+        { id: 4, name: 'Object A', active: true, customerId: 5 },
+        { id: 6, name: 'Object B', active: false, customerId: 7 }
+    ]);
+
+    const payload = Client.buildEntryPayload({
+        startTimestamp: 1770000000000,
+        endTimestamp: 1770003600000,
+        customerId: '5',
+        serviceId: '9',
+        projectId: '4'
+    }, { projectId: '1' });
+    assert.equal(payload.projects_id, 4, 'an explicit entry project wins over the default project');
+
+    const missingCustomer = makeClient(async () => Response.json({
+        projects: [{ id: 4, name: 'Object A' }]
+    }));
+    await assert.rejects(
+        () => missingCustomer.client.getProjects(clientOptions.clientId, clientOptions.accessToken),
+        error => error.code === 'malformed_response'
+    );
+});

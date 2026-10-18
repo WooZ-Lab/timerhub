@@ -155,6 +155,7 @@ function createTestApp(initialData = {}) {
         'activityModal', 'modalTitle', 'activityName', 'activityNotes', 'modalSaveBtn', 'modalCancelBtn', 'modalCloseBtn',
         'activityMenuModal', 'activityMenuTitle',
         'activityCustomerSelect', 'activityServiceSelect', 'activityClockodoHint', 'activityClockodoRetryBtn',
+        'activityProjectSelect', 'activityProjectInput', 'activityProjectList', 'entryEditProjectSelect', 'entryEditProjectList',
         'activityCustomerInput', 'activityCustomerList', 'activityServiceInput', 'activityServiceList',
         'syncConfirmEntriesList', 'syncConfirmDesc', 'syncConfirmSummary',
         'syncConfirmAlreadySyncedNotice', 'syncConfirmSubmitBtn', 'syncConfirmModal',
@@ -2957,9 +2958,9 @@ test('Task 10: confirmation submit control invokes the guarded confirm-and-sync 
     assert.match(source, /async confirmAndSyncClockodo\(\)\s*\{\s*if \(!this\.syncConfirmationOpen\) return false;/);
 });
 
-function makeClockodoReferenceClient({ customers = [], services = [], failCode = null } = {}) {
-    const state = { customerCalls: 0, serviceCalls: 0 };
-    return {
+function makeClockodoReferenceClient({ customers = [], services = [], projects = null, failCode = null } = {}) {
+    const state = { customerCalls: 0, serviceCalls: 0, projectCalls: 0 };
+    const client = {
         state,
         async getCustomers() {
             state.customerCalls += 1;
@@ -2972,6 +2973,14 @@ function makeClockodoReferenceClient({ customers = [], services = [], failCode =
             return { services };
         }
     };
+    if (projects) {
+        client.getProjects = async () => {
+            state.projectCalls += 1;
+            if (failCode) throw Object.assign(new Error('safe failure'), { code: failCode });
+            return { projects };
+        };
+    }
+    return client;
 }
 
 test('Clockodo reference data loads once, caches, and reports unconfigured state', async () => {
@@ -8645,7 +8654,7 @@ function makeShareRecipientHarness(backend) {
     return harness;
 }
 
-function stubClockodoUpstream(t, { customers = [{ id: 1, name: 'Customer A' }], services = [{ id: 9, name: 'Service X' }], entryHandler = null } = {}) {
+function stubClockodoUpstream(t, { customers = [{ id: 1, name: 'Customer A' }], services = [{ id: 9, name: 'Service X' }], projects = [{ id: 4, name: 'Project A', customers_id: 1 }], entryHandler = null } = {}) {
     const originalFetch = globalThis.fetch;
     const calls = [];
     globalThis.fetch = async (url, init = {}) => {
@@ -8661,6 +8670,7 @@ function stubClockodoUpstream(t, { customers = [{ id: 1, name: 'Customer A' }], 
         if (href.includes('/v4/users/me')) return Response.json({ data: { id: 7 } });
         if (href.includes('/v3/customers')) return Response.json({ data: customers });
         if (href.includes('/v4/services')) return Response.json({ data: services });
+        if (href.includes('/v2/projects')) return Response.json({ data: projects });
         if (href.includes('/v2/entries')) {
             if (entryHandler) {
                 const custom = entryHandler(record, calls);
@@ -8944,4 +8954,169 @@ test('a share link URL in the address bar is captured and cleaned', () => {
     assert.equal(app.pendingShareLink.shareId, shareId);
     assert.equal(app.pendingShareLink.secret, secret);
     assert.equal(String(window.location.search).includes('share='), true, 'the mock location keeps its value; real browsers are cleaned via replaceState');
+});
+
+test('Clockodo reference data loads projects with their customer when supported', async () => {
+    const client = makeClockodoReferenceClient({
+        customers: [{ id: 5, name: 'Beta' }],
+        services: [{ id: 9, name: 'Repair' }],
+        projects: [
+            { id: 4, name: 'Object A', active: true, customerId: 5 },
+            { id: 6, name: 'Object B', active: false, customerId: 7 }
+        ]
+    });
+    const { app } = createTestApp({ clockodoClient: client });
+    app.clockodoConfigured = true;
+    assert.equal(await app.loadClockodoReferenceData(), true);
+    assert.deepEqual(app.clockodoProjects.map(item => item.id), [4, 6]);
+    assert.equal(client.state.projectCalls, 1);
+    assert.equal(app.clockodoReferenceStatus, 'ready');
+});
+
+test('project choices follow the selected customer in activity and entry editors', () => {
+    const { app, document } = createTestApp();
+    app.clockodoReferenceStatus = 'ready';
+    app.clockodoCustomers = [{ id: 5, name: 'Beta' }, { id: 7, name: 'Gamma' }];
+    app.clockodoServices = [{ id: 9, name: 'Repair' }];
+    app.clockodoProjects = [
+        { id: 4, name: 'Object A', active: true, customerId: 5 },
+        { id: 6, name: 'Object B', active: true, customerId: 7 }
+    ];
+
+    app.populateClockodoAssignmentSelects('activity', '5', null, 'Beta', '');
+    app.openClockodoCombobox('activity', 'project');
+    assert.deepEqual(clockodoComboboxLabels(app, document, 'activity', 'project'), [
+        'No Clockodo assignment',
+        'Object A'
+    ], 'only projects of the selected customer are offered');
+    app.selectClockodoComboboxOption('activity', 'project', app.clockodoCombobox.options[1]);
+    assert.equal(document.getElementById('activityProjectSelect').value, '4');
+    assert.equal(document.getElementById('activityProjectInput').value, 'Object A');
+
+    document.getElementById('activityCustomerSelect').value = '7';
+    document.getElementById('activityCustomerInput').value = 'Gamma';
+    assert.equal(app.enforceClockodoProjectForCustomer('activity'), true);
+    assert.equal(document.getElementById('activityProjectSelect').value, '', 'a project of another customer is cleared');
+    assert.equal(document.getElementById('activityProjectInput').value, '');
+
+    app.openClockodoCombobox('activity', 'project');
+    assert.deepEqual(clockodoComboboxLabels(app, document, 'activity', 'project'), [
+        'No Clockodo assignment',
+        'Object B'
+    ]);
+    app.closeClockodoCombobox();
+
+    app.populateClockodoAssignmentSelects('entry', '7', '9', 'Gamma', 'Repair', '6', 'Object B');
+    assert.equal(document.getElementById('entryEditProjectSelect').value, '6');
+    assert.equal(document.getElementById('entryEditProject').value, 'Object B');
+    app.openClockodoCombobox('entry', 'project');
+    assert.deepEqual(clockodoComboboxLabels(app, document, 'entry', 'project'), [
+        'No Clockodo assignment',
+        'Object B'
+    ]);
+    app.closeClockodoCombobox();
+});
+
+test('activity project assignments persist into entries and reach the Clockodo payload', async () => {
+    const { app, document, context } = createTestApp();
+    app.clockodoConfigured = true;
+    app.clockodoReferenceStatus = 'ready';
+    app.clockodoCustomers = [{ id: 5, name: 'Beta' }];
+    app.clockodoServices = [{ id: 9, name: 'Repair' }];
+    app.clockodoProjects = [{ id: 4, name: 'Object A', active: true, customerId: 5 }];
+    app.clockodoCustomerId = '5';
+    app.clockodoServiceId = '9';
+    app.clockodoProjectId = '1';
+    app.renderMain = () => {};
+    app.generateId = () => 'activity-with-project';
+    document.getElementById('activityName').value = 'Painting';
+    document.getElementById('activityCustomerSelect').value = '5';
+    document.getElementById('activityProjectSelect').value = '4';
+    document.getElementById('activityServiceSelect').value = '9';
+
+    await app.saveActivity();
+    const activity = app.activities.find(item => item.id === 'activity-with-project');
+    assert.equal(activity.projectId, '4');
+    assert.equal(activity.projectName, 'Object A');
+
+    const start = new Date(2026, 0, 7, 8, 0).getTime();
+    const entry = await app.addEntry({
+        activityId: activity.id,
+        activityNameSnapshot: 'Painting',
+        startTimestamp: start,
+        endTimestamp: start + 60 * 60 * 1000
+    });
+    assert.equal(entry.projectId, '4', 'the entry inherits the activity project');
+    assert.equal(entry.project, 'Object A');
+    assert.equal(entry.customerId, '5');
+    assert.equal(entry.serviceId, '9');
+
+    const buildEntryPayload = vm.runInContext('ClockodoClient.buildEntryPayload', context);
+    const payload = buildEntryPayload(entry, {
+        customerId: app.clockodoCustomerId,
+        serviceId: app.clockodoServiceId,
+        projectId: app.clockodoProjectId,
+        billable: app.clockodoBillable
+    });
+    assert.equal(payload.projects_id, 4, 'the activity project overrides the default project');
+    assert.equal(payload.customers_id, 5);
+    assert.equal(payload.services_id, 9);
+});
+
+test('entry editor saves a selected project and preserves legacy free text', async () => {
+    const entry = {
+        id: 'legacy-project-entry', activityId: 'act-1', activityNameSnapshot: 'Painting',
+        startTimestamp: new Date(2026, 0, 8, 8, 0).getTime(),
+        endTimestamp: new Date(2026, 0, 8, 9, 0).getTime(),
+        project: 'Bridge',
+        customerId: '5', serviceId: '9'
+    };
+    const { app, document } = createTestApp({ timeEntries: [entry] });
+    app.clockodoReferenceStatus = 'ready';
+    app.clockodoCustomers = [{ id: 5, name: 'Beta' }];
+    app.clockodoServices = [{ id: 9, name: 'Repair' }];
+    app.clockodoProjects = [{ id: 4, name: 'Object A', active: true, customerId: 5 }];
+    app.activities = [{ id: 'act-1', name: 'Painting' }];
+    app.timeEntries = [entry];
+
+    app.showEntryEditModal('legacy-project-entry');
+    assert.equal(document.getElementById('entryEditProject').value, 'Bridge', 'legacy free text stays visible');
+    assert.equal(document.getElementById('entryEditProjectSelect').value, '');
+
+    app.populateClockodoAssignmentSelects('entry', '5', '9', 'Beta', 'Repair', '4', 'Object A');
+    assert.equal(document.getElementById('entryEditProjectSelect').value, '4');
+    assert.equal(document.getElementById('entryEditProject').value, 'Object A');
+
+    let saved = null;
+    app.updateEntry = async (id, updates) => { saved = { id, updates }; };
+    app.closeEntryEditModal = () => {};
+    app.renderLog = () => {};
+    app.renderReview = () => {};
+    await app.saveTimeEntry();
+    assert.equal(saved.updates.projectId, '4');
+    assert.equal(saved.updates.project, 'Object A');
+
+    document.getElementById('entryEditProjectSelect').value = '';
+    document.getElementById('entryEditProject').value = 'Custom site';
+    app.normalizeClockodoComboboxText('entry', 'project');
+    assert.equal(document.getElementById('entryEditProject').value, 'Custom site', 'unmatched project text is still allowed as free text');
+});
+
+test('a legacy free-text project survives a reference-data refresh', () => {
+    const { app, document } = createTestApp();
+    app.clockodoReferenceStatus = 'ready';
+    app.clockodoCustomers = [{ id: 5, name: 'Beta' }];
+    app.clockodoServices = [{ id: 9, name: 'Repair' }];
+    app.clockodoProjects = [{ id: 4, name: 'Object A', customerId: 5 }];
+    document.getElementById('entryEditCustomerSelect').value = '5';
+    document.getElementById('entryEditCustomerInput').value = 'Beta';
+    document.getElementById('entryEditServiceSelect').value = '9';
+    document.getElementById('entryEditServiceInput').value = 'Repair';
+    document.getElementById('entryEditProjectSelect').value = '';
+    document.getElementById('entryEditProject').value = 'Bridge';
+    document.getElementById('entryEditModal').classList.contains = name => name === 'active';
+
+    app.refreshClockodoAssignmentViews();
+    assert.equal(document.getElementById('entryEditProject').value, 'Bridge', 'free text is not cleared by a refresh');
+    assert.equal(document.getElementById('entryEditProjectSelect').value, '');
 });

@@ -405,6 +405,11 @@
                                 <ul id="activityCustomerList" class="clockodo-combobox-list" role="listbox" hidden></ul>
                             </div>
                             <div class="form-group clockodo-combobox">
+                                <input type="text" id="activityProjectInput" class="form-input clockodo-combobox-input" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="activityProjectList" autocomplete="off" spellcheck="false" data-i18n-aria-label="clockodoProjectSelectLabel">
+                                <input type="hidden" id="activityProjectSelect" value="">
+                                <ul id="activityProjectList" class="clockodo-combobox-list" role="listbox" hidden></ul>
+                            </div>
+                            <div class="form-group clockodo-combobox">
                                 <input type="text" id="activityServiceInput" class="form-input clockodo-combobox-input" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="activityServiceList" autocomplete="off" spellcheck="false" data-i18n-aria-label="clockodoServiceSelectLabel">
                                 <input type="hidden" id="activityServiceSelect" value="">
                                 <ul id="activityServiceList" class="clockodo-combobox-list" role="listbox" hidden></ul>
@@ -474,15 +479,9 @@
                         </div>
                     </div>
 
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="entryEditProject" data-i18n="project">Project</label>
-                        <input type="text" id="entryEditProject" class="form-input" placeholder="Project name or ID" data-i18n-placeholder="projectPlaceholder">
-                        </div>
-                        <div class="form-group">
-                            <label for="entryEditService" data-i18n="service">Service</label>
+                    <div class="form-group">
+                        <label for="entryEditService" data-i18n="service">Service</label>
                         <input type="text" id="entryEditService" class="form-input" placeholder="Service name or ID" data-i18n-placeholder="servicePlaceholder">
-                        </div>
                     </div>
 
                     <div class="form-group">
@@ -492,6 +491,11 @@
                                 <input type="text" id="entryEditCustomerInput" class="form-input clockodo-combobox-input" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="entryEditCustomerList" autocomplete="off" spellcheck="false" data-i18n-aria-label="clockodoCustomerSelectLabel">
                                 <input type="hidden" id="entryEditCustomerSelect" value="">
                                 <ul id="entryEditCustomerList" class="clockodo-combobox-list" role="listbox" hidden></ul>
+                            </div>
+                            <div class="form-group clockodo-combobox">
+                                <input type="text" id="entryEditProject" class="form-input clockodo-combobox-input" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="entryEditProjectList" autocomplete="off" spellcheck="false" placeholder="Project name or ID" data-i18n-placeholder="projectPlaceholder" aria-label="Project" data-i18n-aria-label="project">
+                                <input type="hidden" id="entryEditProjectSelect" value="">
+                                <ul id="entryEditProjectList" class="clockodo-combobox-list" role="listbox" hidden></ul>
                             </div>
                             <div class="form-group clockodo-combobox">
                                 <input type="text" id="entryEditServiceInput" class="form-input clockodo-combobox-input" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="entryEditServiceList" autocomplete="off" spellcheck="false" data-i18n-aria-label="clockodoServiceSelectLabel">

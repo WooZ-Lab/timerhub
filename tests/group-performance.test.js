@@ -95,6 +95,7 @@ function createTestApp(initialData = {}) {
         'activityModal', 'modalTitle', 'activityName', 'activityNotes', 'modalSaveBtn', 'modalCancelBtn', 'modalCloseBtn',
         'activityMenuModal', 'activityMenuTitle',
         'activityCustomerSelect', 'activityServiceSelect', 'activityClockodoHint', 'activityClockodoRetryBtn',
+        'activityProjectSelect', 'activityProjectInput', 'activityProjectList', 'entryEditProjectSelect', 'entryEditProjectList',
         'activityCustomerInput', 'activityCustomerList', 'activityServiceInput', 'activityServiceList',
         'syncConfirmEntriesList', 'syncConfirmDesc', 'syncConfirmSummary',
         'syncConfirmAlreadySyncedNotice', 'syncConfirmSubmitBtn', 'syncConfirmModal',

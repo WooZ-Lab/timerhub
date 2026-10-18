@@ -1540,3 +1540,58 @@ test('activity names longer than 30 characters are accepted and preserved', asyn
     assert.equal(saved.at(-1).name, longName);
     assert.equal(saved.at(-1).id, 'long-name-activity');
 });
+
+test('Clockodo Worker loads projects with their customer mapping and rejects malformed projects', async t => {
+    const backend = makeBackend();
+    const originalFetch = globalThis.fetch;
+    const requests = [];
+    let projectResponse = Response.json({
+        paging: { items_per_page: 1000, current_page: 1, count_pages: 1 },
+        data: [
+            { id: 4, name: 'Object A', active: true, customers_id: 5, note: 'private project note' },
+            { id: 6, name: 'Object B', active: false, customers_id: 7 }
+        ]
+    });
+    globalThis.fetch = async (url, init) => {
+        requests.push({ url: String(url), init });
+        return projectResponse;
+    };
+    t.after(() => { globalThis.fetch = originalFetch; });
+
+    const clientId = 'clockodo_projects_client_123';
+    const token = 'clockodo-projects-token'.padEnd(48, 'p');
+    const apiKey = 'projects-api-key';
+    const auth = { Authorization: `Bearer ${token}` };
+    await backend.request(`/api/clockodo/config?clientId=${clientId}`, {
+        method: 'PUT',
+        headers: { ...auth, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiUser: 'person@example.test', apiKey })
+    });
+
+    const response = await backend.request(`/api/clockodo/projects?clientId=${clientId}`, { headers: auth });
+    assert.equal(response.status, 200);
+    const body = await response.text();
+    assert.deepEqual(JSON.parse(body), {
+        projects: [
+            { id: 4, name: 'Object A', active: true, customerId: 5 },
+            { id: 6, name: 'Object B', active: false, customerId: 7 }
+        ]
+    });
+    assert.equal(body.includes('private project note'), false);
+    assert.equal(body.includes(apiKey), false);
+    assert.equal(requests[0].url.includes('/api/v2/projects'), true);
+    assert.ok(requests[0].url.includes('items_per_page=1000'));
+    assert.equal(requests[0].init.method, 'GET');
+    assert.equal(requests[0].init.headers['X-ClockodoApiUser'], 'person@example.test');
+    assert.equal(requests[0].init.headers['X-ClockodoApiKey'], apiKey);
+
+    projectResponse = Response.json({ data: [{ id: 8, name: 'No customer' }] });
+    const malformed = await backend.request(`/api/clockodo/projects?clientId=${clientId}`, { headers: auth });
+    assert.equal(malformed.status, 502);
+    assert.deepEqual(await malformed.json(), { error: 'malformed_response' });
+
+    const methodNotAllowed = await backend.request(`/api/clockodo/projects?clientId=${clientId}`, {
+        method: 'POST', headers: auth
+    });
+    assert.equal(methodNotAllowed.status, 405);
+});
