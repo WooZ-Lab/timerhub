@@ -9177,3 +9177,32 @@ test('project hints explain exactly why the project list is empty', () => {
     app.populateClockodoAssignmentSelects('activity', '7');
     assert.equal(document.getElementById('activityClockodoHint').textContent, app.clockodoAssignmentHint());
 });
+
+test('an outdated Cloudflare Worker is identified instead of a generic project error', async () => {
+    const failingClient = () => makeClockodoReferenceClient({
+        customers: [{ id: 5, name: 'Beta' }],
+        services: [{ id: 9, name: 'Repair' }],
+        projects: [{ id: 4, name: 'Object A', customerId: 5 }],
+        projectFailCode: 'clockodo_rejected'
+    });
+
+    const outdated = createTestApp({
+        clockodoClient: failingClient(),
+        fetch: async () => new Response('TimerHub asset', { status: 404 })
+    });
+    outdated.app.clockodoConfigured = true;
+    assert.equal(await outdated.app.loadClockodoReferenceData(), true);
+    assert.equal(outdated.app.clockodoWorkerOutdated, true);
+    outdated.app.populateClockodoAssignmentSelects('activity', '5');
+    assert.equal(outdated.document.getElementById('activityClockodoHint').textContent, outdated.app.t('clockodoWorkerOutdated'));
+
+    const current = createTestApp({
+        clockodoClient: failingClient(),
+        fetch: async () => Response.json({ version: '2026-10-18-projects-v4' })
+    });
+    current.app.clockodoConfigured = true;
+    assert.equal(await current.app.loadClockodoReferenceData(), true);
+    assert.equal(current.app.clockodoWorkerOutdated, false);
+    current.app.populateClockodoAssignmentSelects('activity', '5');
+    assert.match(current.document.getElementById('activityClockodoHint').textContent, /clockodo_rejected/);
+});

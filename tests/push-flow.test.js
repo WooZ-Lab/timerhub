@@ -1597,3 +1597,10 @@ test('Clockodo Worker loads projects with their customer mapping and rejects mal
     });
     assert.equal(methodNotAllowed.status, 405);
 });
+
+test('the Worker reports its version so stale deployments are detectable', async () => {
+    const backend = makeBackend();
+    const response = await backend.request('/api/version');
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { version: '2026-10-18-projects-v4' });
+});

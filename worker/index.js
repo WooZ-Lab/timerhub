@@ -27,6 +27,8 @@ function base64ToBytes(value) {
     return Uint8Array.from(atob(value), character => character.charCodeAt(0));
 }
 
+const WORKER_VERSION = "2026-10-18-projects-v4";
+
 function jsonError(error, status) {
     return Response.json({ error }, { status });
 }
@@ -625,6 +627,10 @@ export class TimerHubDurableObject {
 export default {
     async fetch(request, env) {
         const url = new URL(request.url);
+
+        if (url.pathname === "/api/version") {
+            return Response.json({ version: WORKER_VERSION });
+        }
 
         if (url.pathname === "/api/test") {
             return new Response("TimerHub Web Push Worker OK");
