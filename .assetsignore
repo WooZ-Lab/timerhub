@@ -4,3 +4,4 @@ worker/
 wrangler*.jsonc
 package.json
 node_modules/
+.wrangler/
