@@ -2977,7 +2977,7 @@ function makeClockodoReferenceClient({ customers = [], services = [], projects =
         client.getProjects = async () => {
             state.projectCalls += 1;
             if (failCode) throw Object.assign(new Error('safe failure'), { code: failCode });
-            if (projectFailCode) throw Object.assign(new Error('project failure'), { code: projectFailCode });
+            if (projectFailCode) throw Object.assign(new Error('project failure'), { code: projectFailCode, status: 403 });
             return { projects };
         };
     }
@@ -9145,7 +9145,10 @@ test('a project load failure does not block Clockodo customers and services', as
     assert.equal(client.state.projectCalls, 1);
 
     app.populateClockodoAssignmentSelects('activity', '5', '9', 'Beta', 'Repair');
-    assert.match(document.getElementById('activityClockodoHint').textContent, /projects could not be loaded/i);
+    const failedHint = document.getElementById('activityClockodoHint').textContent;
+    assert.match(failedHint, /projects could not be loaded/i);
+    assert.match(failedHint, /clockodo_rejected/, 'the hint exposes the safe error code');
+    assert.match(failedHint, /HTTP 403/, 'the hint exposes the upstream status');
     assert.equal(document.getElementById('activityClockodoRetryBtn').style.display, '', 'the retry action stays available');
 
     app.clockodoProjectError = null;

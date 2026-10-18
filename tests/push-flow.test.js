@@ -1549,7 +1549,8 @@ test('Clockodo Worker loads projects with their customer mapping and rejects mal
         paging: { items_per_page: 1000, current_page: 1, count_pages: 1 },
         data: [
             { id: 4, name: 'Object A', active: true, customers_id: 5, note: 'private project note' },
-            { id: 6, name: 'Object B', active: false, customers_id: 7 }
+            { id: 6, name: 'Object B', active: false, customers_id: 7 },
+            { id: 9, name: 'Internal', active: true, customers_id: 0 }
         ]
     });
     globalThis.fetch = async (url, init) => {
@@ -1573,6 +1574,7 @@ test('Clockodo Worker loads projects with their customer mapping and rejects mal
     const body = await response.text();
     assert.deepEqual(JSON.parse(body), {
         projects: [
+            { id: 9, name: 'Internal', active: true, customerId: 0 },
             { id: 4, name: 'Object A', active: true, customerId: 5 },
             { id: 6, name: 'Object B', active: false, customerId: 7 }
         ]
@@ -1585,7 +1587,7 @@ test('Clockodo Worker loads projects with their customer mapping and rejects mal
     assert.equal(requests[0].init.headers['X-ClockodoApiUser'], 'person@example.test');
     assert.equal(requests[0].init.headers['X-ClockodoApiKey'], apiKey);
 
-    projectResponse = Response.json({ data: [{ id: 8, name: 'No customer' }] });
+    projectResponse = Response.json({ data: [{ id: 8, name: 'Bad customer', customers_id: 'not-a-number' }] });
     const malformed = await backend.request(`/api/clockodo/projects?clientId=${clientId}`, { headers: auth });
     assert.equal(malformed.status, 502);
     assert.deepEqual(await malformed.json(), { error: 'malformed_response' });

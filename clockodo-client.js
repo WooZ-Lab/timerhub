@@ -121,7 +121,7 @@
                         .slice(0, 500);
                 }
                 if (key === 'projects') {
-                    if (!Number.isSafeInteger(item.customerId) || item.customerId < 1) {
+                    if (!Number.isSafeInteger(item.customerId) || item.customerId < 0) {
                         throw new ClockodoClientError('malformed_response');
                     }
                     entry.customerId = item.customerId;

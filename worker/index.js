@@ -323,10 +323,13 @@ export class TimerHubDurableObject {
                             .slice(0, 500);
                     }
                     if (responseKey === "projects") {
-                        if (!Number.isSafeInteger(item.customers_id) || item.customers_id < 1) {
+                        const customerId = item.customers_id === undefined || item.customers_id === null
+                            ? 0
+                            : Number(item.customers_id);
+                        if (!Number.isSafeInteger(customerId) || customerId < 0) {
                             return jsonError("malformed_response", 502);
                         }
-                        entry.customerId = item.customers_id;
+                        entry.customerId = customerId;
                     }
                     items.push(entry);
                 }
