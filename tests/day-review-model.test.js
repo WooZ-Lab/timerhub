@@ -6475,8 +6475,10 @@ test('collapsed group dimensions resize through the handle, clamp, persist and r
         { activityId: 'rz-b', x: 400, y: 0, width: 220, height: 120 }
     );
 
+    const titleAwareMinWidth = app.groupTitleMinWidth(group);
+    assert.ok(titleAwareMinWidth > 160, 'the collapsed minimum reserves room for the title');
     app.resizeCollapsedGroup(group, -100, -100);
-    assert.equal(app.groupCollapsedWidth(group), 160, 'width clamps to the minimum');
+    assert.equal(app.groupCollapsedWidth(group), titleAwareMinWidth, 'width clamps to the title-aware minimum');
     assert.equal(app.groupCollapsedHeight(group), 48, 'height clamps to the minimum grid-aligned value');
     app.resizeCollapsedGroup(group, 5000, 5000);
     assert.equal(app.groupCollapsedWidth(group), 640, 'width clamps to the maximum');
@@ -9878,4 +9880,29 @@ test('creation does not apply an icon service that the customer cannot use', asy
     assert.ok(created);
     assert.equal(created.serviceId, '34', 'the mapped service 32 is not allowed for the customer');
     assert.equal(created.serviceName, 'Sonstiges');
+});
+
+test('group headers reserve enough width for the full name in both states', () => {
+    const harness = createGroupCanvasHarness();
+    const { app, containers } = harness;
+    const longName = 'Objekt Treppenhaus Theodorstraße 29-33';
+    app.activities = [{ id: 'long-name-a', name: 'A', position: 0, groupId: 'long-name-group', size: 'small' }];
+    app.activityLayouts = new Map([
+        ['long-name-a', { activityId: 'long-name-a', x: 0, y: 0, width: 120, height: 120 }]
+    ]);
+    app.groups = [{ id: 'long-name-group', name: longName, x: 200, y: 200, collapsed: false }];
+    app.renderMain();
+
+    const requiredWidth = app.groupTitleMinWidth(app.groups[0]);
+    assert.ok(requiredWidth > 160, 'the title needs more width than the small activity');
+    const expanded = containers.filter(item => item.dataset.groupId === 'long-name-group').at(-1);
+    assert.ok(Number.parseFloat(expanded.style.width) >= requiredWidth, 'the expanded group reserves the full title width');
+    assert.equal(expanded.children[0].children[1].textContent, longName, 'the full name is rendered');
+
+    app.groups[0].collapsed = true;
+    app.renderMain();
+    const collapsed = containers.filter(item => item.dataset.groupId === 'long-name-group').at(-1);
+    assert.equal(app.groupCollapsedWidth(app.groups[0]), requiredWidth, 'the collapsed group reserves the full title width');
+    assert.equal(Number.parseFloat(collapsed.style.width), requiredWidth);
+    assert.equal(collapsed.children[0].children[1].textContent, longName, 'the full name stays in the collapsed header');
 });

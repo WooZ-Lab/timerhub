@@ -4200,11 +4200,44 @@ class TimerHubApp {
             });
         }
         if (!boxes.length) return null;
-        return this.groupContainerBounds(boxes);
+        const bounds = this.groupContainerBounds(boxes);
+        const minWidth = this.groupTitleMinWidth(group);
+        if (bounds.width < minWidth) {
+            bounds.width = minWidth;
+            bounds.right = bounds.left + minWidth;
+        }
+        return bounds;
     }
 
     groupDepth(group) {
         return this.groupAncestors(group).length;
+    }
+
+    // The header controls are always visible; the group box must reserve enough
+    // width for the full name instead of relying on the CSS ellipsis.
+    measureGroupTitleTextWidth(text) {
+        if (!text) return 0;
+        try {
+            if (!this._groupTitleMeasureContext) {
+                const canvas = document.createElement('canvas');
+                this._groupTitleMeasureContext = canvas?.getContext?.('2d') || null;
+            }
+            if (this._groupTitleMeasureContext) {
+                this._groupTitleMeasureContext.font = '700 12px system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+                return Math.ceil(this._groupTitleMeasureContext.measureText(text).width + text.length * 0.72);
+            }
+        } catch { /* fall back to a deterministic estimate */ }
+        return Math.ceil(text.length * 9);
+    }
+
+    groupTitleMinWidth(group) {
+        const text = String(group?.name || '').trim().toUpperCase();
+        if (!text) return 0;
+        const gaps = (group?.locked ? 4 : 3) * 4;
+        // Three 32px controls, flex gaps, title padding, the 2px container
+        // border on each side, and a small safety margin for font differences.
+        const controls = 32 * 3 + gaps + 10 + 4 + 8 + (group?.locked ? 18 : 0);
+        return controls + this.measureGroupTitleTextWidth(text);
     }
 
     applyGroupBounds(container, bounds) {
@@ -4215,12 +4248,13 @@ class TimerHubApp {
     }
 
     groupCollapsedWidth(group) {
-        return this.clampCanvasCoordinate(
+        const configured = this.clampCanvasCoordinate(
             group?.collapsedWidth,
             CANVAS_GROUP_COLLAPSED_WIDTH,
             CANVAS_GROUP_COLLAPSED_MIN_WIDTH,
             CANVAS_GROUP_COLLAPSED_MAX_WIDTH
         );
+        return Math.max(configured, this.groupTitleMinWidth(group));
     }
 
     groupCollapsedHeight(group) {
