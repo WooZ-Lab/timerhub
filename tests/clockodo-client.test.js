@@ -325,3 +325,13 @@ test('Clockodo client validates projects and maps their customer', async () => {
         error => error.code === 'malformed_response'
     );
 });
+
+test('Clockodo client bypasses browser caches for API calls', async () => {
+    let captured = null;
+    const { client } = makeClient(async (url, init) => {
+        captured = init;
+        return Response.json({ customers: [] });
+    });
+    await client.getCustomers(clientOptions.clientId, clientOptions.accessToken);
+    assert.equal(captured.cache, 'no-store');
+});

@@ -8182,7 +8182,7 @@ class TimerHubApp {
         const fetchImpl = this.getFetchImpl();
         if (!fetchImpl) return false;
         try {
-            const response = await fetchImpl(`${this.locationOrigin()}/api/version`);
+            const response = await fetchImpl(`${this.locationOrigin()}/api/version`, { cache: 'no-store' });
             if (!response || response.status !== 200) return true;
             const contentType = response.headers?.get?.('content-type') || '';
             if (!contentType.includes('application/json')) return true;

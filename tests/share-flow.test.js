@@ -229,6 +229,12 @@ test('share link module maps server and network failures to safe codes', async (
     await assert.rejects(() => ShareLink.fetchShare(respond(410, { error: 'share_expired' }), 'https://timerhub.example.test', shareId), /share_expired/);
     await assert.rejects(() => ShareLink.fetchShare(respond(503, { error: 'boom' }), 'https://timerhub.example.test', shareId), /share_unavailable/);
     await assert.rejects(() => ShareLink.fetchShare(async () => { throw new Error('offline'); }, 'https://timerhub.example.test', shareId), /network_error/);
+    let capturedInit = null;
+    await ShareLink.fetchShare(async (url, init) => {
+        capturedInit = init;
+        return new Response(JSON.stringify({ envelope: { format: 'timerhub-exchange', version: 1, algorithm: 'AES-256-GCM', iv: 'AAAAAAAAAAAAAAAA', ciphertext: 'payload', createdAt: Date.now() }, expiresAt: Date.now() + 60000 }), { status: 200 });
+    }, 'https://timerhub.example.test', shareId);
+    assert.equal(capturedInit.cache, 'no-store', 'share fetches bypass browser caches');
     await assert.rejects(() => ShareLink.completeShare(respond(404, { error: 'share_not_found' }), 'https://timerhub.example.test', shareId), /share_not_found/);
     await assert.rejects(() => ShareLink.createShare(respond(409, { error: 'share_exists' }), 'https://timerhub.example.test', { shareId, envelope, expiresAt: Date.now() + 60000 }), /share_exists/);
     await assert.rejects(() => ShareLink.createShare(respond(200, { ok: true }), 'https://timerhub.example.test', { shareId, envelope: { ...envelope, format: 'nope' }, expiresAt: Date.now() + 60000 }), /invalid_share_payload/);

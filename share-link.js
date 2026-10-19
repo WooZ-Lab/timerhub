@@ -103,7 +103,7 @@
         if (typeof fetchImpl !== 'function') fail('network_error');
         let response;
         try {
-            response = await fetchImpl(url, init);
+            response = await fetchImpl(url, { ...init, cache: 'no-store' });
         } catch {
             fail('network_error');
         }

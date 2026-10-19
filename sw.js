@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'timerhub-v18';
+const CACHE_VERSION = 'timerhub-v19';
 const LOCALE_CACHE_KEY = '/__timerhub_locale__';
 const PUSH_COPY = {
     en: { title: 'TimerHub', body: 'Timer reminder' },
@@ -80,6 +80,12 @@ self.addEventListener('fetch', (event) => {
 
     // Skip cross-origin requests
     if (!event.request.url.startsWith(self.location.origin)) {
+        return;
+    }
+
+    // API responses must always be fresh: never serve them from Cache Storage.
+    const requestUrl = new URL(event.request.url);
+    if (requestUrl.pathname.startsWith('/api/')) {
         return;
     }
 

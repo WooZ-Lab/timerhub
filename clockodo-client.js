@@ -68,7 +68,10 @@
                         method,
                         headers,
                         body: body === undefined ? undefined : JSON.stringify(body),
-                        signal: controller.signal
+                        signal: controller.signal,
+                        // Never let a cached API response (e.g. a stale 410 from an
+                        // older API route) mask the current Worker behaviour.
+                        cache: 'no-store'
                     });
                 } catch (error) {
                     if (error?.name === 'AbortError') throw new ClockodoClientError('timeout');
