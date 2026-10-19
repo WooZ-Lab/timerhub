@@ -1927,6 +1927,10 @@ class TimerHubApp {
         // the display offsets are recomputed. Used by hit testing so pointer
         // handlers never need repeated DOM measurements.
         this.groupDisplayBounds = new Map();
+        // Transient expansion anchors: newest expanded group wins; older groups
+        // may be displaced right/down until the conflicting expansion collapses.
+        this.groupExpansionOrder = [];
+        this.groupExpansionDesiredOffsets = new Map();
         this.suppressActivityClick = null;
         this.editingActivityId = null;
         this.editingEntryId = null;
@@ -2285,6 +2289,7 @@ class TimerHubApp {
                 })
             : [];
         this.sanitizeGroupParents();
+        this.resetGroupExpansionState();
     }
 
     normalizeClockodoId(value) {
@@ -4128,13 +4133,12 @@ class TimerHubApp {
             container.appendChild(title);
 
             if (group.collapsed) {
-                const width = this.groupCollapsedWidth(group);
-                const height = this.groupCollapsedHeight(group);
+                const collapsed = this.groupCollapsedBounds(group);
                 const offset = this.groupDisplayOffset(group.id);
-                container.style.left = `${group.x - CANVAS_GROUP_PADDING + offset.x}px`;
-                container.style.top = `${group.y - CANVAS_GROUP_HEADER + offset.y}px`;
-                container.style.width = `${width}px`;
-                container.style.height = `${height}px`;
+                container.style.left = `${collapsed.left + offset.x}px`;
+                container.style.top = `${collapsed.top + offset.y}px`;
+                container.style.width = `${collapsed.width}px`;
+                container.style.height = `${collapsed.height}px`;
                 const resizeHandle = document.createElement('button');
                 resizeHandle.type = 'button';
                 resizeHandle.className = 'group-resize-handle';
@@ -4285,11 +4289,26 @@ class TimerHubApp {
         return group;
     }
 
+    groupContentAnchor(group, index = this._canvasIndex) {
+        if (!group) return null;
+        if (!this._groupContentAnchorCache) this._groupContentAnchorCache = new Map();
+        if (this._groupContentAnchorCache.has(group.id)) return this._groupContentAnchorCache.get(group.id);
+        const base = this.groupBaseBounds(group, index);
+        const anchor = base
+            ? { left: base.left, top: base.top }
+            : { left: group.x - CANVAS_GROUP_PADDING, top: group.y - CANVAS_GROUP_HEADER };
+        this._groupContentAnchorCache.set(group.id, anchor);
+        return anchor;
+    }
+
     groupCollapsedBounds(group) {
         const width = this.groupCollapsedWidth(group);
         const height = this.groupCollapsedHeight(group);
-        const left = group.x - CANVAS_GROUP_PADDING;
-        const top = group.y - CANVAS_GROUP_HEADER;
+        // Collapsed and expanded boxes share the same content-derived top-left,
+        // so toggling never moves the group or its members.
+        const anchor = this.groupContentAnchor(group);
+        const left = anchor.left;
+        const top = anchor.top;
         return {
             left,
             top,
@@ -4304,8 +4323,10 @@ class TimerHubApp {
         let left = bounds.left;
         let top = bounds.top;
         let shifted = true;
-        while (shifted) {
+        let guard = 0;
+        while (shifted && guard < 500) {
             shifted = false;
+            guard += 1;
             for (const other of obstacles) {
                 const candidate = { left, top, right: left + bounds.width, bottom: top + bounds.height };
                 if (!this.rectanglesIntersect(candidate, other)) continue;
@@ -4340,7 +4361,59 @@ class TimerHubApp {
         return [...this.groups].sort((first, second) => this.compareGroupLayoutOrder(first, second));
     }
 
+    groupDesiredOffset(groupId) {
+        return this.groupExpansionDesiredOffsets.get(groupId) || { x: 0, y: 0 };
+    }
+
+    resetGroupExpansionState() {
+        this.groupExpansionOrder = [];
+        this.groupExpansionDesiredOffsets = new Map();
+    }
+
+    normalizeGroupExpansionState() {
+        const existing = new Set(this.groups.map(group => group.id));
+        const expanded = new Set(this.groups.filter(group => !group.collapsed).map(group => group.id));
+        const order = [];
+        for (const id of this.groupExpansionOrder || []) {
+            if (existing.has(id) && expanded.has(id) && !order.includes(id)) order.push(id);
+        }
+        for (const group of this.sortedGroupsForLayout()) {
+            if (!group.collapsed && !order.includes(group.id)) {
+                order.push(group.id);
+                if (!this.groupExpansionDesiredOffsets.has(group.id)) {
+                    this.groupExpansionDesiredOffsets.set(group.id, { x: 0, y: 0 });
+                }
+            }
+        }
+        for (const id of [...this.groupExpansionDesiredOffsets.keys()]) {
+            if (!expanded.has(id)) this.groupExpansionDesiredOffsets.delete(id);
+        }
+        this.groupExpansionOrder = order;
+    }
+
+    // Expand a collapsed group at its currently displayed top-left. The
+    // expanded base is measured after the flag flips so content offsets do not
+    // introduce a hidden jump.
+    expandGroupInPlace(group) {
+        if (!group || !group.collapsed) return false;
+        const offset = this.groupDisplayOffset(group.id);
+        const collapsed = this.groupCollapsedBounds(group);
+        const displayedLeft = collapsed.left + offset.x;
+        const displayedTop = collapsed.top + offset.y;
+        group.collapsed = false;
+        const base = this.groupBaseBounds(group, this._canvasIndex);
+        const desired = base
+            ? { x: displayedLeft - base.left, y: displayedTop - base.top }
+            : { x: 0, y: 0 };
+        this.groupExpansionOrder = this.groupExpansionOrder.filter(id => id !== group.id);
+        this.groupExpansionOrder.push(group.id);
+        this.groupExpansionDesiredOffsets.set(group.id, desired);
+        return true;
+    }
+
     computeGroupDisplayOffsets() {
+        this._groupContentAnchorCache = new Map();
+        this.normalizeGroupExpansionState();
         const offsets = new Map();
         const displayBounds = new Map();
         const ownOffsets = new Map();
@@ -4349,50 +4422,59 @@ class TimerHubApp {
         this.groupOwnDisplayOffsets = ownOffsets;
         const index = this._canvasIndex;
 
-        // One deterministic rule for every sibling set. Siblings are processed
-        // in their stable saved-anchor order. A group starts at its own anchor
-        // and only ever gains a downward displacement when it would otherwise
-        // overlap an earlier sibling's placed bounds. Earlier siblings never
-        // move because a later one expanded, no sibling is moved upward or
-        // sideways, and the same rule applies recursively at every depth.
+        // Temporary layout rule: the most recently expanded group in a sibling
+        // set keeps its displayed top-left. Every other sibling is moved only
+        // right and/or downward until it no longer overlaps the placed groups.
+        // Offsets are recomputed from saved anchors on every render, so a
+        // collapse restores positions that no remaining expansion needs.
         const placeSiblings = siblings => {
             const ordered = [...siblings].sort((a, b) => this.compareGroupLayoutOrder(a, b));
-            const occupied = [];
-            const standing = [];
+            const expanded = ordered.filter(group => !group.collapsed);
+            if (!expanded.length) return;
+            const priority = groupId => this.groupExpansionOrder.indexOf(groupId);
+            let anchor = null;
+            for (const group of expanded) {
+                const base = this.groupBaseBounds(group, index);
+                if (!base) continue;
+                if (!anchor || priority(group.id) > priority(anchor.id)) anchor = group;
+            }
+            if (!anchor) return;
+            const anchorBase = this.groupBaseBounds(anchor, index);
+            const anchorDesired = this.groupDesiredOffset(anchor.id);
+            const placedAnchor = {
+                left: anchorBase.left + anchorDesired.x,
+                top: anchorBase.top + anchorDesired.y,
+                width: anchorBase.width,
+                height: anchorBase.height
+            };
+            placedAnchor.right = placedAnchor.left + placedAnchor.width;
+            placedAnchor.bottom = placedAnchor.top + placedAnchor.height;
+            if (anchorDesired.x || anchorDesired.y) ownOffsets.set(anchor.id, anchorDesired);
+            const obstacles = [placedAnchor];
+
             for (const group of ordered) {
+                if (group.id === anchor.id) continue;
                 const base = group.collapsed ? this.groupCollapsedBounds(group) : this.groupBaseBounds(group, index);
                 if (!base) continue;
-                // Expanded groups clear every earlier placed sibling. Collapsed
-                // groups keep their saved chip position unless an earlier
-                // sibling is expanded or already displaced, so a displacement
-                // propagates down the sequence and never reorders nor overlaps
-                // a moving neighbour.
-                const obstacles = group.collapsed ? standing : occupied;
-                let top = base.top;
-                let shifted = true;
-                let guard = 0;
-                while (shifted && guard < 200) {
-                    shifted = false;
-                    for (const other of obstacles) {
-                        const candidate = { left: base.left, top, right: base.right, bottom: top + base.height };
-                        if (!this.rectanglesIntersect(candidate, other)) continue;
-                        top = other.bottom + CANVAS_GROUP_PADDING;
-                        shifted = true;
-                    }
-                    guard += 1;
-                }
-                const own = { x: 0, y: top - base.top };
-                if (own.y) ownOffsets.set(group.id, own);
-                const placed = {
-                    left: base.left,
-                    top,
-                    right: base.right,
-                    bottom: top + base.height,
+                const desired = group.collapsed ? { x: 0, y: 0 } : this.groupDesiredOffset(group.id);
+                const start = {
+                    left: base.left + desired.x,
+                    top: base.top + desired.y,
                     width: base.width,
                     height: base.height
                 };
-                occupied.push(placed);
-                if (!group.collapsed || own.y) standing.push(placed);
+                const resolved = this.resolveGroupCollision(start, obstacles);
+                const own = { x: resolved.left - base.left, y: resolved.top - base.top };
+                if (own.x || own.y) ownOffsets.set(group.id, own);
+                const placed = {
+                    left: resolved.left,
+                    top: resolved.top,
+                    width: base.width,
+                    height: base.height
+                };
+                placed.right = placed.left + placed.width;
+                placed.bottom = placed.top + placed.height;
+                obstacles.push(placed);
             }
         };
 
@@ -4480,11 +4562,12 @@ class TimerHubApp {
         if (!container) return;
         container.children[0]?.classList.add('dragging');
         if (group.collapsed) {
+            const collapsed = this.groupCollapsedBounds(group);
             const offset = this.groupDisplayOffset(group.id);
-            container.style.left = `${group.x - CANVAS_GROUP_PADDING + offset.x}px`;
-            container.style.top = `${group.y - CANVAS_GROUP_HEADER + offset.y}px`;
-            container.style.width = `${this.groupCollapsedWidth(group)}px`;
-            container.style.height = `${this.groupCollapsedHeight(group)}px`;
+            container.style.left = `${collapsed.left + offset.x}px`;
+            container.style.top = `${collapsed.top + offset.y}px`;
+            container.style.width = `${collapsed.width}px`;
+            container.style.height = `${collapsed.height}px`;
         } else {
             const base = this.groupBaseBounds(group);
             if (base) {
@@ -4584,7 +4667,7 @@ class TimerHubApp {
             if (this.groupDescendantIds(group.id).includes(parent.id)) return false;
             group.parentId = parent.id;
             if (parent.collapsed) {
-                parent.collapsed = false;
+                this.expandGroupInPlace(parent);
                 Promise.resolve(this.storage.saveGroup?.(parent)).catch(() => {});
             }
         } else {
@@ -4624,7 +4707,7 @@ class TimerHubApp {
             else delete group.parentId;
         }
         if (parent && parent.collapsed) {
-            parent.collapsed = false;
+            this.expandGroupInPlace(parent);
         }
         try {
             if (parent) await this.storage.saveGroup?.(parent);
@@ -4741,7 +4824,13 @@ class TimerHubApp {
     async toggleGroupCollapsed(groupId) {
         const group = this.groups.find(item => item.id === groupId);
         if (!group) return null;
-        group.collapsed = !group.collapsed;
+        if (group.collapsed) {
+            this.expandGroupInPlace(group);
+        } else {
+            group.collapsed = true;
+            this.groupExpansionOrder = this.groupExpansionOrder.filter(id => id !== group.id);
+            this.groupExpansionDesiredOffsets.delete(group.id);
+        }
         try {
             await this.storage.saveGroup?.(group);
         } catch {
@@ -4754,7 +4843,29 @@ class TimerHubApp {
 
     async setAllGroupsCollapsed(collapsed) {
         if (!this.groups.length) return false;
-        for (const group of this.groups) group.collapsed = collapsed;
+        if (collapsed) {
+            for (const group of this.groups) group.collapsed = true;
+            this.resetGroupExpansionState();
+        } else {
+            // Preserve each group's currently displayed top-left where possible.
+            const displayed = new Map();
+            for (const group of this.groups) {
+                const base = group.collapsed ? this.groupCollapsedBounds(group) : this.groupBaseBounds(group);
+                if (!base) continue;
+                const offset = this.groupDisplayOffset(group.id);
+                displayed.set(group.id, { left: base.left + offset.x, top: base.top + offset.y });
+            }
+            for (const group of this.groups) group.collapsed = false;
+            this.resetGroupExpansionState();
+            for (const group of this.sortedGroupsForLayout()) {
+                this.groupExpansionOrder.push(group.id);
+                const base = this.groupBaseBounds(group);
+                const anchor = displayed.get(group.id);
+                this.groupExpansionDesiredOffsets.set(group.id, base && anchor
+                    ? { x: anchor.left - base.left, y: anchor.top - base.top }
+                    : { x: 0, y: 0 });
+            }
+        }
         for (const group of this.groups) {
             try {
                 await this.storage.saveGroup?.(group);
