@@ -384,6 +384,12 @@ Confirmation freezes an identifiable batch snapshot. The Worker records an idemp
 
 Clockodo synchronization requires the deployed same-origin Cloudflare Worker and its Durable Object binding. A static local web server or static-only host does not provide the proxy routes, so Clockodo configuration and synchronization are unavailable there. Day review and local editing continue to work. The integration sends only entries that the user explicitly confirmed; it does not continuously sync timer activity.
 
+### Clockodo assignment helpers
+
+- **Customer ↔ project lookup:** Selecting a project fills its customer when the match is unique. When several customers use the same project name, the matching customers are named in the hint and, unless a customer was already selected manually, the customer list is filtered to those matches instead of guessing. Partial, case-insensitive project text is supported. A customer selected manually in the current editor is never replaced automatically; an automatically suggested customer follows later project changes.
+- **Group default customers:** A group can store a default customer in its editor. Nested groups inherit the nearest default from their ancestors; an explicit default on a nested group overrides it for that group and its descendants. Inheritance is only applied when creating a new activity (including duplicated buttons/groups) or a new time entry from a button without its own customer. Existing activities and entries are never rewritten, and the group editor shows the inherited customer without storing it in the child group.
+- **Icon service defaults:** Choosing the Car icon selects the Clockodo service named "Anfahrt", the Window (squeegee) icon selects "Fensterreinigung", and the mop icon selects "Treppenhaus/Keller Reinigung". Matching uses the exact service name (case-insensitive). If the service is missing, ambiguous, or unavailable for the selected customer, the current service is kept and a hint is shown. Changing an icon applies the default; unrelated activity edits, reloads, and synchronization never overwrite a manually selected service.
+
 ---
 
 ## Future Enhancements

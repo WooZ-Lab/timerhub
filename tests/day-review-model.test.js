@@ -9521,3 +9521,361 @@ test('a failed group duplication cleans up partially persisted records', async (
     assert.equal(toasts.at(-1), app.t('groupCreateFailed'));
     app.storage.saveLayout = originalSaveLayout;
 });
+
+function makeProjectLookupApp() {
+    const harness = createTestApp();
+    const { app, document } = harness;
+    app.clockodoReferenceStatus = 'ready';
+    app.clockodoCustomers = [
+        { id: 5, name: 'Beta', active: true },
+        { id: 7, name: 'Gamma', active: true }
+    ];
+    app.clockodoServices = [];
+    app.clockodoProjects = [
+        { id: 4, name: 'Object A', active: true, customerId: 5 },
+        { id: 10, name: 'Unique Site', active: true, customerId: 5 },
+        { id: 6, name: 'Shared Site', active: true, customerId: 5 },
+        { id: 8, name: 'Shared Site', active: true, customerId: 7 },
+        { id: 9, name: 'Gamma Yard', active: true, customerId: 7 }
+    ];
+    app.renderMain = () => {};
+    app.populateClockodoAssignmentSelects('activity');
+    return harness;
+}
+
+test('a partially typed project selects its unique customer case-insensitively', () => {
+    const { app, document } = makeProjectLookupApp();
+    const projectInput = document.getElementById('activityProjectInput');
+    projectInput.value = 'uniq';
+    app.applyClockodoAssignmentInput('activity', 'project');
+    assert.equal(document.getElementById('activityCustomerSelect').value, '5');
+    assert.equal(document.getElementById('activityCustomerInput').value, 'Beta');
+    assert.match(document.getElementById('activityClockodoHint').textContent, /selected from the project/i);
+    assert.equal(app.clockodoCustomerAutoSelected.has('activity'), true);
+    assert.equal(app.clockodoCustomerFilters.has('activity'), false);
+});
+
+test('a shared project name shows the matching customers instead of guessing', () => {
+    const { app, document } = makeProjectLookupApp();
+    const projectInput = document.getElementById('activityProjectInput');
+    projectInput.value = 'shared';
+    app.applyClockodoAssignmentInput('activity', 'project');
+    assert.equal(document.getElementById('activityCustomerSelect').value, '', 'no customer is guessed');
+    assert.deepEqual([...app.clockodoCustomerFilters.get('activity')], ['5', '7']);
+    assert.match(document.getElementById('activityClockodoHint').textContent, /Beta, Gamma/);
+
+    app.openClockodoCombobox('activity', 'customer');
+    assert.deepEqual(clockodoComboboxLabels(app, document, 'activity', 'customer'), [
+        'No Clockodo assignment',
+        'Beta',
+        'Gamma'
+    ]);
+    app.selectClockodoComboboxOption('activity', 'customer', { id: '7', label: 'Gamma' });
+    assert.equal(document.getElementById('activityCustomerSelect').value, '7');
+    assert.equal(document.getElementById('activityCustomerInput').value, 'Gamma');
+    assert.equal(app.clockodoCustomerFilters.has('activity'), false);
+    assert.equal(app.clockodoCustomerAutoSelected.has('activity'), false);
+});
+
+test('no project match keeps the typed text and a manual customer', () => {
+    const { app, document } = makeProjectLookupApp();
+    app.selectClockodoComboboxOption('activity', 'customer', { id: '7', label: 'Gamma' });
+    const projectInput = document.getElementById('activityProjectInput');
+    projectInput.value = 'Nowhere site';
+    app.applyClockodoAssignmentInput('activity', 'project');
+    assert.equal(projectInput.value, 'Nowhere site', 'the project text was kept');
+    assert.equal(document.getElementById('activityCustomerSelect').value, '7', 'the selected customer was kept');
+    assert.match(document.getElementById('activityClockodoHint').textContent, /No customer found/i);
+});
+
+test('an automatic project customer follows project changes, a manual customer does not', () => {
+    const { app, document } = makeProjectLookupApp();
+    const projectInput = document.getElementById('activityProjectInput');
+    projectInput.value = 'unique';
+    app.applyClockodoAssignmentInput('activity', 'project');
+    assert.equal(document.getElementById('activityCustomerSelect').value, '5');
+    projectInput.value = 'Gamma Yard';
+    app.applyClockodoAssignmentInput('activity', 'project');
+    assert.equal(document.getElementById('activityCustomerSelect').value, '7', 'the automatic customer follows the new project');
+    assert.equal(document.getElementById('activityCustomerInput').value, 'Gamma');
+
+    app.selectClockodoComboboxOption('activity', 'customer', { id: '5', label: 'Beta' });
+    projectInput.value = 'Gamma Yard';
+    app.applyClockodoAssignmentInput('activity', 'project');
+    assert.equal(document.getElementById('activityCustomerSelect').value, '5', 'a manually selected customer is preserved');
+    assert.match(document.getElementById('activityClockodoHint').textContent, /selected customer was kept/i);
+});
+
+test('the entry editor resolves customers from a selected project ID', () => {
+    const { app, document } = makeProjectLookupApp();
+    app.populateClockodoAssignmentSelects('entry');
+    app.selectClockodoComboboxOption('entry', 'project', { id: '9', label: 'Gamma Yard' });
+    assert.equal(document.getElementById('entryEditProjectSelect').value, '9');
+    assert.equal(document.getElementById('entryEditCustomerSelect').value, '7');
+    assert.equal(document.getElementById('entryEditCustomerInput').value, 'Gamma');
+    assert.match(document.getElementById('entryEditClockodoHint').textContent, /selected from the project/i);
+    assert.equal(app.clockodoCustomerAutoSelected.has('entry'), true);
+});
+
+function makeGroupInheritanceApp() {
+    const groups = [
+        { id: 'inherit-root', name: 'Root', x: 0, y: 0, collapsed: false, defaultCustomerId: '5', defaultCustomerName: 'Beta' },
+        { id: 'inherit-mid', name: 'Mid', x: 100, y: 0, collapsed: false, parentId: 'inherit-root' },
+        { id: 'inherit-leaf', name: 'Leaf', x: 200, y: 0, collapsed: false, parentId: 'inherit-mid' },
+        { id: 'inherit-override', name: 'Override', x: 300, y: 0, collapsed: false, parentId: 'inherit-mid', defaultCustomerId: '7', defaultCustomerName: 'Gamma' },
+        { id: 'inherit-override-leaf', name: 'Override leaf', x: 400, y: 0, collapsed: false, parentId: 'inherit-override' },
+        { id: 'inherit-leaf-child', name: 'Leaf child', x: 500, y: 0, collapsed: false, parentId: 'inherit-leaf' },
+        { id: 'inherit-plain', name: 'Plain', x: 0, y: 300, collapsed: false },
+        { id: 'inherit-plain-child', name: 'Plain child', x: 100, y: 300, collapsed: false, parentId: 'inherit-plain' }
+    ];
+    const activities = [
+        { id: 'inherit-leaf-a', name: 'Leaf A', groupId: 'inherit-leaf', position: 0 },
+        { id: 'inherit-mid-a', name: 'Mid A', groupId: 'inherit-mid', position: 1 },
+        { id: 'inherit-override-leaf-a', name: 'Override leaf A', groupId: 'inherit-override-leaf', position: 2 },
+        { id: 'inherit-plain-child-a', name: 'Plain child A', groupId: 'inherit-plain-child', position: 3 },
+        { id: 'inherit-leaf-child-a', name: 'Leaf child A', groupId: 'inherit-leaf-child', position: 4 }
+    ];
+    const harness = createTestApp({
+        groups,
+        activities,
+        timeEntries: [{
+            id: 'inherit-entry', activityId: 'inherit-leaf-a', activityNameSnapshot: 'Leaf A',
+            startTimestamp: new Date(2026, 0, 10, 8, 0).getTime(),
+            endTimestamp: new Date(2026, 0, 10, 9, 0).getTime(),
+            customerId: '', customerName: ''
+        }]
+    });
+    harness.app.renderMain = () => {};
+    harness.app.clockodoReferenceStatus = 'ready';
+    harness.app.clockodoCustomers = [
+        { id: 5, name: 'Beta', active: true },
+        { id: 7, name: 'Gamma', active: true }
+    ];
+    return harness;
+}
+
+test('nested groups inherit the nearest default customer for duplicated buttons and groups', async () => {
+    const { app } = makeGroupInheritanceApp();
+    await app.loadActivities();
+    await app.loadGroups();
+
+    app.editingActivityId = 'inherit-leaf-a';
+    const leafCopy = await app.duplicateActivity();
+    assert.equal(leafCopy.customerId, '5', 'the root default is inherited through the parent chain');
+    assert.equal(leafCopy.customerName, 'Beta');
+
+    app.editingActivityId = 'inherit-override-leaf-a';
+    const overrideCopy = await app.duplicateActivity();
+    assert.equal(overrideCopy.customerId, '7', 'the nearest explicit ancestor wins');
+
+    app.editingActivityId = 'inherit-plain-child-a';
+    const plainCopy = await app.duplicateActivity();
+    assert.equal(plainCopy.customerId, '', 'a chain without defaults keeps the existing behavior');
+
+    const leafGroupCopy = await app.duplicateGroup('inherit-leaf');
+    const groupCopyMember = app.activities.find(item => item.groupId === leafGroupCopy.id);
+    assert.equal(groupCopyMember.customerId, '5', 'duplicated group members inherit through the copied parent');
+
+    const overrideGroupCopy = await app.duplicateGroup('inherit-override');
+    assert.equal(overrideGroupCopy.defaultCustomerId, '7', 'group duplication copies the explicit default');
+    assert.equal(app.activities.some(item => item.groupId === overrideGroupCopy.id), false, 'nested children are not duplicated implicitly');
+});
+
+test('the group editor shows inherited customers without persisting them', async () => {
+    const { app, document } = makeGroupInheritanceApp();
+    await app.loadActivities();
+    await app.loadGroups();
+    app.editingGroupId = 'inherit-leaf';
+    assert.equal(app.openGroupEditModal('inherit-leaf'), true);
+    assert.match(document.getElementById('groupEditClockodoHint').textContent, /Inherited from a parent group: Beta/);
+    assert.equal(document.getElementById('groupEditCustomerSelect').value, '');
+    assert.equal(await app.saveGroupEdit(), true);
+    assert.equal(Object.hasOwn(app.groups.find(item => item.id === 'inherit-leaf'), 'defaultCustomerId'), false, 'inheritance is not written into the child group');
+
+    assert.equal(app.openGroupEditModal('inherit-override-leaf'), true);
+    assert.match(document.getElementById('groupEditClockodoHint').textContent, /Inherited from a parent group: Gamma/);
+    app.closeGroupEditModal();
+
+    assert.equal(app.openGroupEditModal('inherit-leaf'), true);
+    app.selectClockodoComboboxOption('group', 'customer', { id: '7', label: 'Gamma' });
+    assert.equal(await app.saveGroupEdit(), true);
+    assert.equal(app.groups.find(item => item.id === 'inherit-leaf').defaultCustomerId, '7', 'an explicit override is persisted');
+
+    app.editingActivityId = 'inherit-leaf-child-a';
+    const childCopy = await app.duplicateActivity();
+    assert.equal(childCopy.customerId, '7', 'the new override applies to descendants');
+
+    assert.equal(app.openGroupEditModal('inherit-leaf'), true);
+    app.clearGroupDefaultCustomer();
+    assert.equal(await app.saveGroupEdit(), true);
+    assert.equal(Object.hasOwn(app.groups.find(item => item.id === 'inherit-leaf'), 'defaultCustomerId'), false);
+    assert.equal(app.openGroupEditModal('inherit-leaf-child'), true);
+    assert.match(document.getElementById('groupEditClockodoHint').textContent, /Inherited from a parent group: Beta/, 'clearing restores inheritance');
+
+    const root = app.groups.find(item => item.id === 'inherit-root');
+    root.defaultCustomerId = '7';
+    root.defaultCustomerName = 'Gamma';
+    await app.storage.saveGroup(root);
+    app.editingActivityId = 'inherit-leaf-child-a';
+    const afterRootChange = await app.duplicateActivity();
+    assert.equal(afterRootChange.customerId, '7', 'a changed ancestor default affects future descendants');
+});
+
+test('new time entries inherit the effective group customer without touching stored entries', async () => {
+    const { app, document } = makeGroupInheritanceApp();
+    await app.loadActivities();
+    await app.loadGroups();
+    await app.loadTimeEntries();
+    app.showAddEntryModal();
+    assert.equal(document.getElementById('entryEditCustomerSelect').value, '5', 'the add-entry default follows the group chain');
+    assert.equal(document.getElementById('entryEditCustomerInput').value, 'Beta');
+    assert.equal(app.editingEntryId, null);
+
+    app.populateEntryAssignmentForActivity('inherit-override-leaf-a');
+    assert.equal(document.getElementById('entryEditCustomerSelect').value, '7', 'changing the activity in add mode follows its group chain');
+    assert.equal(document.getElementById('entryEditCustomerInput').value, 'Gamma');
+
+    const existing = app.timeEntries.find(item => item.id === 'inherit-entry');
+    app.showEntryEditModal(existing.id);
+    assert.equal(document.getElementById('entryEditCustomerSelect').value, '', 'editing an existing entry does not inherit a new customer');
+    assert.equal(app.timeEntries.find(item => item.id === 'inherit-entry').customerId, null, 'the stored entry keeps its empty assignment');
+});
+
+test('a missing inherited default customer is ignored and reported in the group editor', async () => {
+    const { app, document } = makeGroupInheritanceApp();
+    await app.loadActivities();
+    await app.loadGroups();
+    app.clockodoCustomers = [{ id: 7, name: 'Gamma', active: true }];
+    app.editingActivityId = 'inherit-leaf-a';
+    const copy = await app.duplicateActivity();
+    assert.equal(copy.customerId, '', 'a dangling inherited customer is not applied');
+    assert.equal(app.openGroupEditModal('inherit-leaf'), true);
+    assert.match(document.getElementById('groupEditClockodoHint').textContent, /no longer available/i);
+});
+
+function makeIconServiceApp() {
+    const harness = createTestApp();
+    const { app, document } = harness;
+    app.clockodoReferenceStatus = 'ready';
+    app.clockodoCustomers = [{ id: 5, name: 'Beta', active: true, serviceAssignments: [31, 32, 33, 34] }];
+    app.clockodoServices = [
+        { id: 31, name: 'Anfahrt', active: true },
+        { id: 32, name: 'Fensterreinigung', active: true },
+        { id: 33, name: 'Treppenhaus/Keller Reinigung', active: true },
+        { id: 34, name: 'Sonstiges', active: true }
+    ];
+    app.renderMain = () => {};
+    app.populateClockodoAssignmentSelects('activity', '5', null, 'Beta', '');
+    return harness;
+}
+
+test('icon changes select the mapped Clockodo services', () => {
+    const { app, document } = makeIconServiceApp();
+    assert.equal(app.applyIconServiceMapping('car'), true);
+    assert.equal(document.getElementById('activityServiceSelect').value, '31');
+    assert.equal(document.getElementById('activityServiceInput').value, 'Anfahrt');
+    assert.equal(app.applyIconServiceMapping('squeegee'), true);
+    assert.equal(document.getElementById('activityServiceSelect').value, '32');
+    assert.equal(document.getElementById('activityServiceInput').value, 'Fensterreinigung');
+    assert.equal(app.applyIconServiceMapping('mop'), true);
+    assert.equal(document.getElementById('activityServiceSelect').value, '33');
+    assert.equal(document.getElementById('activityServiceInput').value, 'Treppenhaus/Keller Reinigung');
+    assert.equal(app.applyIconServiceMapping('duster'), false);
+    assert.equal(document.getElementById('activityServiceSelect').value, '33', 'icons without a mapping preserve the service');
+});
+
+test('an unavailable mapped service preserves the current service and reports it', () => {
+    const { app, document } = makeIconServiceApp();
+    app.applyIconServiceMapping('car');
+    app.clockodoServices = app.clockodoServices.filter(item => item.name !== 'Fensterreinigung');
+    assert.equal(app.applyIconServiceMapping('squeegee'), false);
+    assert.equal(document.getElementById('activityServiceSelect').value, '31');
+    assert.equal(document.getElementById('activityServiceInput').value, 'Anfahrt');
+    assert.match(document.getElementById('activityClockodoHint').textContent, /Fensterreinigung/);
+
+    app.clockodoServices = [
+        { id: 31, name: 'Anfahrt', active: true },
+        { id: 33, name: 'Treppenhaus/Keller Reinigung', active: true }
+    ];
+    app.clockodoCustomers[0].serviceAssignments = [31];
+    assert.equal(app.applyIconServiceMapping('mop'), false);
+    assert.equal(document.getElementById('activityServiceSelect').value, '31', 'a service not allowed for the customer is not selected');
+    assert.equal(document.getElementById('activityClockodoHint').textContent, app.t('clockodoServiceNotAllowedForCustomer'));
+});
+
+test('creating an activity applies the icon service default unless a service was chosen manually', async () => {
+    const { app, document } = makeIconServiceApp();
+    document.getElementById('activityName').value = 'Window cleaning';
+    document.querySelector = selector => {
+        if (selector === '.icon-option.selected') return { dataset: { icon: 'squeegee' } };
+        if (selector === '.color-option.selected') return { style: { backgroundColor: '#123456' } };
+        if (selector === '.shape-option.selected') return { dataset: { shape: 'circle' } };
+        return null;
+    };
+    await app.saveActivity();
+    const created = app.activities.find(item => item.name === 'Window cleaning');
+    assert.ok(created);
+    assert.equal(created.serviceId, '32');
+    assert.equal(created.serviceName, 'Fensterreinigung');
+
+    app.activityServiceManuallySelected = true;
+    document.getElementById('activityServiceSelect').value = '34';
+    document.getElementById('activityServiceInput').value = 'Sonstiges';
+    document.getElementById('activityName').value = 'Manual service';
+    await app.saveActivity();
+    const manual = app.activities.find(item => item.name === 'Manual service');
+    assert.equal(manual.serviceId, '34', 'a manually selected service is not overwritten by the icon mapping');
+    assert.equal(manual.serviceName, 'Sonstiges');
+});
+
+test('unrelated edits and timer reloads keep the current service', async () => {
+    const { app, document } = createTestApp({
+        activities: [{
+            id: 'existing-timer', name: 'Existing', groupId: '', customerId: '5', customerName: 'Beta',
+            serviceId: '34', serviceName: 'Sonstiges', position: 0, archived: false
+        }]
+    });
+    app.clockodoReferenceStatus = 'ready';
+    app.clockodoCustomers = [{ id: 5, name: 'Beta', active: true, serviceAssignments: [31, 32, 33, 34] }];
+    app.clockodoServices = [
+        { id: 31, name: 'Anfahrt', active: true },
+        { id: 32, name: 'Fensterreinigung', active: true },
+        { id: 33, name: 'Treppenhaus/Keller Reinigung', active: true },
+        { id: 34, name: 'Sonstiges', active: true }
+    ];
+    app.renderMain = () => {};
+    await app.loadActivities();
+    assert.equal(app.activities[0].serviceId, '34', 'loading a timer never applies a new default');
+
+    app.editingActivityId = 'existing-timer';
+    document.getElementById('activityServiceSelect').value = '34';
+    document.getElementById('activityServiceInput').value = 'Sonstiges';
+    document.getElementById('activityName').value = 'Existing renamed';
+    document.querySelector = selector => {
+        if (selector === '.icon-option.selected') return { dataset: { icon: 'car' } };
+        if (selector === '.color-option.selected') return { style: { backgroundColor: '#123456' } };
+        if (selector === '.shape-option.selected') return { dataset: { shape: 'circle' } };
+        return null;
+    };
+    await app.saveActivity();
+    assert.equal(app.activities[0].serviceId, '34', 'an unrelated edit does not overwrite the selected service');
+    assert.equal(app.activities[0].serviceName, 'Sonstiges');
+});
+
+test('creation does not apply an icon service that the customer cannot use', async () => {
+    const { app, document } = makeIconServiceApp();
+    app.clockodoCustomers[0].serviceAssignments = [34];
+    app.populateClockodoAssignmentSelects('activity', '5', '34', 'Beta', 'Sonstiges');
+    document.getElementById('activityName').value = 'Restricted service';
+    document.querySelector = selector => {
+        if (selector === '.icon-option.selected') return { dataset: { icon: 'squeegee' } };
+        if (selector === '.color-option.selected') return { style: { backgroundColor: '#123456' } };
+        if (selector === '.shape-option.selected') return { dataset: { shape: 'circle' } };
+        return null;
+    };
+    await app.saveActivity();
+    const created = app.activities.find(item => item.name === 'Restricted service');
+    assert.ok(created);
+    assert.equal(created.serviceId, '34', 'the mapped service 32 is not allowed for the customer');
+    assert.equal(created.serviceName, 'Sonstiges');
+});

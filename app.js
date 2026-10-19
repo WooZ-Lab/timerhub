@@ -399,6 +399,11 @@ const extendedTranslations = {
         clockodoAssignmentHelp: 'Type to search. Leave empty for no Clockodo assignment.',
         clockodoProjectNotAllowedForCustomer: 'The selected project does not belong to this customer. Choose a project of the selected customer.',
         clockodoProjectLoadFailed: 'Customers and services loaded, but projects could not be loaded. Retry or check project access in Clockodo. ({detail})',
+        clockodoProjectCustomerSelected: 'Customer "{name}" selected from the project.',
+        clockodoProjectMultipleCustomers: 'Several customers use this project name: {customers}. Choose the matching customer.',
+        clockodoProjectNoCustomer: 'No customer found for "{project}". The text was kept; choose a customer manually if needed.',
+        clockodoProjectCustomerKept: 'This project belongs to "{name}". The selected customer was kept.',
+        iconServiceUnavailable: 'The service "{service}" for this icon is not available. The current service was kept.',
         clockodoWorkerOutdated: 'The TimerHub server (Cloudflare Worker) is outdated. Redeploy the Worker from Cloudflare, then press Reload.',
         clockodoProjectsUnavailable: 'Clockodo does not provide projects for this account or API user ({detail}). Check the Clockodo plan and the user\'s project rights, then press Reload.',
         clockodoProjectChooseCustomer: 'Choose a customer first, then pick one of their projects.',
@@ -539,6 +544,7 @@ const extendedTranslations = {
         groupDefaultCustomer: 'Default customer',
         groupDefaultCustomerHelp: 'New activities in this group use this customer unless they have their own customer.',
         groupDefaultCustomerMissing: 'The saved default customer is no longer available in Clockodo. Choose another customer or clear the field.',
+        groupDefaultCustomerInherited: 'Inherited from a parent group: {name}',
         clearDefaultCustomer: 'Clear customer',
         canvasToolbar: 'Canvas actions',
     },
@@ -769,6 +775,11 @@ const extendedTranslations = {
         clockodoAssignmentHelp: 'Tippen zum Suchen. Leer lassen für keine Clockodo-Zuordnung.',
         clockodoProjectNotAllowedForCustomer: 'Das gewählte Projekt gehört nicht zu diesem Kunden. Wähle ein Projekt des ausgewählten Kunden.',
         clockodoProjectLoadFailed: 'Kunden und Leistungen wurden geladen, aber Projekte konnten nicht geladen werden. Erneut versuchen oder Projektzugriff in Clockodo prüfen. ({detail})',
+        clockodoProjectCustomerSelected: 'Kunde „{name}“ aus dem Projekt ausgewählt.',
+        clockodoProjectMultipleCustomers: 'Mehrere Kunden verwenden diesen Projektnamen: {customers}. Wähle den passenden Kunden.',
+        clockodoProjectNoCustomer: 'Kein Kunde für „{project}“ gefunden. Der Text wurde beibehalten; wähle bei Bedarf manuell einen Kunden.',
+        clockodoProjectCustomerKept: 'Dieses Projekt gehört zu „{name}“. Der ausgewählte Kunde wurde beibehalten.',
+        iconServiceUnavailable: 'Die Leistung „{service}“ für dieses Symbol ist nicht verfügbar. Die aktuelle Leistung wurde beibehalten.',
         clockodoWorkerOutdated: 'Die TimerHub-Serverseite (Cloudflare Worker) ist veraltet. Stelle den Worker in Cloudflare neu bereit und drücke dann „Neu laden“.',
         clockodoProjectsUnavailable: 'Clockodo stellt für dieses Konto oder diesen API-Benutzer keine Projekte bereit ({detail}). Prüfe den Clockodo-Tarif und die Projekt-Rechte des Benutzers und drücke dann „Neu laden“.',
         clockodoProjectChooseCustomer: 'Wähle zuerst einen Kunden und dann eines seiner Projekte.',
@@ -909,6 +920,7 @@ const extendedTranslations = {
         groupDefaultCustomer: 'Standardkunde',
         groupDefaultCustomerHelp: 'Neue Aktivitäten in dieser Gruppe verwenden diesen Kunden, solange sie keinen eigenen Kunden haben.',
         groupDefaultCustomerMissing: 'Der gespeicherte Standardkunde ist in Clockodo nicht mehr verfügbar. Wähle einen anderen Kunden oder leere das Feld.',
+        groupDefaultCustomerInherited: 'Von einer übergeordneten Gruppe geerbt: {name}',
         clearDefaultCustomer: 'Kunde leeren',
         canvasToolbar: 'Canvas-Aktionen',
     },
@@ -1139,6 +1151,11 @@ const extendedTranslations = {
         clockodoAssignmentHelp: 'Введите текст для поиска. Оставьте пустым, чтобы не привязывать.',
         clockodoProjectNotAllowedForCustomer: 'Выбранный проект не принадлежит этому клиенту. Выберите проект выбранного клиента.',
         clockodoProjectLoadFailed: 'Клиенты и услуги загружены, но проекты загрузить не удалось. Повторите попытку или проверьте доступ к проектам в Clockodo. ({detail})',
+        clockodoProjectCustomerSelected: 'Клиент «{name}» выбран по проекту.',
+        clockodoProjectMultipleCustomers: 'Этот проект используется несколькими клиентами: {customers}. Выберите подходящего клиента.',
+        clockodoProjectNoCustomer: 'Клиент для «{project}» не найден. Текст сохранён; выберите клиента вручную при необходимости.',
+        clockodoProjectCustomerKept: 'Проект принадлежит «{name}». Выбранный клиент сохранён.',
+        iconServiceUnavailable: 'Услуга «{service}» для этого значка недоступна. Текущая услуга сохранена.',
         clockodoWorkerOutdated: 'Серверная часть TimerHub (Cloudflare Worker) устарела. Переразверните Worker в Cloudflare и нажмите «Reload».',
         clockodoProjectsUnavailable: 'Clockodo не предоставляет проекты для этого аккаунта или API-пользователя ({detail}). Проверьте тариф Clockodo и права пользователя на проекты, затем нажмите «Reload».',
         clockodoProjectChooseCustomer: 'Сначала выберите клиента, затем его проект.',
@@ -1279,6 +1296,7 @@ const extendedTranslations = {
         groupDefaultCustomer: 'Клиент по умолчанию',
         groupDefaultCustomerHelp: 'Новые занятия в этой группе используют этого клиента, если у них нет собственного клиента.',
         groupDefaultCustomerMissing: 'Сохранённый клиент по умолчанию больше не доступен в Clockodo. Выберите другого клиента или очистите поле.',
+        groupDefaultCustomerInherited: 'Унаследовано от родительской группы: {name}',
         clearDefaultCustomer: 'Очистить клиента',
         canvasToolbar: 'Действия на холсте',
     }
@@ -1968,6 +1986,10 @@ class TimerHubApp {
         this.clockodoReferenceError = null;
         this.clockodoReferencePromise = null;
         this.clockodoCombobox = null;
+        this.clockodoCustomerFilters = new Map();
+        this.clockodoCustomerAutoSelected = new Set();
+        this.groupEditInheritedCustomer = null;
+        this.activityServiceManuallySelected = false;
         this.clockodoComboboxBlurTimer = null;
         this.clockodoComboboxDocumentHandler = null;
         this.clockodoComboboxViewportHandler = null;
@@ -2792,16 +2814,7 @@ class TimerHubApp {
         sel('entryEditSaveBtn')?.addEventListener('click', () => this.saveTimeEntry());
         sel('entryEditDeleteBtn')?.addEventListener('click', () => this.deleteTimeEntry());
         sel('entryEditActivity')?.addEventListener('change', (e) => {
-            const activity = this.activities.find(item => item.id === e.target.value);
-            this.populateClockodoAssignmentSelects(
-                'entry',
-                activity?.customerId,
-                activity?.serviceId,
-                activity?.customerName,
-                activity?.serviceName,
-                activity?.projectId,
-                activity?.projectName
-            );
+            this.populateEntryAssignmentForActivity(e.target.value);
         });
         sel('activityClockodoRetryBtn')?.addEventListener('click', () => this.reloadClockodoReferenceData());
         sel('entryEditClockodoRetryBtn')?.addEventListener('click', () => this.reloadClockodoReferenceData());
@@ -3217,6 +3230,7 @@ class TimerHubApp {
             btn.addEventListener('click', () => {
                 document.querySelectorAll('.icon-option').forEach(option => option.classList.remove('selected'));
                 btn.classList.add('selected');
+                this.applyIconServiceMapping(icon.id);
             });
             picker.appendChild(btn);
         }
@@ -5743,6 +5757,26 @@ class TimerHubApp {
         error.style.display = '';
     }
 
+    refreshGroupInheritedCustomer() {
+        const group = this.groups.find(item => item.id === this.editingGroupId);
+        if (!group || this.normalizeClockodoId(group.defaultCustomerId) !== null) {
+            this.groupEditInheritedCustomer = null;
+            return null;
+        }
+        const inherited = this.effectiveGroupDefaultCustomer(group);
+        if (!inherited) {
+            this.groupEditInheritedCustomer = null;
+            return null;
+        }
+        const known = this.clockodoCustomerById(inherited.id);
+        this.groupEditInheritedCustomer = {
+            id: inherited.id,
+            name: known?.name || inherited.name || `#${inherited.id}`,
+            missing: !known && this.clockodoReferenceStatus === 'ready'
+        };
+        return this.groupEditInheritedCustomer;
+    }
+
     openGroupEditModal(groupId) {
         const group = this.groups.find(item => item.id === groupId);
         if (!group) return false;
@@ -5752,6 +5786,7 @@ class TimerHubApp {
         if (input) input.value = group.name;
         const lockedInput = document.getElementById('groupEditLockedInput');
         if (lockedInput) lockedInput.checked = group.locked === true;
+        this.refreshGroupInheritedCustomer();
         this.populateClockodoAssignmentSelects(
             'group',
             group.defaultCustomerId,
@@ -5770,6 +5805,7 @@ class TimerHubApp {
     closeGroupEditModal() {
         this.editingGroupId = null;
         this.editingGroupColor = '';
+        this.groupEditInheritedCustomer = null;
         document.getElementById('groupEditModal')?.classList.remove('active');
     }
 
@@ -7145,6 +7181,9 @@ class TimerHubApp {
     }
 
     showActivityModal(activityId = null) {
+        this.clockodoCustomerFilters.delete('activity');
+        this.clockodoCustomerAutoSelected.delete('activity');
+        this.activityServiceManuallySelected = false;
         this.editingActivityId = activityId;
         const modal = document.getElementById('activityModal');
         const title = document.getElementById('modalTitle');
@@ -7285,6 +7324,25 @@ class TimerHubApp {
 
         const now = Date.now();
         const assignment = this.readClockodoAssignment('activity');
+
+        if (!this.editingActivityId && !this.activityServiceManuallySelected) {
+            const mappedServiceName = this.iconServiceName(icon);
+            if (mappedServiceName) {
+                const mappedService = this.clockodoReferenceStatus === 'ready'
+                    ? this.findClockodoServiceByName(mappedServiceName)
+                    : null;
+                const assignedCustomerId = this.normalizeClockodoId(assignment.customerId);
+                const allowedForCustomer = !mappedService || !assignedCustomerId ||
+                    this.clockodoAllowedServices(assignedCustomerId)
+                        .some(item => String(item.id) === String(mappedService.id));
+                if (mappedService && allowedForCustomer) {
+                    assignment.serviceId = String(mappedService.id);
+                    assignment.serviceName = mappedService.name;
+                } else if (this.clockodoReferenceStatus === 'ready' && !mappedService) {
+                    this.showToast(this.t('iconServiceUnavailable', { service: mappedServiceName }));
+                }
+            }
+        }
 
         if (this.editingActivityId) {
             // Edit
@@ -7528,7 +7586,34 @@ class TimerHubApp {
         });
     }
 
+    populateEntryAssignmentForActivity(activityId) {
+        const activity = this.activities.find(item => item.id === activityId);
+        const group = activity?.groupId
+            ? this.groups.find(item => item.id === activity.groupId)
+            : null;
+        // Group inheritance is a creation-time default for new entries only; an
+        // existing entry keeps the assignment that was stored with it.
+        const customer = this.editingEntryId === null
+            ? this.resolveNewActivityCustomer({
+                explicitCustomerId: activity?.customerId,
+                explicitCustomerName: activity?.customerName,
+                group
+            })
+            : { customerId: activity?.customerId, customerName: activity?.customerName };
+        this.populateClockodoAssignmentSelects(
+            'entry',
+            customer.customerId,
+            activity?.serviceId,
+            customer.customerName,
+            activity?.serviceName,
+            activity?.projectId,
+            activity?.projectName
+        );
+    }
+
     showEntryEditModal(entryId) {
+        this.clockodoCustomerFilters.delete('entry');
+        this.clockodoCustomerAutoSelected.delete('entry');
         this.editingEntryId = entryId;
         const entry = this.timeEntries.find(e => String(e.id) === String(entryId));
         if (!entry) return;
@@ -7580,18 +7665,12 @@ class TimerHubApp {
     }
 
     showAddEntryModal() {
+        this.clockodoCustomerFilters.delete('entry');
+        this.clockodoCustomerAutoSelected.delete('entry');
         this.editingEntryId = null;
         this.populateEntryActivitySelect(this.activities[0]?.id || '');
         const defaultActivity = this.activities.find(item => item.id === document.getElementById('entryEditActivity').value);
-        this.populateClockodoAssignmentSelects(
-            'entry',
-            defaultActivity?.customerId,
-            defaultActivity?.serviceId,
-            defaultActivity?.customerName,
-            defaultActivity?.serviceName,
-            defaultActivity?.projectId,
-            defaultActivity?.projectName
-        );
+        this.populateEntryAssignmentForActivity(defaultActivity?.id || '');
         this.loadClockodoReferenceData();
         document.getElementById('entryEditDate').value = this.reviewDate;
         document.getElementById('entryEditEndDate').value = this.reviewDate;
@@ -7791,9 +7870,117 @@ class TimerHubApp {
     }
 
     clockodoComboboxItems(context, fieldName) {
-        if (fieldName === 'customer') return this.clockodoCustomers;
+        if (fieldName === 'customer') {
+            const filtered = this.clockodoCustomerFilters.get(context);
+            if (Array.isArray(filtered)) {
+                return filtered
+                    .map(customerId => this.clockodoCustomerById(customerId))
+                    .filter(Boolean);
+            }
+            return this.clockodoCustomers;
+        }
         if (fieldName === 'project') return this.clockodoAllowedProjects(this.clockodoSelectedCustomerId(context));
         return this.clockodoAllowedServices(this.clockodoSelectedCustomerId(context));
+    }
+
+    // Project -> customer lookup. Uses the already loaded Clockodo cache; never
+    // performs an extra API request. With a selected project its stable
+    // customerId wins over name matching. Typed text matches project names
+    // case-insensitively (partial allowed).
+    syncCustomerFromProject(context, { fromSelection = false } = {}) {
+        if (context === 'group' || this.clockodoReferenceStatus !== 'ready') return false;
+        const projectIds = this.clockodoComboboxIds(context, 'project');
+        const projectInput = String(document.getElementById(projectIds.input)?.value || '').trim();
+        const selectedProjectId = this.normalizeClockodoId(document.getElementById(projectIds.hidden)?.value);
+        const projects = selectedProjectId
+            ? this.clockodoProjects.filter(project => String(project.id) === String(selectedProjectId))
+            : projectInput
+                ? this.clockodoProjects.filter(project =>
+                    String(project.name || '').toLowerCase().includes(projectInput.toLowerCase()))
+                : [];
+        if (!selectedProjectId && !projectInput) {
+            this.clockodoCustomerFilters.delete(context);
+            this.setClockodoAssignmentHint(context, null);
+            return false;
+        }
+        const customerIds = [...new Set(projects.map(project => String(project.customerId)))];
+        const customers = customerIds
+            .map(customerId => this.clockodoCustomerById(customerId))
+            .filter(Boolean);
+        if (!customers.length) {
+            this.clockodoCustomerFilters.delete(context);
+            this.setClockodoAssignmentHint(context, this.t('clockodoProjectNoCustomer', {
+                project: projectInput || `#${selectedProjectId}`
+            }));
+            return false;
+        }
+        const currentCustomerId = this.clockodoSelectedCustomerId(context);
+        const currentIsAuto = this.clockodoCustomerAutoSelected.has(context);
+        if (customers.length === 1) {
+            const customer = customers[0];
+            this.clockodoCustomerFilters.delete(context);
+            if (currentCustomerId && String(currentCustomerId) === String(customer.id)) {
+                this.setClockodoAssignmentHint(context, null);
+                return true;
+            }
+            if (currentCustomerId && !currentIsAuto) {
+                // Never replace a customer the user explicitly selected.
+                this.setClockodoAssignmentHint(context, this.t('clockodoProjectCustomerKept', { name: customer.name }));
+                return false;
+            }
+            this.applySuggestedCustomer(context, customer);
+            const serviceCleared = this.enforceClockodoServiceForCustomer(context);
+            const projectCleared = this.enforceClockodoProjectForCustomer(context);
+            this.setClockodoAssignmentHint(
+                context,
+                serviceCleared
+                    ? this.t('clockodoServiceNotAllowedForCustomer')
+                    : projectCleared
+                        ? this.t('clockodoProjectNotAllowedForCustomer')
+                        : this.t('clockodoProjectCustomerSelected', { name: customer.name })
+            );
+            return true;
+        }
+        const currentMatches = currentCustomerId &&
+            customers.some(customer => String(customer.id) === String(currentCustomerId));
+        if (currentCustomerId && !currentMatches && currentIsAuto) {
+            // The previous suggestion came from another project; it is safe to
+            // clear it so the user can choose between the new matches.
+            this.applySuggestedCustomerCleared(context);
+        }
+        const showChoices = !currentCustomerId || currentMatches || currentIsAuto;
+        if (showChoices) {
+            this.clockodoCustomerFilters.set(context, customers.map(customer => String(customer.id)));
+        } else {
+            this.clockodoCustomerFilters.delete(context);
+        }
+        this.setClockodoAssignmentHint(context, this.t('clockodoProjectMultipleCustomers', {
+            customers: customers.map(customer => customer.name).join(', ')
+        }));
+        const hasCurrentAfter = this.clockodoSelectedCustomerId(context);
+        if (fromSelection && (!hasCurrentAfter || this.clockodoCustomerAutoSelected.has(context))) {
+            this.openClockodoCombobox(context, 'customer');
+        }
+        return false;
+    }
+
+    applySuggestedCustomer(context, customer) {
+        const ids = this.clockodoComboboxIds(context, 'customer');
+        const hidden = document.getElementById(ids.hidden);
+        const input = document.getElementById(ids.input);
+        if (hidden) hidden.value = String(customer.id);
+        if (input) input.value = customer.name;
+        this.clockodoCustomerAutoSelected.add(context);
+        this.clockodoCustomerFilters.delete(context);
+    }
+
+    applySuggestedCustomerCleared(context) {
+        const ids = this.clockodoComboboxIds(context, 'customer');
+        const hidden = document.getElementById(ids.hidden);
+        const input = document.getElementById(ids.input);
+        if (hidden) hidden.value = '';
+        if (input) input.value = '';
+        this.clockodoCustomerAutoSelected.delete(context);
     }
 
     clockodoCustomerById(customerId) {
@@ -7803,11 +7990,35 @@ class TimerHubApp {
         return customers.find(customer => String(customer.id) === id) || null;
     }
 
+    // Nearest explicitly configured default customer in the group hierarchy.
+    // Inherited values are only read; they are never written into child groups.
+    effectiveGroupDefaultCustomer(group) {
+        if (!group) return null;
+        const seen = new Set();
+        let current = group;
+        while (current && !seen.has(current.id)) {
+            seen.add(current.id);
+            if (this.normalizeClockodoId(current.defaultCustomerId) !== null) {
+                return {
+                    id: current.defaultCustomerId,
+                    name: current.defaultCustomerName || '',
+                    group: current
+                };
+            }
+            const parentId = current.parentId;
+            current = parentId
+                ? (this.groups.find(item => item.id === parentId) || null)
+                : null;
+        }
+        return null;
+    }
+
     // Creation-time customer precedence: an explicit button customer always
-    // wins; otherwise the group default is used. A default that no longer
-    // exists in a fully loaded Clockodo list is ignored instead of creating a
-    // dangling reference. While the reference data is unavailable (offline or
-    // not configured), the persisted default is applied as-is.
+    // wins; otherwise the nearest group default (own or inherited) is used. A
+    // default that no longer exists in a fully loaded Clockodo list is ignored
+    // instead of creating a dangling reference. While the reference data is
+    // unavailable (offline or not configured), the persisted default is
+    // applied as-is.
     resolveNewActivityCustomer({ explicitCustomerId = null, explicitCustomerName = '', group = null } = {}) {
         const hasExplicit = explicitCustomerId !== null && explicitCustomerId !== undefined &&
             String(explicitCustomerId).trim() !== '';
@@ -7818,7 +8029,8 @@ class TimerHubApp {
                     this.clockodoCustomerById(explicitCustomerId)?.name || ''
             };
         }
-        const storedDefaultId = group?.defaultCustomerId;
+        const effective = this.effectiveGroupDefaultCustomer(group);
+        const storedDefaultId = effective?.id;
         if (this.normalizeClockodoId(storedDefaultId) === null) {
             return { customerId: '', customerName: '' };
         }
@@ -7827,7 +8039,7 @@ class TimerHubApp {
         if (this.clockodoReferenceStatus === 'ready') {
             return { customerId: '', customerName: '' };
         }
-        return { customerId: storedDefaultId, customerName: group.defaultCustomerName || '' };
+        return { customerId: storedDefaultId, customerName: effective.name || '' };
     }
 
     clockodoAllowedServices(customerId) {
@@ -7837,6 +8049,55 @@ class TimerHubApp {
         if (!Array.isArray(assignments) || assignments.length === 0) return services;
         const allowed = new Set(assignments.map(String));
         return services.filter(service => allowed.has(String(service.id)));
+    }
+
+    iconServiceName(iconId) {
+        // The service names are the stable, user-visible Clockodo names.
+        return {
+            car: 'Anfahrt',
+            squeegee: 'Fensterreinigung',
+            mop: 'Treppenhaus/Keller Reinigung'
+        }[iconId] || '';
+    }
+
+    findClockodoServiceByName(serviceName) {
+        const normalize = value => String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+        const target = normalize(serviceName);
+        if (!target) return null;
+        const matches = (this.clockodoServices || [])
+            .filter(service => normalize(service.name) === target);
+        // Ambiguous duplicates are not guessed.
+        return matches.length === 1 ? matches[0] : null;
+    }
+
+    applyIconServiceMapping(iconId) {
+        const serviceName = this.iconServiceName(iconId);
+        if (!serviceName) return false;
+        if (this.clockodoReferenceStatus !== 'ready') {
+            this.setClockodoAssignmentHint('activity', this.t('iconServiceUnavailable', { service: serviceName }));
+            return false;
+        }
+        const service = this.findClockodoServiceByName(serviceName);
+        if (!service) {
+            this.setClockodoAssignmentHint('activity', this.t('iconServiceUnavailable', { service: serviceName }));
+            return false;
+        }
+        const customerId = this.clockodoSelectedCustomerId('activity');
+        if (customerId) {
+            const allowed = this.clockodoAllowedServices(customerId);
+            if (!allowed.some(item => String(item.id) === String(service.id))) {
+                this.setClockodoAssignmentHint('activity', this.t('clockodoServiceNotAllowedForCustomer'));
+                return false;
+            }
+        }
+        const ids = this.clockodoAssignmentIds('activity');
+        const hidden = document.getElementById(ids.service);
+        const input = document.getElementById(ids.serviceInput);
+        if (hidden) hidden.value = String(service.id);
+        if (input) input.value = service.name;
+        this.activityServiceManuallySelected = false;
+        this.setClockodoAssignmentHint('activity', null);
+        return true;
     }
 
     clockodoAllowedProjects(customerId) {
@@ -8039,7 +8300,11 @@ class TimerHubApp {
                                 ? this.t('clockodoProjectLoadFailed', { detail: this.clockodoProjectFailureDetail() })
                                 : groupContext && ready && selectedCustomerId && !this.clockodoCustomerById(selectedCustomerId)
                                     ? this.t('groupDefaultCustomerMissing')
-                                    : projectHint || this.clockodoAssignmentHint();
+                                    : groupContext && !selectedCustomerId && this.groupEditInheritedCustomer
+                                        ? this.groupEditInheritedCustomer.missing
+                                            ? this.t('groupDefaultCustomerMissing')
+                                            : this.t('groupDefaultCustomerInherited', { name: this.groupEditInheritedCustomer.name })
+                                        : projectHint || this.clockodoAssignmentHint();
         }
         const retry = document.getElementById(ids.retry);
         const hasProjectProblem = !groupContext && Boolean(this.clockodoProjectError);
@@ -8052,6 +8317,17 @@ class TimerHubApp {
         const hiddenEl = document.getElementById(hidden);
         const match = this.findClockodoItem(this.clockodoComboboxItems(context, fieldName), inputEl?.value);
         if (hiddenEl) hiddenEl.value = match ? String(match.id) : '';
+        if (context === 'activity' && fieldName === 'service') this.activityServiceManuallySelected = true;
+        if (fieldName === 'customer') {
+            this.clockodoCustomerFilters.delete(context);
+            this.clockodoCustomerAutoSelected.delete(context);
+        }
+        if (fieldName === 'project' && context !== 'group') {
+            this.syncCustomerFromProject(context);
+            if (this.clockodoReferenceStatus === 'ready') this.openClockodoCombobox(context, fieldName, inputEl?.value || '');
+            else this.closeClockodoCombobox();
+            return;
+        }
         const serviceCleared = fieldName === 'customer' ? this.enforceClockodoServiceForCustomer(context) : false;
         const projectCleared = fieldName === 'customer' ? this.enforceClockodoProjectForCustomer(context) : false;
         this.setClockodoAssignmentHint(
@@ -8185,6 +8461,15 @@ class TimerHubApp {
         if (hiddenEl) hiddenEl.value = option.unassigned ? '' : option.id;
         if (inputEl) inputEl.value = option.unassigned ? '' : option.label;
         this.closeClockodoCombobox();
+        if (context === 'activity' && fieldName === 'service') this.activityServiceManuallySelected = true;
+        if (fieldName === 'customer') {
+            this.clockodoCustomerFilters.delete(context);
+            this.clockodoCustomerAutoSelected.delete(context);
+        }
+        if (fieldName === 'project' && context !== 'group') {
+            this.syncCustomerFromProject(context, { fromSelection: true });
+            return;
+        }
         const serviceCleared = fieldName === 'customer' ? this.enforceClockodoServiceForCustomer(context) : false;
         const projectCleared = fieldName === 'customer' ? this.enforceClockodoProjectForCustomer(context) : false;
         this.setClockodoAssignmentHint(
@@ -8334,6 +8619,7 @@ class TimerHubApp {
         }
         const groupModal = document.getElementById('groupEditModal');
         if (groupModal?.classList?.contains?.('active')) {
+            this.refreshGroupInheritedCustomer();
             this.populateClockodoAssignmentSelects(
                 'group',
                 document.getElementById('groupEditCustomerSelect')?.value,
