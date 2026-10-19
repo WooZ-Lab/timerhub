@@ -294,7 +294,10 @@ export class TimerHubDurableObject {
                     `${resource}?items_per_page=1000&page=${page}`
                 );
                 if (!response.ok) {
-                    return jsonError(this.clockodoErrorCode(response.status), response.status);
+                    const error = this.clockodoErrorCode(response.status);
+                    const errorData = await response.json().catch(() => null);
+                    const rejection = this.clockodoRejectionDetails(response.status, errorData);
+                    return Response.json({ error, ...(rejection ? { clockodo: rejection } : {}) }, { status: response.status });
                 }
                 const data = await response.json().catch(() => null);
                 if (!data || typeof data !== "object" || Array.isArray(data)) {

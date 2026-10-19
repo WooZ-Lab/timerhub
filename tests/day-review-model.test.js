@@ -2958,7 +2958,7 @@ test('Task 10: confirmation submit control invokes the guarded confirm-and-sync 
     assert.match(source, /async confirmAndSyncClockodo\(\)\s*\{\s*if \(!this\.syncConfirmationOpen\) return false;/);
 });
 
-function makeClockodoReferenceClient({ customers = [], services = [], projects = null, failCode = null, projectFailCode = null } = {}) {
+function makeClockodoReferenceClient({ customers = [], services = [], projects = null, failCode = null, projectFailCode = null, projectFailStatus = 403, projectFailDetails = null } = {}) {
     const state = { customerCalls: 0, serviceCalls: 0, projectCalls: 0 };
     const client = {
         state,
@@ -2977,7 +2977,7 @@ function makeClockodoReferenceClient({ customers = [], services = [], projects =
         client.getProjects = async () => {
             state.projectCalls += 1;
             if (failCode) throw Object.assign(new Error('safe failure'), { code: failCode });
-            if (projectFailCode) throw Object.assign(new Error('project failure'), { code: projectFailCode, status: 403 });
+            if (projectFailCode) throw Object.assign(new Error('project failure'), { code: projectFailCode, status: projectFailStatus, details: projectFailDetails });
             return { projects };
         };
     }
@@ -9223,5 +9223,27 @@ test('Clockodo HTTP 410 explains that projects are unavailable for the account',
     app.clockodoWorkerOutdated = false;
     app.clockodoProjectErrorStatus = 410;
     app.populateClockodoAssignmentSelects('activity', '5');
-    assert.equal(document.getElementById('activityClockodoHint').textContent, app.t('clockodoProjectsUnavailable'));
+    assert.equal(document.getElementById('activityClockodoHint').textContent, app.t('clockodoProjectsUnavailable', { detail: 'clockodo_rejected · HTTP 410' }));
+});
+
+test('Clockodo project errors show the safe upstream explanation', async () => {
+    const client = makeClockodoReferenceClient({
+        customers: [{ id: 5, name: 'Beta' }],
+        services: [{ id: 9, name: 'Repair' }],
+        projects: [{ id: 4, name: 'Object A', customerId: 5 }],
+        projectFailCode: 'clockodo_rejected',
+        projectFailStatus: 410,
+        projectFailDetails: { status: 410, code: 'ProjectsNotAvailable', message: 'Projects are not booked for this account' }
+    });
+    const { app, document } = createTestApp({
+        clockodoClient: client,
+        fetch: async () => Response.json({ version: '2026-10-18-projects-v4' })
+    });
+    app.clockodoConfigured = true;
+    assert.equal(await app.loadClockodoReferenceData(), true);
+    app.populateClockodoAssignmentSelects('activity', '5');
+    const hint = document.getElementById('activityClockodoHint').textContent;
+    assert.match(hint, /HTTP 410/);
+    assert.match(hint, /Projects are not booked for this account/);
+    assert.equal(hint.includes('apiKey'), false);
 });

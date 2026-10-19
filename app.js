@@ -400,7 +400,7 @@ const extendedTranslations = {
         clockodoProjectNotAllowedForCustomer: 'The selected project does not belong to this customer. Choose a project of the selected customer.',
         clockodoProjectLoadFailed: 'Customers and services loaded, but projects could not be loaded. Retry or check project access in Clockodo. ({detail})',
         clockodoWorkerOutdated: 'The TimerHub server (Cloudflare Worker) is outdated. Redeploy the Worker from Cloudflare, then press Reload.',
-        clockodoProjectsUnavailable: 'Clockodo does not provide projects for this account or API user (HTTP 410). Check the Clockodo plan and the user\'s project rights, then press Reload.',
+        clockodoProjectsUnavailable: 'Clockodo does not provide projects for this account or API user ({detail}). Check the Clockodo plan and the user\'s project rights, then press Reload.',
         clockodoProjectChooseCustomer: 'Choose a customer first, then pick one of their projects.',
         clockodoNoProjects: 'Clockodo returned no projects for this account. Check project access and whether projects are enabled in Clockodo.',
         clockodoNoProjectsForCustomer: 'The selected customer has no projects in Clockodo.',
@@ -762,7 +762,7 @@ const extendedTranslations = {
         clockodoProjectNotAllowedForCustomer: 'Das gewählte Projekt gehört nicht zu diesem Kunden. Wähle ein Projekt des ausgewählten Kunden.',
         clockodoProjectLoadFailed: 'Kunden und Leistungen wurden geladen, aber Projekte konnten nicht geladen werden. Erneut versuchen oder Projektzugriff in Clockodo prüfen. ({detail})',
         clockodoWorkerOutdated: 'Die TimerHub-Serverseite (Cloudflare Worker) ist veraltet. Stelle den Worker in Cloudflare neu bereit und drücke dann „Neu laden“.',
-        clockodoProjectsUnavailable: 'Clockodo stellt für dieses Konto oder diesen API-Benutzer keine Projekte bereit (HTTP 410). Prüfe den Clockodo-Tarif und die Projekt-Rechte des Benutzers und drücke dann „Neu laden“.',
+        clockodoProjectsUnavailable: 'Clockodo stellt für dieses Konto oder diesen API-Benutzer keine Projekte bereit ({detail}). Prüfe den Clockodo-Tarif und die Projekt-Rechte des Benutzers und drücke dann „Neu laden“.',
         clockodoProjectChooseCustomer: 'Wähle zuerst einen Kunden und dann eines seiner Projekte.',
         clockodoNoProjects: 'Clockodo hat für dieses Konto keine Projekte geliefert. Prüfe den Projektzugriff und ob Projekte in Clockodo aktiviert sind.',
         clockodoNoProjectsForCustomer: 'Der ausgewählte Kunde hat keine Projekte in Clockodo.',
@@ -1124,7 +1124,7 @@ const extendedTranslations = {
         clockodoProjectNotAllowedForCustomer: 'Выбранный проект не принадлежит этому клиенту. Выберите проект выбранного клиента.',
         clockodoProjectLoadFailed: 'Клиенты и услуги загружены, но проекты загрузить не удалось. Повторите попытку или проверьте доступ к проектам в Clockodo. ({detail})',
         clockodoWorkerOutdated: 'Серверная часть TimerHub (Cloudflare Worker) устарела. Переразверните Worker в Cloudflare и нажмите «Reload».',
-        clockodoProjectsUnavailable: 'Clockodo не предоставляет проекты для этого аккаунта или API-пользователя (HTTP 410). Проверьте тариф Clockodo и права пользователя на проекты, затем нажмите «Reload».',
+        clockodoProjectsUnavailable: 'Clockodo не предоставляет проекты для этого аккаунта или API-пользователя ({detail}). Проверьте тариф Clockodo и права пользователя на проекты, затем нажмите «Reload».',
         clockodoProjectChooseCustomer: 'Сначала выберите клиента, затем его проект.',
         clockodoNoProjects: 'Clockodo не вернул проекты для этого аккаунта. Проверьте доступ к проектам и включены ли проекты в Clockodo.',
         clockodoNoProjectsForCustomer: 'У выбранного клиента нет проектов в Clockodo.',
@@ -1936,6 +1936,7 @@ class TimerHubApp {
         this.clockodoProjects = [];
         this.clockodoProjectError = null;
         this.clockodoProjectErrorStatus = 0;
+        this.clockodoProjectErrorDetails = null;
         this.clockodoWorkerOutdated = false;
         this.clockodoReferenceStatus = 'idle';
         this.clockodoReferenceError = null;
@@ -7853,13 +7854,9 @@ class TimerHubApp {
                     : this.clockodoWorkerOutdated
                         ? this.t('clockodoWorkerOutdated')
                         : this.clockodoProjectErrorStatus === 410
-                            ? this.t('clockodoProjectsUnavailable')
+                            ? this.t('clockodoProjectsUnavailable', { detail: this.clockodoProjectFailureDetail() || 'HTTP 410' })
                             : this.clockodoProjectError
-                                ? this.t('clockodoProjectLoadFailed', {
-                                    detail: [this.clockodoProjectError, this.clockodoProjectErrorStatus ? `HTTP ${this.clockodoProjectErrorStatus}` : '']
-                                        .filter(Boolean)
-                                        .join(' · ')
-                                })
+                                ? this.t('clockodoProjectLoadFailed', { detail: this.clockodoProjectFailureDetail() })
                                 : projectHint || this.clockodoAssignmentHint();
         }
         const retry = document.getElementById(ids.retry);
@@ -8168,6 +8165,19 @@ class TimerHubApp {
         }
     }
 
+    clockodoProjectFailureDetail() {
+        const details = this.clockodoProjectErrorDetails;
+        const message = details?.message
+            || (Array.isArray(details?.fields) && details.fields.length ? details.fields.join(', ') : '')
+            || details?.path
+            || '';
+        return [
+            this.clockodoProjectError,
+            this.clockodoProjectErrorStatus ? `HTTP ${this.clockodoProjectErrorStatus}` : '',
+            message
+        ].filter(Boolean).join(' · ');
+    }
+
     async detectOutdatedWorker() {
         const fetchImpl = this.getFetchImpl();
         if (!fetchImpl) return false;
@@ -8194,6 +8204,7 @@ class TimerHubApp {
                 this.clockodoProjects = [];
                 this.clockodoProjectError = null;
                 this.clockodoProjectErrorStatus = 0;
+                this.clockodoProjectErrorDetails = null;
                 this.clockodoWorkerOutdated = false;
                 this.clockodoReferenceStatus = 'unconfigured';
             }
@@ -8231,6 +8242,9 @@ class TimerHubApp {
                 this.clockodoProjectErrorStatus = projectResult.status === 'rejected'
                     ? Number(projectResult.reason?.status) || 0
                     : 0;
+                this.clockodoProjectErrorDetails = projectResult.status === 'rejected'
+                    ? this.normalizeClockodoErrorDetails(projectResult.reason?.details)
+                    : null;
                 this.clockodoWorkerOutdated = this.clockodoProjectError
                     ? await this.detectOutdatedWorker()
                     : false;
@@ -8335,6 +8349,7 @@ class TimerHubApp {
                 this.clockodoProjects = [];
                 this.clockodoProjectError = null;
                 this.clockodoProjectErrorStatus = 0;
+                this.clockodoProjectErrorDetails = null;
                 this.clockodoWorkerOutdated = false;
                 this.clockodoReferenceStatus = 'unconfigured';
             }
@@ -8390,6 +8405,7 @@ class TimerHubApp {
             this.clockodoProjects = [];
             this.clockodoProjectError = null;
             this.clockodoProjectErrorStatus = 0;
+            this.clockodoProjectErrorDetails = null;
             this.clockodoWorkerOutdated = false;
             this.clockodoReferenceStatus = 'idle';
             this.clockodoReferencePromise = null;
@@ -8462,6 +8478,7 @@ class TimerHubApp {
         this.clockodoProjects = [];
         this.clockodoProjectError = null;
         this.clockodoProjectErrorStatus = 0;
+        this.clockodoProjectErrorDetails = null;
         this.clockodoWorkerOutdated = false;
         this.clockodoReferenceStatus = 'unconfigured';
         this.clockodoReferencePromise = null;

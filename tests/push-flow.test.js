@@ -1587,6 +1587,17 @@ test('Clockodo Worker loads projects with their customer mapping and rejects mal
     assert.equal(requests[0].init.headers['X-ClockodoApiUser'], 'person@example.test');
     assert.equal(requests[0].init.headers['X-ClockodoApiKey'], apiKey);
 
+    projectResponse = Response.json(
+        { errors: [{ type: 'ProjectsNotAvailable', message: 'Projects are not booked for this account' }] },
+        { status: 410 }
+    );
+    const unavailable = await backend.request(`/api/clockodo/projects?clientId=${clientId}`, { headers: auth });
+    assert.equal(unavailable.status, 410);
+    const unavailableBody = await unavailable.json();
+    assert.equal(unavailableBody.error, 'clockodo_rejected');
+    assert.equal(unavailableBody.clockodo.message, 'Projects are not booked for this account');
+    assert.equal(JSON.stringify(unavailableBody).includes(apiKey), false);
+
     projectResponse = Response.json({ data: [{ id: 8, name: 'Bad customer', customers_id: 'not-a-number' }] });
     const malformed = await backend.request(`/api/clockodo/projects?clientId=${clientId}`, { headers: auth });
     assert.equal(malformed.status, 502);
