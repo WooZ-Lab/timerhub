@@ -117,6 +117,8 @@ function createTestApp(initialData = {}) {
         'assignmentPreviewWarnings', 'assignmentPreviewList', 'assignmentImportCancelBtn', 'assignmentImportConfirmBtn',
         'groupEditModal', 'groupEditModalTitle', 'groupEditModalCloseBtn', 'groupEditNameInput', 'groupEditNameError',
         'groupEditColorOptions', 'groupEditCancelBtn', 'groupEditSaveBtn',
+        'groupEditCustomerInput', 'groupEditCustomerSelect', 'groupEditCustomerList',
+        'groupEditClockodoHint', 'groupEditClockodoRetryBtn', 'groupEditCustomerClearBtn', 'menuDuplicateBtn',
         'createGroupFromGroupsBtn', 'deleteGroupsBtn', 'groupDeleteModal', 'groupDeleteModalTitle',
         'groupDeleteModalCloseBtn', 'groupDeleteSummary', 'groupDeleteOutcome', 'groupDeleteLockedWarning',
         'groupDeleteActivitiesKeep', 'groupDeleteActivitiesDelete', 'groupDeleteNestedKeep', 'groupDeleteNestedDelete',

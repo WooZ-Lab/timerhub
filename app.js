@@ -506,6 +506,10 @@ const extendedTranslations = {
         collapseGroup: 'Collapse group', expandGroup: 'Expand group',
         collapseAllGroups: 'Collapse all', expandAllGroups: 'Expand all',
         duplicateGroup: 'Duplicate group', groupCopyName: '{name} (copy)',
+        duplicateActivity: 'Duplicate',
+        activityCopyName: '{name} (copy)',
+        activityDuplicated: 'Activity "{name}" duplicated',
+        activityDuplicateFailed: 'Could not duplicate the activity. The original was not changed.',
         groupDuplicated: 'Group "{name}" duplicated',
         editGroup: 'Edit group', resizeGroup: 'Resize collapsed group',
         groupSelectedGroups: 'Group selected groups',
@@ -532,6 +536,10 @@ const extendedTranslations = {
         groupColorLabel: 'Group color', groupColorDefault: 'Default',
         groupNameRequired: 'Enter a group name.',
         groupEditSaveFailed: 'Could not save the group. Try again.',
+        groupDefaultCustomer: 'Default customer',
+        groupDefaultCustomerHelp: 'New activities in this group use this customer unless they have their own customer.',
+        groupDefaultCustomerMissing: 'The saved default customer is no longer available in Clockodo. Choose another customer or clear the field.',
+        clearDefaultCustomer: 'Clear customer',
         canvasToolbar: 'Canvas actions',
     },
     de: {
@@ -868,6 +876,10 @@ const extendedTranslations = {
         collapseGroup: 'Gruppe einklappen', expandGroup: 'Gruppe ausklappen',
         collapseAllGroups: 'Alle einklappen', expandAllGroups: 'Alle ausklappen',
         duplicateGroup: 'Gruppe duplizieren', groupCopyName: '{name} (Kopie)',
+        duplicateActivity: 'Duplizieren',
+        activityCopyName: '{name} (Kopie)',
+        activityDuplicated: 'Aktivität „{name}“ dupliziert',
+        activityDuplicateFailed: 'Die Aktivität konnte nicht dupliziert werden. Das Original wurde nicht verändert.',
         groupDuplicated: 'Gruppe "{name}" dupliziert',
         editGroup: 'Gruppe bearbeiten', resizeGroup: 'Eingeklappte Gruppe skalieren',
         groupSelectedGroups: 'Ausgewählte Gruppen gruppieren',
@@ -894,6 +906,10 @@ const extendedTranslations = {
         groupColorLabel: 'Gruppenfarbe', groupColorDefault: 'Standard',
         groupNameRequired: 'Bitte einen Gruppennamen eingeben.',
         groupEditSaveFailed: 'Gruppe konnte nicht gespeichert werden. Bitte erneut versuchen.',
+        groupDefaultCustomer: 'Standardkunde',
+        groupDefaultCustomerHelp: 'Neue Aktivitäten in dieser Gruppe verwenden diesen Kunden, solange sie keinen eigenen Kunden haben.',
+        groupDefaultCustomerMissing: 'Der gespeicherte Standardkunde ist in Clockodo nicht mehr verfügbar. Wähle einen anderen Kunden oder leere das Feld.',
+        clearDefaultCustomer: 'Kunde leeren',
         canvasToolbar: 'Canvas-Aktionen',
     },
     ru: {
@@ -1230,6 +1246,10 @@ const extendedTranslations = {
         collapseGroup: 'Свернуть группу', expandGroup: 'Развернуть группу',
         collapseAllGroups: 'Свернуть все', expandAllGroups: 'Развернуть все',
         duplicateGroup: 'Дублировать группу', groupCopyName: '{name} (копия)',
+        duplicateActivity: 'Дублировать',
+        activityCopyName: '{name} (копия)',
+        activityDuplicated: 'Занятие «{name}» дублировано',
+        activityDuplicateFailed: 'Не удалось дублировать занятие. Оригинал не изменён.',
         groupDuplicated: 'Группа «{name}» дублирована',
         editGroup: 'Редактировать группу', resizeGroup: 'Изменить размер свёрнутой группы',
         groupSelectedGroups: 'Сгруппировать выбранные группы',
@@ -1256,6 +1276,10 @@ const extendedTranslations = {
         groupColorLabel: 'Цвет группы', groupColorDefault: 'По умолчанию',
         groupNameRequired: 'Введите название группы.',
         groupEditSaveFailed: 'Не удалось сохранить группу. Попробуйте ещё раз.',
+        groupDefaultCustomer: 'Клиент по умолчанию',
+        groupDefaultCustomerHelp: 'Новые занятия в этой группе используют этого клиента, если у них нет собственного клиента.',
+        groupDefaultCustomerMissing: 'Сохранённый клиент по умолчанию больше не доступен в Clockodo. Выберите другого клиента или очистите поле.',
+        clearDefaultCustomer: 'Очистить клиента',
         canvasToolbar: 'Действия на холсте',
     }
 };
@@ -1754,6 +1778,8 @@ class StorageRepository {
             optionalNumber(group, 'y');
             optionalBoolean(group, 'collapsed');
             optionalNullableString(group, 'parentId');
+            optionalNullableString(group, 'defaultCustomerId');
+            optionalNullableString(group, 'defaultCustomerName');
             optionalNumber(group, 'collapsedWidth');
             optionalNumber(group, 'collapsedHeight');
         }
@@ -2215,6 +2241,15 @@ class TimerHubApp {
                     }
                     if (typeof group.parentId === 'string' && group.parentId) {
                         normalized.parentId = group.parentId;
+                    }
+                    // Optional default customer for newly created activities.
+                    // Absent on legacy groups, which keep behaving as before.
+                    const defaultCustomerId = this.normalizeClockodoId(group.defaultCustomerId);
+                    if (defaultCustomerId) {
+                        normalized.defaultCustomerId = defaultCustomerId;
+                        if (typeof group.defaultCustomerName === 'string' && group.defaultCustomerName.trim()) {
+                            normalized.defaultCustomerName = group.defaultCustomerName.trim();
+                        }
                     }
                     // Assignment provenance must survive a reload: replace-mode
                     // imports and later saves need it to stay intact.
@@ -2747,6 +2782,7 @@ class TimerHubApp {
         // Activity menu modal
         sel('menuCloseBtn')?.addEventListener('click', () => this.closeActivityMenu());
         sel('menuEditBtn')?.addEventListener('click', () => this.editActivity());
+        sel('menuDuplicateBtn')?.addEventListener('click', () => this.duplicateActivity());
         sel('menuArchiveBtn')?.addEventListener('click', () => this.archiveActivity());
         sel('menuDeleteBtn')?.addEventListener('click', () => this.deleteActivity());
 
@@ -2769,9 +2805,12 @@ class TimerHubApp {
         });
         sel('activityClockodoRetryBtn')?.addEventListener('click', () => this.reloadClockodoReferenceData());
         sel('entryEditClockodoRetryBtn')?.addEventListener('click', () => this.reloadClockodoReferenceData());
+        sel('groupEditClockodoRetryBtn')?.addEventListener('click', () => this.reloadClockodoReferenceData());
+        sel('groupEditCustomerClearBtn')?.addEventListener('click', () => this.clearGroupDefaultCustomer());
         for (const [context, fieldName] of [
             ['activity', 'customer'], ['activity', 'project'], ['activity', 'service'],
-            ['entry', 'customer'], ['entry', 'project'], ['entry', 'service']
+            ['entry', 'customer'], ['entry', 'project'], ['entry', 'service'],
+            ['group', 'customer']
         ]) {
             const combobox = this.clockodoComboboxIds(context, fieldName);
             sel(combobox.input)?.addEventListener('focus', () => this.openClockodoCombobox(context, fieldName));
@@ -4703,6 +4742,10 @@ class TimerHubApp {
         // persistent presentation metadata.
         if (group.parentId) duplicate.parentId = group.parentId;
         if (group.color) duplicate.color = group.color;
+        if (group.defaultCustomerId) {
+            duplicate.defaultCustomerId = group.defaultCustomerId;
+            if (group.defaultCustomerName) duplicate.defaultCustomerName = group.defaultCustomerName;
+        }
         if (Number.isFinite(Number(group.collapsedWidth))) duplicate.collapsedWidth = group.collapsedWidth;
         if (Number.isFinite(Number(group.collapsedHeight))) duplicate.collapsedHeight = group.collapsedHeight;
         const now = Date.now();
@@ -4718,6 +4761,13 @@ class TimerHubApp {
                 createdAt: now,
                 updatedAt: now
             };
+            const assignment = this.resolveNewActivityCustomer({
+                explicitCustomerId: activity.customerId,
+                explicitCustomerName: activity.customerName,
+                group: duplicate
+            });
+            copy.customerId = assignment.customerId;
+            copy.customerName = assignment.customerName;
             const saved = this.activityLayouts.get(activity.id);
             let layout;
             if (this.isCompleteLayout(saved)) {
@@ -4751,6 +4801,13 @@ class TimerHubApp {
                 this.activities = this.activities.filter(item => item.id !== copy.id);
                 this.activityLayouts.delete(copy.id);
             }
+            try {
+                await this.storage.deleteGroup?.(duplicate.id);
+                for (const { copy } of copies) {
+                    await this.storage.deleteActivity?.(copy.id);
+                    await this.storage.deleteLayout?.(copy.id);
+                }
+            } catch { /* best-effort cleanup */ }
             this.showToast(this.t('groupCreateFailed'));
             return null;
         }
@@ -5695,6 +5752,14 @@ class TimerHubApp {
         if (input) input.value = group.name;
         const lockedInput = document.getElementById('groupEditLockedInput');
         if (lockedInput) lockedInput.checked = group.locked === true;
+        this.populateClockodoAssignmentSelects(
+            'group',
+            group.defaultCustomerId,
+            null,
+            group.defaultCustomerName,
+            ''
+        );
+        this.loadClockodoReferenceData();
         this.renderGroupColorOptions();
         this.hideGroupEditNameError();
         document.getElementById('groupEditModal')?.classList.add('active');
@@ -5730,6 +5795,16 @@ class TimerHubApp {
         }
     }
 
+    clearGroupDefaultCustomer() {
+        const ids = this.clockodoComboboxIds('group', 'customer');
+        const hidden = document.getElementById(ids.hidden);
+        const input = document.getElementById(ids.input);
+        if (hidden) hidden.value = '';
+        if (input) input.value = '';
+        this.setClockodoAssignmentHint('group', null);
+        return true;
+    }
+
     async saveGroupEdit() {
         const group = this.groups.find(item => item.id === this.editingGroupId);
         if (!group) {
@@ -5748,6 +5823,14 @@ class TimerHubApp {
         const lockedInput = document.getElementById('groupEditLockedInput');
         if (lockedInput?.checked) group.locked = true;
         else delete group.locked;
+        const assignment = this.readClockodoAssignment('group');
+        if (assignment.customerId) {
+            group.defaultCustomerId = assignment.customerId;
+            group.defaultCustomerName = assignment.customerName || '';
+        } else {
+            delete group.defaultCustomerId;
+            delete group.defaultCustomerName;
+        }
         try {
             await this.storage.saveGroup?.(group);
         } catch {
@@ -7273,6 +7356,63 @@ class TimerHubApp {
         this.showActivityModal(this.editingActivityId);
     }
 
+    async duplicateActivity() {
+        const activity = this.activities.find(item => item.id === this.editingActivityId);
+        this.closeActivityMenu();
+        if (!activity) return null;
+        const group = activity.groupId
+            ? this.groups.find(item => item.id === activity.groupId)
+            : null;
+        const assignment = this.resolveNewActivityCustomer({
+            explicitCustomerId: activity.customerId,
+            explicitCustomerName: activity.customerName,
+            group
+        });
+        const now = Date.now();
+        const duplicate = {
+            ...activity,
+            id: this.generateId(),
+            name: this.t('activityCopyName', { name: activity.name }),
+            customerId: assignment.customerId,
+            customerName: assignment.customerName,
+            position: Math.max(0, ...this.activities.map(item => Number(item.position) || 0)) + 1,
+            archived: false,
+            createdAt: now,
+            updatedAt: now
+        };
+        // Import provenance belongs to the source record, not to a manual copy.
+        delete duplicate.assignment;
+        delete duplicate.importedAt;
+        const current = this.getActivityCanvasLayout(activity, this.activities.indexOf(activity), false);
+        const baseX = group ? current.x - group.x : current.x;
+        const baseY = group ? current.y - group.y : current.y;
+        const layout = {
+            activityId: duplicate.id,
+            x: this.snapToCanvasGrid(baseX + CANVAS_GROUP_DUPLICATE_OFFSET),
+            y: this.snapToCanvasGrid(baseY + CANVAS_GROUP_DUPLICATE_OFFSET),
+            width: current.width,
+            height: current.height
+        };
+        this.activities.push(duplicate);
+        this.activityLayouts.set(duplicate.id, layout);
+        try {
+            await this.storage.saveActivity(duplicate);
+            await this.storage.saveLayout(layout);
+        } catch {
+            this.activities = this.activities.filter(item => item.id !== duplicate.id);
+            this.activityLayouts.delete(duplicate.id);
+            try {
+                await this.storage.deleteActivity?.(duplicate.id);
+                await this.storage.deleteLayout?.(duplicate.id);
+            } catch { /* best-effort cleanup */ }
+            this.showToast(this.t('activityDuplicateFailed'));
+            return null;
+        }
+        this.renderMain();
+        this.showToast(this.t('activityDuplicated', { name: duplicate.name }));
+        return duplicate;
+    }
+
     async archiveActivity() {
         const activity = this.activities.find(a => a.id === this.editingActivityId);
         if (activity) {
@@ -7619,6 +7759,12 @@ class TimerHubApp {
     }
 
     clockodoAssignmentIds(context) {
+        if (context === 'group') {
+            return {
+                customer: 'groupEditCustomerSelect', customerInput: 'groupEditCustomerInput', customerList: 'groupEditCustomerList',
+                hint: 'groupEditClockodoHint', retry: 'groupEditClockodoRetryBtn'
+            };
+        }
         return context === 'activity'
             ? {
                 customer: 'activityCustomerSelect', customerInput: 'activityCustomerInput', customerList: 'activityCustomerList',
@@ -7655,6 +7801,33 @@ class TimerHubApp {
         if (!id) return null;
         const customers = Array.isArray(this.clockodoCustomers) ? this.clockodoCustomers : [];
         return customers.find(customer => String(customer.id) === id) || null;
+    }
+
+    // Creation-time customer precedence: an explicit button customer always
+    // wins; otherwise the group default is used. A default that no longer
+    // exists in a fully loaded Clockodo list is ignored instead of creating a
+    // dangling reference. While the reference data is unavailable (offline or
+    // not configured), the persisted default is applied as-is.
+    resolveNewActivityCustomer({ explicitCustomerId = null, explicitCustomerName = '', group = null } = {}) {
+        const hasExplicit = explicitCustomerId !== null && explicitCustomerId !== undefined &&
+            String(explicitCustomerId).trim() !== '';
+        if (hasExplicit) {
+            return {
+                customerId: explicitCustomerId,
+                customerName: explicitCustomerName ||
+                    this.clockodoCustomerById(explicitCustomerId)?.name || ''
+            };
+        }
+        const storedDefaultId = group?.defaultCustomerId;
+        if (this.normalizeClockodoId(storedDefaultId) === null) {
+            return { customerId: '', customerName: '' };
+        }
+        const known = this.clockodoCustomerById(storedDefaultId);
+        if (known) return { customerId: storedDefaultId, customerName: known.name };
+        if (this.clockodoReferenceStatus === 'ready') {
+            return { customerId: '', customerName: '' };
+        }
+        return { customerId: storedDefaultId, customerName: group.defaultCustomerName || '' };
     }
 
     clockodoAllowedServices(customerId) {
@@ -7804,26 +7977,32 @@ class TimerHubApp {
             selectedCustomerId,
             customerName
         );
-        this.populateClockodoAssignmentField(
-            { hidden: ids.project, input: ids.projectInput, list: ids.projectList },
-            ready ? this.clockodoAllowedProjects(this.clockodoSelectedCustomerId(context)) : [],
-            selectedProjectId,
-            projectName
-        );
-        this.populateClockodoAssignmentField(
-            { hidden: ids.service, input: ids.serviceInput, list: ids.serviceList },
-            ready ? this.clockodoAllowedServices(this.clockodoSelectedCustomerId(context)) : [],
-            selectedServiceId,
-            serviceName
-        );
-        const serviceCleared = this.enforceClockodoServiceForCustomer(context);
-        const projectCleared = this.enforceClockodoProjectForCustomer(context);
+        const groupContext = context === 'group';
+        if (!groupContext) {
+            this.populateClockodoAssignmentField(
+                { hidden: ids.project, input: ids.projectInput, list: ids.projectList },
+                ready ? this.clockodoAllowedProjects(this.clockodoSelectedCustomerId(context)) : [],
+                selectedProjectId,
+                projectName
+            );
+            this.populateClockodoAssignmentField(
+                { hidden: ids.service, input: ids.serviceInput, list: ids.serviceList },
+                ready ? this.clockodoAllowedServices(this.clockodoSelectedCustomerId(context)) : [],
+                selectedServiceId,
+                serviceName
+            );
+        }
+        const serviceCleared = groupContext ? false : this.enforceClockodoServiceForCustomer(context);
+        const projectCleared = groupContext ? false : this.enforceClockodoProjectForCustomer(context);
         const statePlaceholder = this.clockodoAssignmentPlaceholder();
-        for (const [inputId, labelKey] of [
-            [ids.customerInput, 'clockodoCustomerSelectLabel'],
-            [ids.projectInput, 'clockodoProjectSelectLabel'],
-            [ids.serviceInput, 'clockodoServiceSelectLabel']
-        ]) {
+        const placeholderFields = [[ids.customerInput, 'clockodoCustomerSelectLabel']];
+        if (!groupContext) {
+            placeholderFields.push(
+                [ids.projectInput, 'clockodoProjectSelectLabel'],
+                [ids.serviceInput, 'clockodoServiceSelectLabel']
+            );
+        }
+        for (const [inputId, labelKey] of placeholderFields) {
             const input = document.getElementById(inputId);
             if (input) {
                 input.disabled = !ready;
@@ -7838,7 +8017,7 @@ class TimerHubApp {
         const hint = document.getElementById(ids.hint);
         if (hint) {
             const selectedCustomerId = this.clockodoSelectedCustomerId(context);
-            const projectHint = ready && !serviceCleared && !projectCleared && !this.clockodoProjectError
+            const projectHint = !groupContext && ready && !serviceCleared && !projectCleared && !this.clockodoProjectError
                 ? this.clockodoProjects.length === 0
                     ? this.t('clockodoNoProjects')
                     : !selectedCustomerId
@@ -7847,20 +8026,24 @@ class TimerHubApp {
                             ? this.t('clockodoNoProjectsForCustomer')
                             : null
                 : null;
+            const projectFailure = !groupContext ? this.clockodoProjectError : null;
             hint.textContent = serviceCleared
                 ? this.t('clockodoServiceNotAllowedForCustomer')
                 : projectCleared
                     ? this.t('clockodoProjectNotAllowedForCustomer')
-                    : this.clockodoWorkerOutdated
+                    : !groupContext && this.clockodoWorkerOutdated
                         ? this.t('clockodoWorkerOutdated')
-                        : this.clockodoProjectErrorStatus === 410
+                        : !groupContext && this.clockodoProjectErrorStatus === 410
                             ? this.t('clockodoProjectsUnavailable', { detail: this.clockodoProjectFailureDetail() || 'HTTP 410' })
-                            : this.clockodoProjectError
+                            : projectFailure
                                 ? this.t('clockodoProjectLoadFailed', { detail: this.clockodoProjectFailureDetail() })
-                                : projectHint || this.clockodoAssignmentHint();
+                                : groupContext && ready && selectedCustomerId && !this.clockodoCustomerById(selectedCustomerId)
+                                    ? this.t('groupDefaultCustomerMissing')
+                                    : projectHint || this.clockodoAssignmentHint();
         }
         const retry = document.getElementById(ids.retry);
-        if (retry) retry.style.display = status === 'error' || this.clockodoProjectError ? '' : 'none';
+        const hasProjectProblem = !groupContext && Boolean(this.clockodoProjectError);
+        if (retry) retry.style.display = status === 'error' || hasProjectProblem ? '' : 'none';
     }
 
     applyClockodoAssignmentInput(context, fieldName) {
@@ -8148,6 +8331,15 @@ class TimerHubApp {
                 projectText
             );
             this.restoreProjectFreeText('activity', projectText);
+        }
+        const groupModal = document.getElementById('groupEditModal');
+        if (groupModal?.classList?.contains?.('active')) {
+            this.populateClockodoAssignmentSelects(
+                'group',
+                document.getElementById('groupEditCustomerSelect')?.value,
+                null,
+                document.getElementById('groupEditCustomerInput')?.value
+            );
         }
         const entryModal = document.getElementById('entryEditModal');
         if (entryModal?.classList?.contains?.('active')) {

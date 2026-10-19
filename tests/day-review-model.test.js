@@ -184,6 +184,8 @@ function createTestApp(initialData = {}) {
         'assignmentPreviewWarnings', 'assignmentPreviewList', 'assignmentImportCancelBtn', 'assignmentImportConfirmBtn',
         'groupEditModal', 'groupEditModalTitle', 'groupEditModalCloseBtn', 'groupEditNameInput', 'groupEditNameError',
         'groupEditColorOptions', 'groupEditCancelBtn', 'groupEditSaveBtn',
+        'groupEditCustomerInput', 'groupEditCustomerSelect', 'groupEditCustomerList',
+        'groupEditClockodoHint', 'groupEditClockodoRetryBtn', 'groupEditCustomerClearBtn', 'menuDuplicateBtn',
         'createGroupFromGroupsBtn', 'deleteGroupsBtn', 'groupDeleteModal', 'groupDeleteModalTitle',
         'groupDeleteModalCloseBtn', 'groupDeleteSummary', 'groupDeleteOutcome', 'groupDeleteLockedWarning',
         'groupDeleteActivitiesKeep', 'groupDeleteActivitiesDelete', 'groupDeleteNestedKeep', 'groupDeleteNestedDelete',
@@ -9246,4 +9248,276 @@ test('Clockodo project errors show the safe upstream explanation', async () => {
     assert.match(hint, /HTTP 410/);
     assert.match(hint, /Projects are not booked for this account/);
     assert.equal(hint.includes('apiKey'), false);
+});
+
+test('duplicating an activity copies its configuration with a fresh independent identity', async () => {
+    const source = {
+        id: 'source-activity', name: 'Painting', color: '#123456', shape: 'hexagon',
+        icon: 'car', displayMode: 'icon-only', size: 'large', notes: 'Two coats',
+        customerId: '5', customerName: 'Beta', serviceId: '9', serviceName: 'Repair',
+        projectId: '4', projectName: 'Object A', groupId: 'dup-group',
+        position: 2, archived: false, createdAt: 1000, updatedAt: 2000,
+        assignment: 'Old job', importedAt: 3000
+    };
+    const group = { id: 'dup-group', name: 'Crew', x: 300, y: 200, collapsed: false };
+    const layout = { activityId: source.id, x: 40, y: 60, width: 320, height: 190 };
+    const { app, storageData, document } = createTestApp({
+        activities: [source],
+        groups: [group],
+        layout: [layout]
+    });
+    await app.loadActivities();
+    await app.loadGroups();
+    app.clockodoReferenceStatus = 'ready';
+    app.clockodoCustomers = [{ id: 5, name: 'Beta' }];
+    app.editingActivityId = source.id;
+
+    const duplicate = await app.duplicateActivity();
+    assert.ok(duplicate, 'the duplicate is created');
+    assert.notEqual(duplicate.id, source.id, 'the duplicate has a fresh identity');
+    assert.equal(duplicate.name, app.t('activityCopyName', { name: 'Painting' }));
+    for (const field of [
+        'color', 'shape', 'icon', 'displayMode', 'size', 'notes',
+        'customerId', 'customerName', 'serviceId', 'serviceName',
+        'projectId', 'projectName', 'groupId'
+    ]) {
+        assert.equal(duplicate[field], source[field], `${field} is copied`);
+    }
+    assert.equal(duplicate.archived, false);
+    assert.equal(duplicate.createdAt >= 1000, true);
+    assert.equal(duplicate.updatedAt, duplicate.createdAt);
+    assert.equal(Object.hasOwn(duplicate, 'assignment'), false, 'import provenance is not copied');
+    assert.equal(Object.hasOwn(duplicate, 'importedAt'), false, 'import metadata is not copied');
+    assert.equal(source.customerId, '5', 'the original is untouched');
+    assert.equal(storageData.activities.find(item => item.id === duplicate.id).icon, 'car');
+
+    const duplicateLayout = storageData.layout.find(item => item.activityId === duplicate.id);
+    assert.deepEqual({ ...duplicateLayout }, {
+        activityId: duplicate.id,
+        x: app.snapToCanvasGrid(40 + 48),
+        y: app.snapToCanvasGrid(60 + 48),
+        width: 320,
+        height: 190
+    }, 'the duplicate gets its own persisted canvas layout');
+
+    const reloaded = createTestApp({
+        activities: structuredClone(storageData.activities),
+        groups: structuredClone(storageData.groups),
+        layout: structuredClone(storageData.layout)
+    });
+    await reloaded.app.loadActivities();
+    await reloaded.app.loadGroups();
+    const persisted = reloaded.app.activities.find(item => item.id === duplicate.id);
+    assert.ok(persisted, 'the duplicate survives a reload');
+    assert.equal(persisted.groupId, 'dup-group');
+    assert.equal(persisted.customerId, '5');
+    assert.equal(reloaded.app.activityLayouts.get(duplicate.id).width, 320);
+
+    duplicate.name = 'Changed duplicate';
+    await app.storage.saveActivity(duplicate);
+    assert.equal(storageData.activities.find(item => item.id === source.id).name, 'Painting', 'editing the duplicate never changes the original');
+
+    app.editingActivityId = duplicate.id;
+    app.confirmDelete = false;
+    await app.deleteActivity();
+    assert.equal(app.activities.some(item => item.id === source.id), true, 'deleting the duplicate never deletes the original');
+    assert.equal(app.activities.some(item => item.id === duplicate.id), false);
+});
+
+test('a failed duplication leaves no partial record and keeps the original', async () => {
+    const { app, storageData, toasts } = createTestApp({
+        activities: [{ id: 'keep-me', name: 'Original', customerId: '5', customerName: 'Beta' }]
+    });
+    await app.loadActivities();
+    app.editingActivityId = 'keep-me';
+    const originalSaveLayout = app.storage.saveLayout;
+    app.storage.saveLayout = async () => { throw new Error('layout write failed'); };
+
+    const result = await app.duplicateActivity();
+    assert.equal(result, null);
+    assert.deepEqual(app.activities.map(item => item.id), ['keep-me']);
+    assert.deepEqual(app.activityLayouts.size, 0);
+    assert.equal(storageData.activities.some(item => item.id !== 'keep-me'), false, 'no partial activity record is persisted');
+    assert.equal(storageData.layout.length, 0, 'no partial layout record is persisted');
+    assert.equal(toasts.at(-1), app.t('activityDuplicateFailed'));
+    assert.equal(app.activities[0].customerId, '5');
+    app.storage.saveLayout = originalSaveLayout;
+});
+
+test('a group can select, change, and clear a persisted default customer', async () => {
+    const { app, storageData, document } = createTestApp({
+        groups: [{ id: 'default-customer-group', name: 'Crew', x: 100, y: 100, collapsed: false }]
+    });
+    await app.loadGroups();
+    app.renderMain = () => {};
+    app.clockodoReferenceStatus = 'ready';
+    app.clockodoCustomers = [{ id: 5, name: 'Beta' }, { id: 7, name: 'Gamma' }];
+
+    assert.equal(app.openGroupEditModal('default-customer-group'), true);
+    app.selectClockodoComboboxOption('group', 'customer', { id: '5', label: 'Beta' });
+    assert.equal(document.getElementById('groupEditCustomerSelect').value, '5');
+    assert.equal(document.getElementById('groupEditCustomerInput').value, 'Beta');
+    document.getElementById('groupEditLockedInput').checked = false;
+    assert.equal(await app.saveGroupEdit(), true);
+    let stored = storageData.groups.find(item => item.id === 'default-customer-group');
+    assert.equal(stored.defaultCustomerId, '5');
+    assert.equal(stored.defaultCustomerName, 'Beta');
+
+    const reloaded = createTestApp({ groups: structuredClone(storageData.groups) });
+    await reloaded.app.loadGroups();
+    assert.equal(reloaded.app.groups[0].defaultCustomerId, '5', 'the setting survives a restart');
+    assert.equal(reloaded.app.groups[0].defaultCustomerName, 'Beta');
+
+    assert.equal(app.openGroupEditModal('default-customer-group'), true);
+    app.selectClockodoComboboxOption('group', 'customer', { id: '7', label: 'Gamma' });
+    assert.equal(await app.saveGroupEdit(), true);
+    stored = storageData.groups.find(item => item.id === 'default-customer-group');
+    assert.equal(stored.defaultCustomerId, '7');
+    assert.equal(stored.defaultCustomerName, 'Gamma');
+
+    assert.equal(app.openGroupEditModal('default-customer-group'), true);
+    app.clockodoReferenceStatus = 'error';
+    assert.equal(app.clearGroupDefaultCustomer(), true);
+    assert.equal(document.getElementById('groupEditCustomerSelect').value, '');
+    assert.equal(document.getElementById('groupEditCustomerInput').value, '');
+    assert.equal(await app.saveGroupEdit(), true, 'the default can be cleared while offline');
+    stored = storageData.groups.find(item => item.id === 'default-customer-group');
+    assert.equal(Object.hasOwn(stored, 'defaultCustomerId'), false, 'clearing removes the reference');
+    assert.equal(Object.hasOwn(stored, 'defaultCustomerName'), false);
+});
+
+test('duplicated activities use the group default unless the button has its own customer', async () => {
+    const group = {
+        id: 'customer-default-group', name: 'Crew', x: 100, y: 100, collapsed: false,
+        defaultCustomerId: '5', defaultCustomerName: 'Beta'
+    };
+    const { app } = createTestApp({
+        groups: [group],
+        activities: [
+            { id: 'plain', name: 'Plain', groupId: group.id, customerId: '', customerName: '', position: 0 },
+            { id: 'assigned', name: 'Assigned', groupId: group.id, customerId: 7, customerName: 'Gamma', position: 1 },
+            { id: 'solo', name: 'Solo', customerId: '', customerName: '', position: 2 }
+        ]
+    });
+    await app.loadActivities();
+    await app.loadGroups();
+    app.clockodoReferenceStatus = 'ready';
+    app.clockodoCustomers = [{ id: 5, name: 'Beta' }, { id: 7, name: 'Gamma' }];
+
+    app.editingActivityId = 'plain';
+    const plainCopy = await app.duplicateActivity();
+    assert.equal(plainCopy.customerId, '5');
+    assert.equal(plainCopy.customerName, 'Beta');
+
+    app.editingActivityId = 'assigned';
+    const assignedCopy = await app.duplicateActivity();
+    assert.equal(assignedCopy.customerId, 7, 'an explicit button customer wins over the group default');
+    assert.equal(assignedCopy.customerName, 'Gamma');
+
+    app.editingActivityId = 'solo';
+    const soloCopy = await app.duplicateActivity();
+    assert.equal(soloCopy.customerId, '', 'an ungrouped button without a customer keeps the existing behavior');
+
+    const duplicatedGroup = await app.duplicateGroup(group.id);
+    const groupCopies = app.activities.filter(item => item.groupId === duplicatedGroup.id);
+    const copiedPlain = groupCopies.find(item => item.name.startsWith('Plain'));
+    const copiedAssigned = groupCopies.find(item => item.name.startsWith('Assigned'));
+    assert.equal(copiedPlain.customerId, '5', 'group duplication applies the duplicated group default');
+    assert.equal(copiedAssigned.customerId, 7, 'group duplication preserves explicit member customers');
+    assert.equal(app.activities.find(item => item.id === 'plain').customerId, '', 'existing activities are not changed');
+
+    const groupRecord = app.groups.find(item => item.id === group.id);
+    groupRecord.defaultCustomerId = '7';
+    groupRecord.defaultCustomerName = 'Gamma';
+    await app.storage.saveGroup(groupRecord);
+    app.editingActivityId = 'plain';
+    const laterCopy = await app.duplicateActivity();
+    assert.equal(laterCopy.customerId, '7', 'a changed group default affects future creations');
+    assert.equal(plainCopy.customerId, '5', 'previously created activities keep their customer');
+    assert.equal(app.activities.find(item => item.id === 'plain').customerId, '', 'the source button stays unchanged');
+});
+
+test('a missing group default customer is ignored when reference data is loaded', async () => {
+    const group = {
+        id: 'deleted-customer-group', name: 'Crew', x: 100, y: 100, collapsed: false,
+        defaultCustomerId: '5', defaultCustomerName: 'Deleted customer'
+    };
+    const { app, document } = createTestApp({
+        groups: [group],
+        activities: [{ id: 'member', name: 'Member', groupId: group.id, customerId: '', customerName: '', position: 0 }]
+    });
+    await app.loadActivities();
+    await app.loadGroups();
+    app.clockodoReferenceStatus = 'ready';
+    app.clockodoCustomers = [{ id: 7, name: 'Gamma' }];
+    app.editingActivityId = 'member';
+    const duplicate = await app.duplicateActivity();
+    assert.equal(duplicate.customerId, '', 'a dangling default is not applied');
+    assert.equal(duplicate.customerName, '');
+
+    assert.equal(app.openGroupEditModal(group.id), true);
+    assert.equal(
+        document.getElementById('groupEditClockodoHint').textContent,
+        app.t('groupDefaultCustomerMissing'),
+        'the group editor warns about the unavailable default customer'
+    );
+    app.closeGroupEditModal();
+
+    app.clockodoReferenceStatus = 'error';
+    await app.storage.saveActivity({ ...app.activities.find(item => item.id === 'member'), customerId: '', customerName: '' });
+    app.editingActivityId = 'member';
+    const offlineDuplicate = await app.duplicateActivity();
+    assert.equal(offlineDuplicate.customerId, '5', 'offline creation still uses the persisted default');
+    assert.equal(offlineDuplicate.customerName, 'Deleted customer');
+});
+
+test('group default customers survive export and restore without touching existing activities', async () => {
+    const group = {
+        id: 'backup-group', name: 'Crew', x: 100, y: 100, collapsed: false,
+        defaultCustomerId: '5', defaultCustomerName: 'Beta'
+    };
+    const { app } = createTestApp({
+        groups: [group],
+        activities: [{ id: 'existing', name: 'Existing', groupId: group.id, customerId: '', customerName: '', position: 0 }]
+    });
+    await app.loadActivities();
+    await app.loadGroups();
+    const { context } = createTestApp();
+    const repository = vm.runInContext('new StorageRepository()', context);
+    const harness = createIndexedDbHarness();
+    repository.db = harness.db;
+    const exported = await repository.exportAll();
+
+    const source = createTestApp({ groups: [group], activities: [{ id: 'existing', name: 'Existing', groupId: group.id, customerId: '', customerName: '', position: 0 }] });
+    source.app.clockodoReferenceStatus = 'ready';
+    source.app.clockodoCustomers = [{ id: 5, name: 'Beta' }];
+    const backup = await source.app.storage.exportAll();
+    assert.equal(backup.groups[0].defaultCustomerId, '5', 'the group default is exported');
+    await repository.importAll(backup, false);
+    const restored = await repository.getGroups();
+    assert.equal(restored[0].defaultCustomerId, '5');
+    assert.equal(restored[0].defaultCustomerName, 'Beta');
+    assert.equal((await repository.getActivities())[0].customerId, '', 'the existing activity assignment is untouched');
+    assert.deepEqual(exported.groups, [], 'the fresh repository export is empty');
+});
+
+test('a failed group duplication cleans up partially persisted records', async () => {
+    const { app, storageData, toasts } = createTestApp({
+        groups: [{ id: 'rollback-group', name: 'Crew', x: 100, y: 100, collapsed: false }],
+        activities: [{ id: 'rollback-member', name: 'Member', groupId: 'rollback-group', position: 0 }]
+    });
+    await app.loadActivities();
+    await app.loadGroups();
+    const originalSaveLayout = app.storage.saveLayout;
+    app.storage.saveLayout = async () => { throw new Error('layout write failed'); };
+
+    const result = await app.duplicateGroup('rollback-group');
+    assert.equal(result, null);
+    assert.deepEqual(app.groups.map(item => item.id), ['rollback-group']);
+    assert.deepEqual(app.activities.map(item => item.id), ['rollback-member']);
+    assert.deepEqual(storageData.groups.map(item => item.id), ['rollback-group'], 'no partial group remains');
+    assert.deepEqual(storageData.activities.map(item => item.id), ['rollback-member'], 'no partial member remains');
+    assert.equal(storageData.layout.length, 0, 'no partial layout remains');
+    assert.equal(toasts.at(-1), app.t('groupCreateFailed'));
+    app.storage.saveLayout = originalSaveLayout;
 });

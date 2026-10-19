@@ -1615,3 +1615,11 @@ test('the Worker reports its version so stale deployments are detectable', async
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { version: '2026-10-18-projects-v4' });
 });
+
+test('activity menu exposes Duplicate and the group editor exposes the default customer', () => {
+    assert.match(htmlSource, /id="menuDuplicateBtn"[\s\S]{0,240}data-i18n="duplicateActivity"/);
+    assert.match(htmlSource, /data-i18n="groupDefaultCustomer"[\s\S]{0,220}id="groupEditCustomerInput"/);
+    assert.match(htmlSource, /id="groupEditCustomerSelect"[\s\S]{0,200}id="groupEditCustomerList"/);
+    assert.match(source, /sel\('menuDuplicateBtn'\)\?\.addEventListener\('click', \(\) => this\.duplicateActivity\(\)\)/);
+    assert.match(source, /sel\('groupEditClockodoRetryBtn'\)\?\.addEventListener\('click', \(\) => this\.reloadClockodoReferenceData\(\)\)/);
+});
