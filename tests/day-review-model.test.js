@@ -1960,6 +1960,7 @@ test('legacy off-grid group anchors normalize to the 16px grid on load', async (
     storageData.groups = [
         {
             id: 'legacy-parent', name: 'Legacy Parent', x: 101, y: 189, collapsed: false,
+            collapsedWidth: 288, collapsedHeight: 64,
             color: '#123456', assignment: 'Legacy job', importedAt: 7, customField: 'keep-me'
         },
         { id: 'legacy-child', name: 'Legacy Child', x: 133, y: 221, collapsed: true, parentId: 'legacy-parent' }
@@ -1994,6 +1995,10 @@ test('legacy off-grid group anchors normalize to the 16px grid on load', async (
     assert.equal(storedParent.assignment, 'Legacy job');
     assert.equal(storedParent.importedAt, 7);
     assert.equal(storedParent.customField, 'keep-me');
+    assert.equal(storedParent.collapsedWidth, 288, 'collapsed width survives migration');
+    assert.equal(storedParent.collapsedHeight, 64, 'collapsed height survives migration');
+    assert.equal(parent.collapsedWidth, 288);
+    assert.equal(parent.collapsedHeight, 64);
     assert.deepEqual([parent.x, parent.y], [96, 192], 'legacy parent anchors snap to the nearest grid point');
     assert.deepEqual([child.x, child.y], [128, 224], 'legacy child anchors snap to the nearest grid point');
     assert.equal(parent.x % 16, 0);
@@ -2021,6 +2026,54 @@ test('legacy off-grid group anchors normalize to the 16px grid on load', async (
     assert.deepEqual([child.x, child.y], [128, 224], 'normalization is idempotent for nested groups');
     assert.equal(saveCalls.length, 1, 'an already-normalized reload does not rewrite storage');
 });
+test('assignment imports persist snapped group anchors without bypassing the grid', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, storageData } = harness;
+    app.groups = [{ id: 'existing-import', name: 'Existing', x: 48, y: 64, collapsed: false }];
+    app.activities = [{ id: 'existing-a', name: 'Existing A', position: 0, groupId: 'existing-import', size: 'medium' }];
+    app.activityLayouts = new Map([['existing-a', { activityId: 'existing-a', x: 0, y: 0, width: 200, height: 120 }]]);
+    storageData.groups = structuredClone(app.groups);
+    storageData.activities = structuredClone(app.activities);
+    storageData.layout = [...app.activityLayouts.values()].map(layout => structuredClone(layout));
+    app.renderMain();
+    harness.context.document.getElementById('assignmentJsonInput').value = JSON.stringify({
+        format: 'timerhub-assignment', version: 1, name: 'Job',
+        groups: [{ name: 'Imported', activities: [{ name: 'A' }] }]
+    });
+    assert.equal(await app.validateAssignmentJson(), true);
+    assert.equal(await app.confirmAssignmentImport(), true);
+    const imported = app.groups.find(group => group.name === 'Imported');
+    const stored = storageData.groups.find(group => group.id === imported.id);
+    assert.equal(imported.x, app.snapToCanvasGrid(imported.x));
+    assert.equal(imported.y, app.snapToCanvasGrid(imported.y));
+    assert.equal(imported.x % 16, 0);
+    assert.equal(imported.y % 16, 0);
+    assert.equal(stored.x, imported.x, 'the snapped anchor is persisted immediately');
+    assert.equal(stored.y, imported.y);
+    await app.loadGroups();
+    assert.deepEqual([app.groups.find(group => group.id === imported.id).x,
+        app.groups.find(group => group.id === imported.id).y], [imported.x, imported.y], 'reload does not overwrite the imported anchor');
+});
+test('diagnostic legacy anchors normalize with the existing snapping rule', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, storageData } = harness;
+    const pairs = [[479, 212], [11, 293], [470, 287], [11, 367], [470, 367]];
+    storageData.groups = pairs.map(([x, y], index) => ({
+        id: `diagnostic-${index}`, name: `Diagnostic ${index}`, x, y, collapsed: true
+    }));
+    await app.loadGroups();
+    const expected = pairs.map(([x, y]) => [app.snapToCanvasGrid(x), app.snapToCanvasGrid(y)]);
+    for (const [index, [x, y]] of expected.entries()) {
+        const loaded = app.groups.find(group => group.id === `diagnostic-${index}`);
+        const persisted = storageData.groups.find(group => group.id === `diagnostic-${index}`);
+        assert.equal(loaded.x, x, `diagnostic ${index} x uses snapToCanvasGrid`);
+        assert.equal(loaded.y, y, `diagnostic ${index} y uses snapToCanvasGrid`);
+        assert.equal(loaded.x % 16, 0);
+        assert.equal(loaded.y % 16, 0);
+        assert.deepEqual([persisted.x, persisted.y], [x, y], `diagnostic ${index} is persisted normalized`);
+    }
+});
+
 test('already aligned groups are not rewritten on load', async () => {
     const harness = createGroupCanvasHarness();
     const { app, storageData } = harness;

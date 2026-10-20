@@ -10650,8 +10650,10 @@ class TimerHubApp {
             height
         }, packing.obstacles);
         const placed = {
-            x: free.left + CANVAS_GROUP_PADDING,
-            y: free.top + CANVAS_GROUP_HEADER
+            // Import collision resolution can add arbitrary padding-derived
+            // shifts. Persist the logical anchor on the canvas grid.
+            x: this.snapToCanvasGrid(free.left + CANVAS_GROUP_PADDING),
+            y: this.snapToCanvasGrid(free.top + CANVAS_GROUP_HEADER)
         };
         const bounds = {
             left: placed.x - CANVAS_GROUP_PADDING,
