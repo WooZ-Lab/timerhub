@@ -1617,7 +1617,69 @@ test('activity geometry keeps grid, shape, and content invariants', () => {
     assert.equal(freshLayout.width, freshLayout.height, 'new square activities use equal outer dimensions');
 });
 
-test('activity text minimum sizes grow on the grid without clipping', () => {
+test('resize normalization changes dimensions only in whole grid steps', () => {
+    const { app } = createTestApp();
+    const rectangle = activity => app.normalizeActivityGeometryDimensions(activity, 160, 112);
+    const expected = [[160, 160], [161, 176], [175, 176], [176, 176], [191, 192], [192, 192]];
+    for (const [requested, snapped] of expected) {
+        const dimensions = app.normalizeActivityGeometryDimensions(
+            { name: 'Ignored text', shape: 'rounded' }, requested, 112
+        );
+        assert.equal(dimensions.width, snapped, `rounds ${requested} up to the next grid step`);
+        assert.equal(dimensions.width % 16, 0);
+        assert.equal(dimensions.height, 112);
+    }
+    const circle = app.normalizeActivityGeometryDimensions({ name: 'Ignored text', shape: 'circle' }, 160, 112);
+    const square = app.normalizeActivityGeometryDimensions({ name: 'Ignored text', shape: 'square' }, 161, 112);
+    assert.deepEqual([circle.width, circle.height], [160, 160], 'circle reaches the minimum square grid size');
+    assert.deepEqual([square.width, square.height], [176, 176], 'square resize keeps equal grid dimensions');
+    assert.deepEqual({ ...rectangle({ name: 'x' }) }, { width: 160, height: 112 });
+});
+
+test('long text does not affect resize, creation, or shape constraints', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, buttons, pointer } = harness;
+    const activity = {
+        id: 'tiny-circle', name: 'A name that is deliberately far too long to fit in a minimum circle',
+        shape: 'circle', position: 0
+    };
+    app.activities = [activity];
+    app.activityLayouts = new Map([['tiny-circle', {
+        activityId: 'tiny-circle', x: 144, y: 96, width: 400, height: 400
+    }]]);
+    app.renderMain();
+    let button = buttons.find(item => item.dataset.activityId === 'tiny-circle');
+    assert.equal(button.style.width, '400px', 'rendering does not shrink or grow based on text');
+    const small = app.normalizeActivityGeometryDimensions(activity, 160, 160);
+    assert.deepEqual([small.width, small.height], [160, 160], 'long text does not prevent the minimum size');
+    app.activityLayouts.set('tiny-circle', {
+        activityId: 'tiny-circle', x: 144, y: 96, width: 160, height: 160
+    });
+    app.renderMain();
+    button = buttons.find(item => item.dataset.activityId === 'tiny-circle');
+    assert.equal(button.style.width, '160px');
+    assert.equal(button.style.height, '160px');
+    assert.ok(button, 'the minimum-size activity still renders and can receive pointer interaction');
+    assert.equal(harness.handles.some(handle => handle.dataset.activityId === 'tiny-circle'), true,
+        'the resize handle remains available at minimum size');
+
+    pointer('pointerdown', button, 0, 0);
+    pointer('pointermove', button, 16, 0);
+    pointer('pointerup', button, 16, 0);
+    assert.equal(app.activityLayouts.get('tiny-circle').x, 160, 'a minimum-size activity can still be dragged on the grid');
+
+    const handle = harness.handles.find(item => item.dataset.activityId === 'tiny-circle');
+    pointer('pointerdown', handle, 0, 0);
+    pointer('pointermove', handle, 16, 16);
+    pointer('pointerup', handle, 16, 16);
+    const resized = app.activityLayouts.get('tiny-circle');
+    assert.equal(resized.width, 176);
+    assert.equal(resized.height, 176);
+    assert.equal(resized.width % 16, 0);
+    assert.equal(resized.height % 16, 0);
+});
+
+test('text length never influences activity dimensions', () => {
     const { app } = createTestApp();
     const short = app.normalizeActivityGeometryDimensions({ name: 'A', shape: 'rounded' }, 160, 112);
     const longWord = 'Supercalifragilisticexpialidocious';
@@ -1626,20 +1688,14 @@ test('activity text minimum sizes grow on the grid without clipping', () => {
     const wrapped = app.normalizeActivityGeometryDimensions({ name: sentence, shape: 'rounded' }, 160, 112);
     const diamond = app.normalizeActivityGeometryDimensions({ name: longWord, shape: 'diamond' }, 160, 112);
     const circle = app.normalizeActivityGeometryDimensions({ name: longWord, shape: 'circle' }, 160, 112);
-    assert.equal(circle.width, circle.height, 'text fitting preserves circle equality');
-    assert.ok(circle.width >= long.width, 'circle interiors reserve at least the rectangular text width');
-    assert.ok(long.width > short.width, 'a long unbreakable word expands width');
-    assert.ok(wrapped.height > short.height, 'a long sentence expands height');
-    assert.ok(diamond.width > long.width, 'non-rectangular interiors reserve more space');
-    for (const dimensions of [short, long, wrapped, diamond]) {
+    assert.deepEqual({ ...long }, { ...short }, 'a long word does not expand a rectangle');
+    assert.deepEqual({ ...wrapped }, { ...short }, 'a long sentence does not expand a rectangle');
+    assert.deepEqual({ ...diamond }, { ...short }, 'shape interiors do not impose a text minimum');
+    assert.deepEqual({ ...circle }, { width: 160, height: 160 }, 'circles reach the minimum square grid size regardless of text');
+    for (const dimensions of [short, long, wrapped, diamond, circle]) {
         assert.equal(dimensions.width % 16, 0);
         assert.equal(dimensions.height % 16, 0);
     }
-    const longestSentenceWord = Math.max(...sentence.split(' ').map(word => app.measureActivityTextWidth(word, 14)));
-    assert.ok(wrapped.width >= longestSentenceWord + 16, 'wrapping still reserves the longest word');
-    assert.ok(wrapped.height > long.height);
-    const textWidth = app.measureActivityTextWidth(longWord, 14);
-    assert.ok(long.width >= textWidth + 16, 'long text fits within the minimum readable width');
 });
 
 test('activity geometry migration reaches the authoritative layout store', async () => {
@@ -1709,29 +1765,26 @@ test('invalid activity geometry follows the safe fallback and persists finite gr
     assert.equal(stored.x === 'left', false);
 });
 
-test('text changes and resizing recalculate valid activity geometry', async () => {
+test('text edits never resize activities while shape constraints stay valid', async () => {
     const { app, storageData } = createTestApp();
     const activity = { id: 'text-geometry', name: 'A', shape: 'rounded', position: 0 };
     app.activities = [activity];
-    app.activityLayouts = new Map([['text-geometry', {
-        activityId: 'text-geometry', x: 144, y: 96, width: 160, height: 112
-    }]]);
+    const initialLayout = { activityId: 'text-geometry', x: 144, y: 96, width: 160, height: 112 };
+    app.activityLayouts = new Map([['text-geometry', { ...initialLayout }]]);
+    storageData.layout = [{ ...initialLayout }];
     activity.name = 'A much longer activity name that must wrap across several lines on the canvas';
-    const normalized = await app.syncActivityLayoutGeometry(activity);
-    assert.ok(normalized.width >= 160);
-    assert.ok(normalized.height > 112, 'the changed text expands the outer height');
-    assert.equal(normalized.width % 16, 0);
-    assert.equal(normalized.height % 16, 0);
+    const afterTextEdit = await app.syncActivityLayoutGeometry(activity);
+    assert.deepEqual([afterTextEdit.width, afterTextEdit.height], [160, 112], 'editing text does not enlarge the object');
     assert.deepEqual(
         [storageData.layout[0].width, storageData.layout[0].height],
-        [normalized.width, normalized.height],
-        'the expanded geometry is persisted'
+        [160, 112],
+        'text edits persist the unchanged dimensions'
     );
 
     activity.shape = 'circle';
     const circle = await app.syncActivityLayoutGeometry(activity);
     assert.equal(circle.width, circle.height, 'shape changes enforce equal circle dimensions');
-    assert.ok(circle.width >= normalized.width);
+    assert.deepEqual([circle.width, circle.height], [160, 160], 'shape equality uses the minimum supported grid size');
     assert.equal(circle.width % 16, 0);
 });
 

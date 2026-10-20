@@ -1346,28 +1346,11 @@ const CANVAS_ACTIVITY_MIN_WIDTH = 160;
 const CANVAS_ACTIVITY_MIN_HEIGHT = 112;
 const CANVAS_ACTIVITY_MAX_WIDTH = 640;
 const CANVAS_ACTIVITY_MAX_HEIGHT = 520;
-const CANVAS_ACTIVITY_MIN_FONT_SIZE = 14;
-const CANVAS_ACTIVITY_TEXT_PADDING = 24;
-const CANVAS_ACTIVITY_ICON_FOOTPRINT = 46;
-const CANVAS_ACTIVITY_TEXT_LINE_HEIGHT = 1.2;
 const CANVAS_ACTIVITY_SIZE_DEFAULTS = Object.freeze({
     small: Object.freeze({ width: 224, height: 128 }),
     medium: Object.freeze({ width: 272, height: 160 }),
     large: Object.freeze({ width: 320, height: 192 })
 });
-const CANVAS_SHAPE_INTERIOR_FACTORS = Object.freeze({
-    circle: 0.7,
-    oval: 0.7,
-    diamond: 0.5,
-    triangle: 0.5,
-    hexagon: 0.75,
-    octagon: 0.8,
-    star: 0.35,
-    heart: 0.4,
-    square: 1,
-    rounded: 1
-});
-
 const CanvasGeometry = Object.freeze({
     grid: CANVAS_GRID_SIZE,
     snap(value) {
@@ -1384,9 +1367,6 @@ const CanvasGeometry = Object.freeze({
     },
     isEquilateralShape(shape) {
         return shape === 'circle' || shape === 'square';
-    },
-    shapeInteriorFactor(shape) {
-        return CANVAS_SHAPE_INTERIOR_FACTORS[shape] || 1;
     },
     groupOuterBounds(boxes, padding = CANVAS_GROUP_PADDING, header = CANVAS_GROUP_HEADER) {
         if (!boxes.length) return null;
@@ -1405,35 +1385,8 @@ const CanvasGeometry = Object.freeze({
     screenDeltaToWorld(dx, dy, zoom) {
         return { x: dx / zoom, y: dy / zoom };
     },
-    measureTextWidth(text, fontSize, measureText) {
-        const value = Number(measureText?.(String(text ?? ''), fontSize));
-        if (Number.isFinite(value)) return value;
-        return String(text ?? '').length * fontSize * 0.62;
-    },
-    wrapLineCount(text, maxWidth, fontSize, measureText) {
-        const words = String(text ?? '').trim().split(/\s+/).filter(Boolean);
-        if (!words.length) return 1;
-        const space = this.measureTextWidth(' ', fontSize, measureText);
-        let lines = 1;
-        let lineWidth = 0;
-        for (const word of words) {
-            let wordWidth = this.measureTextWidth(word, fontSize, measureText);
-            if (wordWidth > maxWidth) {
-                lines += Math.floor(wordWidth / maxWidth);
-                wordWidth = wordWidth % maxWidth || maxWidth;
-            }
-            if (!lineWidth) lineWidth = wordWidth;
-            else if (lineWidth + space + wordWidth <= maxWidth) lineWidth += space + wordWidth;
-            else {
-                lines += 1;
-                lineWidth = wordWidth;
-            }
-        }
-        return Math.max(1, lines);
-    },
-    normalizeActivityDimensions(activity, width, height, measureText) {
+    normalizeActivityDimensions(activity, width, height) {
         const shape = activity?.shape || 'rounded';
-        const factor = this.shapeInteriorFactor(shape);
         const defaults = CANVAS_ACTIVITY_SIZE_DEFAULTS[activity?.size] || CANVAS_ACTIVITY_SIZE_DEFAULTS.medium;
         const requestedWidth = Number.isFinite(Number(width)) ? Number(width) : defaults.width;
         const requestedHeight = Number.isFinite(Number(height)) ? Number(height) : defaults.height;
@@ -1445,41 +1398,6 @@ const CanvasGeometry = Object.freeze({
             CANVAS_ACTIVITY_MIN_HEIGHT,
             Math.min(CANVAS_ACTIVITY_MAX_HEIGHT, requestedHeight)
         ));
-        if (this.isEquilateralShape(shape)) {
-            const side = Math.max(outerWidth, outerHeight);
-            outerWidth = side;
-            outerHeight = side;
-        }
-        const name = String(activity?.name || '');
-        if (!name.trim() || activity?.displayMode === 'icon-only') {
-            return { width: outerWidth, height: outerHeight };
-        }
-
-        const fontSize = CANVAS_ACTIVITY_MIN_FONT_SIZE;
-        const lineHeight = Math.ceil(fontSize * CANVAS_ACTIVITY_TEXT_LINE_HEIGHT);
-        const iconHeight = activity?.icon ? CANVAS_ACTIVITY_ICON_FOOTPRINT : 0;
-        const longestWord = name.trim().split(/\s+/).filter(Boolean)
-            .reduce((max, word) => Math.max(max, this.measureTextWidth(word, fontSize, measureText)), 0);
-        const widthForWord = this.ceil((longestWord + CANVAS_ACTIVITY_TEXT_PADDING * 2) / factor);
-
-        for (let pass = 0; pass < 3; pass += 1) {
-            outerWidth = Math.max(outerWidth, widthForWord);
-            if (this.isEquilateralShape(shape)) {
-                const side = Math.max(outerWidth, outerHeight);
-                outerWidth = side;
-                outerHeight = side;
-            }
-            const usableWidth = Math.max(1, outerWidth * factor - CANVAS_ACTIVITY_TEXT_PADDING * 2);
-            const lines = this.wrapLineCount(name, usableWidth, fontSize, measureText);
-            const requiredHeight = this.ceil((lines * lineHeight + iconHeight + CANVAS_ACTIVITY_TEXT_PADDING * 2) / factor);
-            if (requiredHeight <= outerHeight) break;
-            outerHeight = requiredHeight;
-            if (this.isEquilateralShape(shape)) {
-                const side = Math.max(outerWidth, outerHeight);
-                outerWidth = side;
-                outerHeight = side;
-            }
-        }
         if (this.isEquilateralShape(shape)) {
             const side = Math.max(outerWidth, outerHeight);
             outerWidth = side;
@@ -4488,13 +4406,6 @@ class TimerHubApp {
         return Math.ceil(value.length * 9);
     }
 
-    measureActivityTextWidth(text, fontSize = CANVAS_ACTIVITY_MIN_FONT_SIZE) {
-        const value = String(text ?? '');
-        const font = `400 ${fontSize}px system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif`;
-        const measured = this.measureCanvasTextWidth(value, font);
-        return measured || Math.ceil(value.length * fontSize * 0.62);
-    }
-
     // The header controls are always visible; the group box must reserve enough
     // width for the full name instead of relying on the CSS ellipsis.
     measureGroupTitleTextWidth(text) {
@@ -5512,12 +5423,7 @@ class TimerHubApp {
     }
 
     normalizeActivityGeometryDimensions(activity, width, height) {
-        return CanvasGeometry.normalizeActivityDimensions(
-            activity,
-            width,
-            height,
-            (text, fontSize) => this.measureActivityTextWidth(text, fontSize)
-        );
+        return CanvasGeometry.normalizeActivityDimensions(activity, width, height);
     }
 
     // Derive compact group-relative positions for members that have no usable
