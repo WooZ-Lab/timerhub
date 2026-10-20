@@ -1946,6 +1946,59 @@ test('groups and memberships persist, export, and stay compatible with legacy ba
     assert.equal((await migrated.getActivities())[0].name, 'Legacy');
 });
 
+test('legacy off-grid group anchors normalize to the 16px grid on load', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, storageData, buttons, containers } = harness;
+    storageData.groups = [
+        { id: 'legacy-parent', name: 'Legacy Parent', x: 101, y: 189, collapsed: false },
+        { id: 'legacy-child', name: 'Legacy Child', x: 133, y: 221, collapsed: true, parentId: 'legacy-parent' }
+    ];
+    storageData.activities = [
+        { id: 'legacy-parent-a', name: 'Parent activity', position: 0, groupId: 'legacy-parent', size: 'medium' },
+        { id: 'legacy-child-a', name: 'Child activity', position: 1, groupId: 'legacy-child', size: 'medium' }
+    ];
+    storageData.layout = [
+        { activityId: 'legacy-parent-a', x: 0, y: 0, width: 200, height: 120 },
+        { activityId: 'legacy-child-a', x: 0, y: 0, width: 200, height: 120 }
+    ];
+    await app.loadActivities();
+    await app.loadGroups();
+    app.renderMain();
+
+    const parent = app.groups.find(group => group.id === 'legacy-parent');
+    const child = app.groups.find(group => group.id === 'legacy-child');
+    assert.deepEqual(
+        [storageData.groups.find(group => group.id === 'legacy-parent').x,
+            storageData.groups.find(group => group.id === 'legacy-parent').y],
+        [101, 189],
+        'loading normalizes in memory without rewriting persisted user data'
+    );
+    assert.deepEqual([parent.x, parent.y], [96, 192], 'legacy parent anchors snap to the nearest grid point');
+    assert.deepEqual([child.x, child.y], [128, 224], 'legacy child anchors snap to the nearest grid point');
+    assert.equal(parent.x % 16, 0);
+    assert.equal(parent.y % 16, 0);
+    assert.equal(child.x % 16, 0);
+    assert.equal(child.y % 16, 0);
+    assert.equal(child.parentId, 'legacy-parent', 'nesting is preserved');
+    assert.deepEqual([child.x - parent.x, child.y - parent.y], [32, 32], 'a shared legacy offset preserves the relative nested layout');
+    assert.deepEqual(app.activityLayouts.get('legacy-parent-a'), { activityId: 'legacy-parent-a', x: 0, y: 0, width: 200, height: 120 });
+    assert.deepEqual(app.activityLayouts.get('legacy-child-a'), { activityId: 'legacy-child-a', x: 0, y: 0, width: 200, height: 120 });
+    const memberButton = buttons.find(button => button.dataset.activityId === 'legacy-parent-a');
+    assert.equal(memberButton.style.left, '96px', 'members inherit the normalized grid-aligned anchor');
+    assert.equal(Number.parseFloat(memberButton.style.left) % 16, 0);
+
+    const parentBefore = groupRect(containers, 'legacy-parent');
+    const childBefore = groupRect(containers, 'legacy-child');
+    await app.toggleGroupCollapsed('legacy-child');
+    assert.equal(groupRect(containers, 'legacy-parent').top, parentBefore.top, 'expansion keeps the normalized parent anchor');
+    await app.toggleGroupCollapsed('legacy-child');
+    assert.deepEqual(groupRect(containers, 'legacy-child'), childBefore, 'collapsing restores the normalized child box');
+    assert.deepEqual(groupRect(containers, 'legacy-parent'), parentBefore, 'collapsing restores the normalized parent box');
+
+    await app.loadGroups();
+    assert.deepEqual([parent.x, parent.y], [96, 192], 'normalization is idempotent');
+    assert.deepEqual([child.x, child.y], [128, 224], 'normalization is idempotent for nested groups');
+});
 test('dragging a collapsed group follows the 16px grid without a release jump', () => {
     const harness = createGroupCanvasHarness();
     const { app, containers, pointer } = harness;
@@ -9006,6 +9059,9 @@ test('dragging a sibling before expansion keeps the deterministic sequence', asy
 
 test('reloaded four-sibling hierarchies expand identically in any storage order', async () => {
     const { harness: first, childIds } = makeVerticalSiblingsHarness();
+    await first.app.loadActivities();
+    await first.app.loadGroups();
+    first.app.renderMain();
     await first.app.toggleGroupCollapsed('v-2');
     const expected = childIds.map(id => groupRect(first.containers, id));
     const storedGroups = structuredClone(first.storageData.groups);

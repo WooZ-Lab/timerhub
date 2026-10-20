@@ -2248,8 +2248,11 @@ class TimerHubApp {
                     const normalized = {
                         id: String(group.id || this.generateId()),
                         name: String(group.name || ''),
-                        x: this.clampCanvasCoordinate(group.x, 0, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY),
-                        y: this.clampCanvasCoordinate(group.y, 0, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY),
+                        // Group creation and dragging both snap anchors to the
+                        // shared canvas grid. Normalize legacy records in memory
+                        // to the same invariant without rewriting stored data.
+                        x: this.snapToCanvasGrid(this.clampCanvasCoordinate(group.x, 0, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY)),
+                        y: this.snapToCanvasGrid(this.clampCanvasCoordinate(group.y, 0, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY)),
                         collapsed: group.collapsed === true
                     };
                     // Persistent collapsed dimensions are independent of the
