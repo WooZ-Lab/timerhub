@@ -2267,21 +2267,21 @@ class TimerHubApp {
                     };
                     // Persistent collapsed dimensions are independent of the
                     // expanded content; older records fall back to the defaults.
-                    if (Number.isFinite(Number(group.collapsedWidth))) {
-                        normalized.collapsedWidth = this.clampCanvasCoordinate(
+                    if (group.collapsedWidth !== undefined && group.collapsedWidth !== null) {
+                        normalized.collapsedWidth = this.ceilToCanvasGrid(this.clampCanvasCoordinate(
                             group.collapsedWidth,
                             CANVAS_GROUP_COLLAPSED_WIDTH,
                             CANVAS_GROUP_COLLAPSED_MIN_WIDTH,
                             CANVAS_GROUP_COLLAPSED_MAX_WIDTH
-                        );
+                        ));
                     }
-                    if (Number.isFinite(Number(group.collapsedHeight))) {
-                        normalized.collapsedHeight = this.clampCanvasCoordinate(
+                    if (group.collapsedHeight !== undefined && group.collapsedHeight !== null) {
+                        normalized.collapsedHeight = this.ceilToCanvasGrid(this.clampCanvasCoordinate(
                             group.collapsedHeight,
                             CANVAS_GROUP_COLLAPSED_HEIGHT,
                             CANVAS_GROUP_COLLAPSED_MIN_HEIGHT,
                             CANVAS_GROUP_COLLAPSED_MAX_HEIGHT
-                        );
+                        ));
                     }
                     if (typeof group.color === 'string' && /^#[0-9a-f]{6}$/i.test(group.color)) {
                         normalized.color = group.color.toLowerCase();
@@ -2319,13 +2319,25 @@ class TimerHubApp {
                 if (!original || typeof original !== 'object' || original.id === undefined || original.id === null) continue;
                 const normalized = normalizedById.get(String(original.id));
                 if (!normalized) continue;
-                const alreadyNormalized = typeof original.x === 'number' && Number.isFinite(original.x)
-                    && typeof original.y === 'number' && Number.isFinite(original.y)
-                    && original.x === normalized.x && original.y === normalized.y;
-                if (alreadyNormalized) continue;
+                const xChanged = typeof original.x !== 'number' || !Number.isFinite(original.x)
+                    || original.x !== normalized.x;
+                const yChanged = typeof original.y !== 'number' || !Number.isFinite(original.y)
+                    || original.y !== normalized.y;
+                const widthChanged = normalized.collapsedWidth !== undefined
+                    && (typeof original.collapsedWidth !== 'number'
+                        || !Number.isFinite(original.collapsedWidth)
+                        || original.collapsedWidth !== normalized.collapsedWidth);
+                const heightChanged = normalized.collapsedHeight !== undefined
+                    && (typeof original.collapsedHeight !== 'number'
+                        || !Number.isFinite(original.collapsedHeight)
+                        || original.collapsedHeight !== normalized.collapsedHeight);
+                if (!xChanged && !yChanged && !widthChanged && !heightChanged) continue;
                 // Preserve every unrelated persisted field by updating a copy of
                 // the original record instead of writing the normalized view.
-                migrated.push({ ...original, x: normalized.x, y: normalized.y });
+                const migratedGroup = { ...original, x: normalized.x, y: normalized.y };
+                if (widthChanged) migratedGroup.collapsedWidth = normalized.collapsedWidth;
+                if (heightChanged) migratedGroup.collapsedHeight = normalized.collapsedHeight;
+                migrated.push(migratedGroup);
             }
             if (migrated.length) {
                 try {
@@ -4240,10 +4252,18 @@ class TimerHubApp {
     }
 
     groupContainerBounds(boxes) {
-        const left = Math.min(...boxes.map(box => box.x)) - CANVAS_GROUP_PADDING;
-        const top = Math.min(...boxes.map(box => box.y)) - CANVAS_GROUP_HEADER;
-        const right = Math.max(...boxes.map(box => box.x + box.width)) + CANVAS_GROUP_PADDING;
-        const bottom = Math.max(...boxes.map(box => box.y + box.height)) + CANVAS_GROUP_PADDING;
+        const left = this.floorToCanvasGrid(
+            Math.min(...boxes.map(box => box.x)) - CANVAS_GROUP_PADDING
+        );
+        const top = this.floorToCanvasGrid(
+            Math.min(...boxes.map(box => box.y)) - CANVAS_GROUP_HEADER
+        );
+        const right = this.ceilToCanvasGrid(
+            Math.max(...boxes.map(box => box.x + box.width)) + CANVAS_GROUP_PADDING
+        );
+        const bottom = this.ceilToCanvasGrid(
+            Math.max(...boxes.map(box => box.y + box.height)) + CANVAS_GROUP_PADDING
+        );
         return { left, top, right, bottom, width: right - left, height: bottom - top };
     }
 
@@ -4285,11 +4305,15 @@ class TimerHubApp {
         }
         if (!boxes.length) return null;
         const bounds = this.groupContainerBounds(boxes);
-        if (Number.isFinite(displacedRight)) bounds.right = Math.max(bounds.right, displacedRight);
-        if (Number.isFinite(displacedBottom)) bounds.bottom = Math.max(bounds.bottom, displacedBottom);
+        if (Number.isFinite(displacedRight)) {
+            bounds.right = Math.max(bounds.right, this.ceilToCanvasGrid(displacedRight));
+        }
+        if (Number.isFinite(displacedBottom)) {
+            bounds.bottom = Math.max(bounds.bottom, this.ceilToCanvasGrid(displacedBottom));
+        }
         bounds.width = bounds.right - bounds.left;
         bounds.height = bounds.bottom - bounds.top;
-        const minWidth = this.groupTitleMinWidth(group);
+        const minWidth = this.ceilToCanvasGrid(this.groupTitleMinWidth(group));
         if (bounds.width < minWidth) {
             bounds.width = minWidth;
             bounds.right = bounds.left + minWidth;
@@ -4342,16 +4366,16 @@ class TimerHubApp {
             CANVAS_GROUP_COLLAPSED_MIN_WIDTH,
             CANVAS_GROUP_COLLAPSED_MAX_WIDTH
         );
-        return Math.max(configured, this.groupTitleMinWidth(group));
+        return this.ceilToCanvasGrid(Math.max(configured, this.groupTitleMinWidth(group)));
     }
 
     groupCollapsedHeight(group) {
-        return this.clampCanvasCoordinate(
+        return this.ceilToCanvasGrid(this.clampCanvasCoordinate(
             group?.collapsedHeight,
             CANVAS_GROUP_COLLAPSED_HEIGHT,
             CANVAS_GROUP_COLLAPSED_MIN_HEIGHT,
             CANVAS_GROUP_COLLAPSED_MAX_HEIGHT
-        );
+        ));
     }
 
     resizeCollapsedGroup(group, width, height) {
@@ -4383,7 +4407,12 @@ class TimerHubApp {
         const base = this.groupBaseBounds(group, index);
         const anchor = base
             ? { left: base.left, top: base.top, x: group.x, y: group.y }
-            : { left: group.x - CANVAS_GROUP_PADDING, top: group.y - CANVAS_GROUP_HEADER, x: group.x, y: group.y };
+            : {
+                left: this.floorToCanvasGrid(group.x - CANVAS_GROUP_PADDING),
+                top: this.floorToCanvasGrid(group.y - CANVAS_GROUP_HEADER),
+                x: group.x,
+                y: group.y
+            };
         this._groupContentAnchorCache.set(group.id, anchor);
         return anchor;
     }
@@ -5301,6 +5330,20 @@ class TimerHubApp {
         const number = Number(value);
         return Number.isFinite(number)
             ? Math.round(number / CANVAS_GRID_SIZE) * CANVAS_GRID_SIZE
+            : 0;
+    }
+
+    floorToCanvasGrid(value) {
+        const number = Number(value);
+        return Number.isFinite(number)
+            ? Math.floor(number / CANVAS_GRID_SIZE) * CANVAS_GRID_SIZE
+            : 0;
+    }
+
+    ceilToCanvasGrid(value) {
+        const number = Number(value);
+        return Number.isFinite(number)
+            ? Math.ceil(number / CANVAS_GRID_SIZE) * CANVAS_GRID_SIZE
             : 0;
     }
 

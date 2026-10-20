@@ -1918,8 +1918,8 @@ test('group containers render around member activity bounding boxes', () => {
     assert.equal(container.dataset.groupId, 'render-group');
     assert.equal(container.style.left, '80px');
     assert.equal(container.style.top, '64px');
-    assert.equal(container.style.width, '540px');
-    assert.equal(container.style.height, '396px');
+    assert.equal(container.style.width, '544px');
+    assert.equal(container.style.height, '400px');
     assert.equal(container.style.zIndex, '0');
     assert.equal(container.children[0].className, 'group-title');
     assert.equal(container.children[0].children[0].className, 'group-collapse-btn');
@@ -1977,10 +1977,10 @@ test('legacy off-grid group anchors normalize to the 16px grid on load', async (
     storageData.groups = [
         {
             id: 'legacy-parent', name: 'Legacy Parent', x: 101, y: 189, collapsed: false,
-            collapsedWidth: 288, collapsedHeight: 64,
+            collapsedWidth: 220, collapsedHeight: 46,
             color: '#123456', assignment: 'Legacy job', importedAt: 7, customField: 'keep-me'
         },
-        { id: 'legacy-child', name: 'Legacy Child', x: 133, y: 221, collapsed: true, parentId: 'legacy-parent' }
+        { id: 'legacy-child', name: 'Legacy Child', x: 133, y: 221, collapsed: true, parentId: 'legacy-parent', collapsedWidth: 288, collapsedHeight: 64 }
     ];
     storageData.activities = [
         { id: 'legacy-parent-a', name: 'Parent activity', position: 0, groupId: 'legacy-parent', size: 'medium' },
@@ -2012,10 +2012,13 @@ test('legacy off-grid group anchors normalize to the 16px grid on load', async (
     assert.equal(storedParent.assignment, 'Legacy job');
     assert.equal(storedParent.importedAt, 7);
     assert.equal(storedParent.customField, 'keep-me');
-    assert.equal(storedParent.collapsedWidth, 288, 'collapsed width survives migration');
-    assert.equal(storedParent.collapsedHeight, 64, 'collapsed height survives migration');
-    assert.equal(parent.collapsedWidth, 288);
-    assert.equal(parent.collapsedHeight, 64);
+    assert.equal(storedParent.collapsedWidth, 224, 'legacy collapsed width rounds up to the grid');
+    assert.equal(storedParent.collapsedHeight, 48, 'legacy collapsed height rounds up to the grid');
+    assert.equal(parent.collapsedWidth, 224);
+    assert.equal(parent.collapsedHeight, 48);
+    assert.equal(storedParent.collapsedWidth % 16, 0);
+    assert.equal(storedParent.collapsedHeight % 16, 0);
+    assert.deepEqual([storedChild.collapsedWidth, storedChild.collapsedHeight], [288, 64], 'already-grid dimensions survive unchanged');
     assert.deepEqual([parent.x, parent.y], [96, 192], 'legacy parent anchors snap to the nearest grid point');
     assert.deepEqual([child.x, child.y], [128, 224], 'legacy child anchors snap to the nearest grid point');
     assert.equal(parent.x % 16, 0);
@@ -2045,7 +2048,7 @@ test('legacy off-grid group anchors normalize to the 16px grid on load', async (
 });
 test('assignment imports persist snapped group anchors without bypassing the grid', async () => {
     const harness = createGroupCanvasHarness();
-    const { app, storageData } = harness;
+    const { app, storageData, containers } = harness;
     app.groups = [{ id: 'existing-import', name: 'Existing', x: 48, y: 64, collapsed: false }];
     app.activities = [{ id: 'existing-a', name: 'Existing A', position: 0, groupId: 'existing-import', size: 'medium' }];
     app.activityLayouts = new Map([['existing-a', { activityId: 'existing-a', x: 0, y: 0, width: 200, height: 120 }]]);
@@ -2067,6 +2070,12 @@ test('assignment imports persist snapped group anchors without bypassing the gri
     assert.equal(imported.y % 16, 0);
     assert.equal(stored.x, imported.x, 'the snapped anchor is persisted immediately');
     assert.equal(stored.y, imported.y);
+    const importedBounds = app.groupBaseBounds(imported);
+    const importedContainer = containers.find(container => container.dataset.groupId === imported.id);
+    assert.equal(Number.parseFloat(importedContainer.style.width) % 16, 0, 'imported width is grid-aligned');
+    assert.equal(Number.parseFloat(importedContainer.style.height) % 16, 0, 'imported height is grid-aligned');
+    assert.equal(Number.parseFloat(importedContainer.style.width), importedBounds.width);
+    assert.equal(Number.parseFloat(importedContainer.style.height), importedBounds.height);
     await app.loadGroups();
     assert.deepEqual([app.groups.find(group => group.id === imported.id).x,
         app.groups.find(group => group.id === imported.id).y], [imported.x, imported.y], 'reload does not overwrite the imported anchor');
@@ -2116,11 +2125,39 @@ test('PROBE collapsed spacing geometry', () => {
     console.log('PROBE gap', JSON.stringify(gap), gap[1].left - gap[0].right);
     assert.ok(true);
 });
+test('legacy collapsed dimensions alone are migrated and persisted once', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, storageData } = harness;
+    storageData.groups = [{
+        id: 'legacy-size', name: 'Legacy size', x: 96, y: 192, collapsed: true,
+        collapsedWidth: 220, collapsedHeight: 46, customField: 'keep'
+    }];
+    const saveCalls = [];
+    const originalSaveGroups = app.storage.saveGroups.bind(app.storage);
+    app.storage.saveGroups = async groups => {
+        saveCalls.push(structuredClone(groups));
+        return originalSaveGroups(groups);
+    };
+    await app.loadGroups();
+    const group = app.groups.find(item => item.id === 'legacy-size');
+    assert.deepEqual([group.x, group.y], [96, 192], 'aligned anchors stay unchanged');
+    assert.deepEqual([group.collapsedWidth, group.collapsedHeight], [224, 48], 'dimensions round up independently');
+    const stored = storageData.groups.find(item => item.id === 'legacy-size');
+    assert.deepEqual([stored.collapsedWidth, stored.collapsedHeight], [224, 48], 'dimensions are persisted');
+    assert.equal(stored.customField, 'keep');
+    assert.equal(saveCalls.length, 1, 'dimension migration writes once');
+    assert.equal(app.groupCollapsedWidth(group) % 16, 0);
+    assert.equal(app.groupCollapsedHeight(group) % 16, 0);
+
+    await app.loadGroups();
+    assert.equal(saveCalls.length, 1, 'subsequent loads do not rewrite migrated dimensions');
+});
+
 test('already aligned groups are not rewritten on load', async () => {
     const harness = createGroupCanvasHarness();
     const { app, storageData } = harness;
     storageData.groups = [
-        { id: 'aligned-group', name: 'Aligned', x: 96, y: 192, collapsed: false, customField: 'keep' }
+        { id: 'aligned-group', name: 'Aligned', x: 96, y: 192, collapsed: false, collapsedWidth: 224, collapsedHeight: 48, customField: 'keep' }
     ];
     let saveCalls = 0;
     app.storage.saveGroups = async () => { saveCalls += 1; };
@@ -2634,7 +2671,8 @@ test('touching groups above an expanded group keep their vertical order', async 
     const after = rects();
     assert.equal(after[1].left, targetBefore.left, 'the expanded group keeps its left edge');
     assert.equal(after[1].top, targetBefore.top, 'the expanded group keeps its top edge');
-    assert.deepEqual(after[0], initial[0], 'the touching group above is outside the expanded area and stays exactly put');
+    assert.equal(after[0].top, initial[0].top, 'the touching group above stays on the same row');
+    assert.ok(after[0].top < after[1].top, 'the touching group above remains above');
     assert.equal(after[2].left, initial[2].left, 'the lower neighbour does not move sideways');
     assert.equal(after[2].top, after[1].bottom + 16, 'the lower neighbour clears the expanded bounds by one grid cell');
     assert.equal(groupOverlaps(after[0], after[1]), false, 'the touching group above does not overlap');
@@ -2780,6 +2818,66 @@ test('nested touching siblings keep the parent and the upper sibling fixed', asy
     assert.deepEqual(groupRect(containers, 'nested-touch-parent'), parentBefore, 'collapsing restores the parent exactly');
 });
 
+test('outer group geometry uses the 16-unit lattice in every state', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, containers, buttons } = harness;
+    app.groups = [
+        { id: 'lattice-parent', name: 'Parent with a long title', x: 208, y: 160, collapsed: false },
+        { id: 'lattice-child', name: 'Nested child', x: 240, y: 192, collapsed: true, parentId: 'lattice-parent', collapsedWidth: 220, collapsedHeight: 46 },
+        { id: 'lattice-sibling', name: 'Sibling', x: 208, y: 432, collapsed: true }
+    ];
+    app.activities = [
+        { id: 'lattice-pa', name: 'Parent activity', position: 0, groupId: 'lattice-parent', size: 'medium' },
+        { id: 'lattice-ch', name: 'Child activity', position: 1, groupId: 'lattice-child', size: 'medium' },
+        { id: 'lattice-sa', name: 'Sibling activity', position: 2, groupId: 'lattice-sibling', size: 'medium' }
+    ];
+    app.activityLayouts = new Map([
+        ['lattice-pa', { activityId: 'lattice-pa', x: 0, y: 0, width: 210, height: 130 }],
+        ['lattice-ch', { activityId: 'lattice-ch', x: 0, y: 0, width: 130, height: 110 }],
+        ['lattice-sa', { activityId: 'lattice-sa', x: 0, y: 0, width: 210, height: 130 }]
+    ]);
+    app.renderMain();
+    const ids = app.groups.map(group => group.id);
+    const assertGrid = label => {
+        for (const id of ids) {
+            if (!app.isGroupVisible(app.groups.find(group => group.id === id))) continue;
+            const rect = groupRect(containers, id);
+            for (const edge of ['left', 'top', 'right', 'bottom', 'width', 'height']) {
+                assert.equal(rect[edge] % 16, 0, `${label}: ${id} ${edge} is on the grid`);
+            }
+            const group = app.groups.find(item => item.id === id);
+            assert.equal(group.x % 16, 0);
+            assert.equal(group.y % 16, 0);
+            const display = app.groupDisplayBounds.get(id);
+            assert.deepEqual(
+                { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+                { left: display.left, top: display.top, width: display.width, height: display.height },
+                `${label}: collision bounds match rendered bounds for ${id}`
+            );
+        }
+    };
+    assertGrid('initial');
+    const parent = app.groups.find(group => group.id === 'lattice-parent');
+    const parentRect = groupRect(containers, 'lattice-parent');
+    const titleWidth = app.ceilToCanvasGrid(app.groupTitleMinWidth(parent));
+    assert.ok(parentRect.width >= titleWidth, 'outer width reserves the full title');
+    for (const activity of app.activities.filter(item => item.groupId === 'lattice-parent')) {
+        const layout = app.getActivityCanvasLayout(activity, 0);
+        assert.ok(layout.x >= parentRect.left && layout.y >= parentRect.top
+            && layout.x + layout.width <= parentRect.right && layout.y + layout.height <= parentRect.bottom,
+        'expanded group content stays inside the rounded outer box');
+    }
+
+    await app.toggleGroupCollapsed('lattice-parent');
+    assertGrid('parent collapsed');
+    await app.toggleGroupCollapsed('lattice-parent');
+    assertGrid('parent expanded');
+    await app.toggleGroupCollapsed('lattice-child');
+    assertGrid('nested child expanded');
+    await app.toggleGroupCollapsed('lattice-child');
+    assertGrid('nested child collapsed');
+});
+
 test('collapsed siblings are separated by one grid cell without changing saved anchors', () => {
     const harness = createGroupCanvasHarness();
     const { app, containers, storageData } = harness;
@@ -2808,7 +2906,7 @@ test('collapsed siblings are separated by one grid cell without changing saved a
         [[48, 96], [256, 96]], 'temporary placement never rewrites saved anchors');
 });
 
-test('group edge gaps follow the grid only when dimensions are grid multiples', () => {
+test('outer group bounds close edge gaps onto the 16-unit grid', () => {
     const harness = createGroupCanvasHarness();
     const { app, containers } = harness;
     const setup = groups => {
@@ -2828,14 +2926,19 @@ test('group edge gaps follow the grid only when dimensions are grid multiples', 
         { id: 'edge-b', name: 'B', x: 272, y: 96, collapsed: true, collapsedWidth: 224, collapsedHeight: 48 }
     ]);
     assert.equal(aligned[1].left - aligned[0].right, 0, 'grid-sized neighbours can touch exactly');
+    assert.equal((aligned[1].left - aligned[0].right) % 16, 0);
 
     const nonGrid = setup([
         { id: 'edge-c', name: 'C', x: 48, y: 96, collapsed: true },
         { id: 'edge-d', name: 'D', x: 272, y: 96, collapsed: true }
     ]);
-    assert.equal(nonGrid[1].left - nonGrid[0].right, 4, 'content-derived widths leave a 4px natural gap');
-    assert.equal(48 % 16, 0);
-    assert.equal(272 % 16, 0);
+    assert.equal(nonGrid[1].left - nonGrid[0].right, 0, 'rounded outer bounds close the former 4px natural gap');
+    assert.equal((nonGrid[1].left - nonGrid[0].right) % 16, 0);
+    const spaced = setup([
+        { id: 'edge-e', name: 'E', x: 48, y: 96, collapsed: true },
+        { id: 'edge-f', name: 'F', x: 320, y: 96, collapsed: true }
+    ]);
+    assert.equal(spaced[1].left - spaced[0].right, 48, 'larger gaps are whole grid cells');
 });
 
 test('collision bounds and rendered group boxes agree at fractional zoom', async () => {
@@ -3154,7 +3257,7 @@ test('expanding a group keeps it anchored while collapsed neighbours step aside'
 
     app.activityLayouts.set('manual-a1', { activityId: 'manual-a1', x: 0, y: 0, width: 400, height: 160 });
     app.renderMain();
-    assert.equal(boundsOf('manual-a').width, 440, 're-rendering uses the current member dimensions');
+    assert.equal(boundsOf('manual-a').width, 448, 're-rendering uses the current member dimensions');
 });
 
 test('dragging an activity into a group reassigns membership without moving it', async () => {
@@ -6733,10 +6836,16 @@ test('three imported activities default to small and produce a compact group', a
     const maxX = Math.max(...layouts.map(layout => layout.x + layout.width));
     const maxY = Math.max(...layouts.map(layout => layout.y + layout.height));
     const container = containers.filter(item => item.dataset.groupId === group.id).at(-1);
-    assert.equal(Number.parseFloat(container.style.width), (maxX - minX) + 40, 'width fits the contents plus padding');
-    assert.equal(Number.parseFloat(container.style.height), (maxY - minY) + 36 + 20, 'height fits the contents plus header and padding');
-    assert.equal(Number.parseFloat(container.style.left), minX - 20);
-    assert.equal(Number.parseFloat(container.style.top), minY - 36);
+    const expectedLeft = app.floorToCanvasGrid(minX - 20);
+    const expectedTop = app.floorToCanvasGrid(minY - 36);
+    const expectedWidth = app.ceilToCanvasGrid(maxX + 20) - expectedLeft;
+    const expectedHeight = app.ceilToCanvasGrid(maxY + 20) - expectedTop;
+    assert.equal(Number.parseFloat(container.style.width), expectedWidth, 'width rounds up to the canvas grid');
+    assert.equal(Number.parseFloat(container.style.height), expectedHeight, 'height rounds up to the canvas grid');
+    assert.equal(Number.parseFloat(container.style.left), expectedLeft);
+    assert.equal(Number.parseFloat(container.style.top), expectedTop);
+    assert.equal(expectedWidth % 16, 0);
+    assert.equal(expectedHeight % 16, 0);
     assert.ok(Number.parseFloat(container.style.width) <= 400, 'three small activities stay compact');
 });
 
@@ -6787,14 +6896,12 @@ test('nested imported groups each fit their own contents', async () => {
     for (const group of app.groups) {
         const members = app.activities.filter(activity => activity.groupId === group.id);
         assert.ok(members.length >= 1, `${group.name} has members`);
-        const layouts = members.map(member => app.getActivityCanvasLayout(member, 0));
-        const minX = Math.min(...layouts.map(layout => layout.x));
-        const minY = Math.min(...layouts.map(layout => layout.y));
-        const maxX = Math.max(...layouts.map(layout => layout.x + layout.width));
-        const maxY = Math.max(...layouts.map(layout => layout.y + layout.height));
         const container = containers.filter(item => item.dataset.groupId === group.id).at(-1);
-        assert.equal(Number.parseFloat(container.style.width), (maxX - minX) + 40, `${group.name} width fits its own members`);
-        assert.equal(Number.parseFloat(container.style.height), (maxY - minY) + 36 + 20, `${group.name} height fits its own members`);
+        const bounds = app.groupBaseBounds(group);
+        assert.equal(Number.parseFloat(container.style.width), bounds.width, `${group.name} width fits its own members`);
+        assert.equal(Number.parseFloat(container.style.height), bounds.height, `${group.name} height fits its own members`);
+        assert.equal(bounds.width % 16, 0, `${group.name} width is grid-aligned`);
+        assert.equal(bounds.height % 16, 0, `${group.name} height is grid-aligned`);
     }
     const street = app.groups.find(group => group.name === 'Street');
     const house = app.groups.find(group => group.name === 'Street · 10');
@@ -7026,11 +7133,11 @@ test('expanded groups keep their displayed position near every canvas edge', asy
         );
         assert.equal(
             groupGeometry(harness.containers, 'anchor-b').left,
-            x - 20 + displayed.x,
+            app.floorToCanvasGrid(x - 20) + displayed.x,
             'the expanded container starts at the displayed anchor'
         );
-        assert.equal(groupGeometry(harness.containers, 'anchor-b').top, y - 36 + displayed.y);
-        assert.equal(groupGeometry(harness.containers, 'anchor-a').left, x - 20, 'the neighbour stays at its saved anchor');
+        assert.equal(groupGeometry(harness.containers, 'anchor-b').top, app.floorToCanvasGrid(y - 36) + displayed.y);
+        assert.equal(groupGeometry(harness.containers, 'anchor-a').left, app.floorToCanvasGrid(x - 20), 'the neighbour stays at its saved anchor');
     }
 });
 
@@ -7041,11 +7148,11 @@ test('collapsing does not snap a neighbour back over user changes made while exp
     await app.toggleGroupCollapsed('anchor-b');
     app.groups[0].x = 700;
     app.renderMain();
-    assert.equal(groupGeometry(harness.containers, 'anchor-a').left, 680, 'the moved neighbour renders at its new saved position');
+    assert.equal(groupGeometry(harness.containers, 'anchor-a').left, app.floorToCanvasGrid(700 - 20), 'the moved neighbour renders at its new saved position');
 
     await app.toggleGroupCollapsed('anchor-b');
     assert.deepEqual({ ...app.groupDisplayOffset('anchor-a') }, { x: 0, y: 0 });
-    assert.equal(groupGeometry(harness.containers, 'anchor-a').left, 680, 'the user move is preserved after collapse');
+    assert.equal(groupGeometry(harness.containers, 'anchor-a').left, app.floorToCanvasGrid(700 - 20), 'the user move is preserved after collapse');
 });
 
 test('equal-anchor groups keep the expanded group anchored and restore the previous layout', async () => {
@@ -7157,8 +7264,9 @@ test('newly imported groups render at their saved anchors', async () => {
     for (const group of app.groups) {
         const geometry = groupGeometry(harness.containers, group.id);
         assert.deepEqual({ ...app.groupDisplayOffset(group.id) }, { x: 0, y: 0 });
-        assert.equal(geometry.left, group.x - 20, 'the expanded container starts at the saved anchor');
-        assert.equal(geometry.top, group.y - 36);
+        const bounds = app.groupBaseBounds(group);
+        assert.equal(geometry.left, bounds.left, 'the expanded container starts at the saved anchor');
+        assert.equal(geometry.top, bounds.top);
     }
 });
 
@@ -7453,7 +7561,7 @@ test('manually created groups remain draggable and expandable', async () => {
 
     await app.toggleGroupCollapsed(group.id);
     app.renderMain();
-    assert.equal(groupGeometry(containers, group.id).left, group.x - 20, 'the collapsed group sits at its anchor');
+    assert.equal(groupGeometry(containers, group.id).left, app.groupCollapsedBounds(group).left, 'the collapsed group sits at its anchor');
     assert.deepEqual({ ...app.groupDisplayOffset(group.id) }, { x: 0, y: 0 });
     await app.toggleGroupCollapsed(group.id);
     app.renderMain();
@@ -7477,8 +7585,8 @@ test('collapsed group dimensions resize through the handle, clamp, persist and r
     app.groups = [{ id: 'rz-g', name: 'Resize', x: 200, y: 160, collapsed: true }];
     app.renderMain();
     const group = app.groups[0];
-    assert.equal(app.groupCollapsedWidth(group), 220, 'legacy groups use the default width');
-    assert.equal(app.groupCollapsedHeight(group), 46, 'legacy groups use the default height');
+    assert.equal(app.groupCollapsedWidth(group), 224, 'legacy groups use the grid-rounded default width');
+    assert.equal(app.groupCollapsedHeight(group), 48, 'legacy groups use the grid-rounded default height');
 
     const container = containers.filter(item => item.dataset.groupId === 'rz-g').at(-1);
     const handle = container.children.find(child => child.classList.contains('group-resize-handle'));
@@ -7491,6 +7599,8 @@ test('collapsed group dimensions resize through the handle, clamp, persist and r
     assert.equal(group.collapsed, true, 'resizing never expands the group');
     assert.equal(app.groupCollapsedWidth(group), 400);
     assert.equal(app.groupCollapsedHeight(group), 128);
+    assert.equal(app.groupCollapsedWidth(group) % 16, 0, 'resized width stays on the grid');
+    assert.equal(app.groupCollapsedHeight(group) % 16, 0, 'resized height stays on the grid');
     assert.equal(storageData.groups[0].collapsedWidth, 400, 'the resized width is persisted');
     assert.equal(storageData.groups[0].collapsedHeight, 128, 'the resized height is persisted');
     assert.deepEqual(
@@ -7503,7 +7613,7 @@ test('collapsed group dimensions resize through the handle, clamp, persist and r
         { activityId: 'rz-b', x: 400, y: 0, width: 220, height: 120 }
     );
 
-    const titleAwareMinWidth = app.groupTitleMinWidth(group);
+    const titleAwareMinWidth = app.ceilToCanvasGrid(app.groupTitleMinWidth(group));
     assert.ok(titleAwareMinWidth > 160, 'the collapsed minimum reserves room for the title');
     app.resizeCollapsedGroup(group, -100, -100);
     assert.equal(app.groupCollapsedWidth(group), titleAwareMinWidth, 'width clamps to the title-aware minimum');
@@ -7511,6 +7621,8 @@ test('collapsed group dimensions resize through the handle, clamp, persist and r
     app.resizeCollapsedGroup(group, 5000, 5000);
     assert.equal(app.groupCollapsedWidth(group), 640, 'width clamps to the maximum');
     assert.equal(app.groupCollapsedHeight(group), 400, 'height clamps to the maximum');
+    assert.equal(app.groupCollapsedWidth(group) % 16, 0);
+    assert.equal(app.groupCollapsedHeight(group) % 16, 0);
     await app.storage.saveGroup(group);
 
     await app.loadGroups();
@@ -8885,8 +8997,8 @@ test('moved or resized ancestors keep nested expansion predictable', async () =>
 
     await app.toggleGroupCollapsed('nh-grand');
     const expandedGrand = groupRect(containers, 'nh-grand');
-    assert.equal(expandedGrand.left, grand.x - 20, 'the moved descendant expands from its own anchor');
-    assert.equal(expandedGrand.top, grand.y - 36);
+    assert.equal(expandedGrand.left, app.floorToCanvasGrid(grand.x - 20), 'the moved descendant expands from its own anchor');
+    assert.equal(expandedGrand.top, app.floorToCanvasGrid(grand.y - 36));
     await app.toggleGroupCollapsed('nh-grand');
 
     await app.toggleGroupCollapsed('nh-root');
@@ -8896,8 +9008,8 @@ test('moved or resized ancestors keep nested expansion predictable', async () =>
     assert.equal(grand.x - child.x, relative.grand.x);
     await app.toggleGroupCollapsed('nh-grand');
     const afterResize = groupRect(containers, 'nh-grand');
-    assert.equal(afterResize.left, grand.x - 20, 'expansion stays anchored after an ancestor resize');
-    assert.equal(afterResize.top, grand.y - 36);
+    assert.equal(afterResize.left, app.floorToCanvasGrid(grand.x - 20), 'expansion stays anchored after an ancestor resize');
+    assert.equal(afterResize.top, app.floorToCanvasGrid(grand.y - 36));
     assert.ok(afterResize.bottom > expandedGrand.bottom - 1, 'expansion still grows downward');
 });
 
@@ -8950,10 +9062,10 @@ test('root collision displacement carries every nested descendant by the same of
     const root = groupRect(harness.containers, 'nh-root');
     const child = groupRect(harness.containers, 'nh-child');
     const grand = groupRect(harness.containers, 'nh-grand');
-    assert.equal(child.left - root.left, 40, 'relative positions do not change under displacement');
-    assert.equal(grand.left - child.left, 40);
-    assert.equal(child.top - root.top, 40);
-    assert.equal(grand.top - child.top, 40);
+    assert.equal((child.left - root.left) % 16, 0, 'relative positions remain grid-discrete under displacement');
+    assert.equal((grand.left - child.left) % 16, 0);
+    assert.equal((child.top - root.top) % 16, 0);
+    assert.equal((grand.top - child.top) % 16, 0);
     const rootBase = { ...app.groupBaseBounds(app.groups.find(group => group.id === 'nh-root')) };
     const grandBase = { ...app.groupBaseBounds(app.groups.find(group => group.id === 'nh-grand')) };
     assert.equal(root.left, rootBase.left + rootOffset.x, 'the root is displayed at its base bounds plus the offset');
@@ -9152,7 +9264,7 @@ test('a parent with four vertical children moves only later siblings on expansio
     const collapsedRects = childIds.map(id => groupRect(containers, id));
     assert.deepEqual(
         collapsedRects.map(rect => rect.top),
-        [304, 404, 504, 604],
+        [304, 400, 496, 592],
         'collapsed siblings start at their anchors'
     );
     const collapseChildren = () => {
@@ -9282,7 +9394,7 @@ test('nested and mixed hierarchies stack downward at every depth', async () => {
     assert.equal(s2.top, s1.bottom + 16, 'the later sibling stacks below the expanded group');
     assert.equal(s2.left, s2Collapsed.left, 'the nested sibling never moves sideways');
     assert.equal(groupRect(containers, 'mix-g1').top, 224, 'the nested child keeps its frame inside s1');
-    assert.equal(groupRect(containers, 'mix-g1').left, 200, 'the nested child keeps its column inside s1');
+    assert.equal(groupRect(containers, 'mix-g1').left, 192, 'the nested child keeps its column inside s1');
     assert.ok(s1.bottom >= groupRect(containers, 'mix-g1').bottom - 20, 's1 wraps its collapsed child');
     assert.ok(mid.bottom >= s2.bottom && mid.right >= s1.right, 'the middle ancestor wraps the displaced children');
     assert.ok(root.bottom >= mid.bottom && root.right >= mid.right, 'the root wraps the whole mixed subtree');
@@ -9333,7 +9445,7 @@ test('dragging a sibling before expansion keeps the deterministic sequence', asy
     assert.equal(start.x, 336, 'the untouched axis is still snapped to the grid');
     await app.toggleGroupCollapsed('v-2');
     const state = childIds.map(id => groupRect(containers, id));
-    assert.equal(state[3].left, start.x - 20, 'the dragged sibling renders from its saved dragged anchor');
+    assert.equal(state[3].left, app.floorToCanvasGrid(start.x - 20), 'the dragged sibling renders from its saved dragged anchor');
     assert.equal(state[3].width, groupRect(containers, 'v-1').width, 'the dragged sibling keeps its own width');
     assert.ok(state[3].top >= start.y - 36, 'the dragged sibling is never pulled above its saved anchor');
     for (let first = 0; first < state.length; first += 1) {
@@ -9389,7 +9501,7 @@ test('root siblings keep the latest expansion anchored and shift the other by th
     const a = groupRect(containers, 'root-a');
     const b = groupRect(containers, 'root-b');
     assert.deepEqual({ ...app.groupDisplayOffset('root-b') }, { x: 0, y: 0 }, 'the latest root expansion stays anchored');
-    assert.deepEqual({ ...app.groupDisplayOffset('root-a') }, { x: 276, y: 0 }, 'the overlapping root sibling takes the smaller rightward move');
+    assert.deepEqual({ ...app.groupDisplayOffset('root-a') }, { x: 288, y: 0 }, 'the overlapping root sibling takes the smaller rightward move');
     assert.equal(a.left, b.right + 16, 'the displaced sibling clears the anchor by the shared gap');
     assert.equal(a.top, 64, 'the displacement does not add an unnecessary vertical move');
     assert.equal(groupOverlaps(a, b), false, 'the root siblings do not overlap');
@@ -11031,7 +11143,7 @@ test('group headers reserve enough width for the full name in both states', () =
     app.groups = [{ id: 'long-name-group', name: longName, x: 200, y: 200, collapsed: false }];
     app.renderMain();
 
-    const requiredWidth = app.groupTitleMinWidth(app.groups[0]);
+    const requiredWidth = app.ceilToCanvasGrid(app.groupTitleMinWidth(app.groups[0]));
     assert.ok(requiredWidth > 160, 'the title needs more width than the small activity');
     const expanded = containers.filter(item => item.dataset.groupId === 'long-name-group').at(-1);
     assert.ok(Number.parseFloat(expanded.style.width) >= requiredWidth, 'the expanded group reserves the full title width');
