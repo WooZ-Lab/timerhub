@@ -2557,6 +2557,76 @@ test('dragging a collapsed group follows the 16px grid without a release jump', 
     assert.equal(group.y % 16, 0);
     assert.deepEqual([savedGroups.at(-1).x, savedGroups.at(-1).y], [176, 112], 'the snapped position is persisted');
 });
+test('expanding a group displaces conflicting free activities temporarily', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, buttons, containers, overlays, storageData } = harness;
+    app.groups = [{ id: 'free-group', name: 'Group', x: 304, y: 304, collapsed: true }];
+    app.activities = [
+        { id: 'free-member', name: 'Member', shape: 'rounded', position: 0, groupId: 'free-group' },
+        {
+            id: 'free-activity', name: 'Outside', shape: 'rounded', position: 1,
+            customerName: 'Customer', projectName: 'Project'
+        }
+    ];
+    app.activityLayouts = new Map([
+        ['free-member', { activityId: 'free-member', x: 0, y: 0, width: 400, height: 300 }],
+        ['free-activity', { activityId: 'free-activity', x: 512, y: 320, width: 160, height: 112 }]
+    ]);
+    storageData.groups = structuredClone(app.groups);
+    storageData.activities = structuredClone(app.activities);
+    storageData.layout = [...app.activityLayouts.values()].map(layout => structuredClone(layout));
+    await app.toggleActivityAssignments();
+    app.renderMain();
+    const free = app.activities.find(activity => activity.id === 'free-activity');
+    const freeBase = app.getActivityCanvasLayout(free, 1, false);
+    let freeButton = buttons.find(button => button.dataset.activityId === 'free-activity');
+    assert.equal(app.groupDisplayOffset('free-group').x, 0);
+    assert.equal(freeButton.style.left, `${freeBase.x}px`, 'a non-overlapping free activity starts at its saved position');
+    const groupCollapsed = groupRect(containers, 'free-group');
+
+    await app.toggleGroupCollapsed('free-group');
+    const groupExpanded = groupRect(containers, 'free-group');
+    assert.equal(groupExpanded.left, groupCollapsed.left, 'the expanded group keeps its anchor');
+    freeButton = buttons.find(button => button.dataset.activityId === 'free-activity');
+    const freeDisplayed = app.getActivityCanvasLayout(free, 1);
+    const freeOffset = app.activityDisplayOffset('free-activity');
+    assert.ok(freeOffset.x > 0 || freeOffset.y > 0, 'the conflicting free activity moves');
+    assert.equal(freeDisplayed.x % 16, 0);
+    assert.equal(freeDisplayed.y % 16, 0);
+    assert.deepEqual([freeButton.style.left, freeButton.style.top], [`${freeDisplayed.x}px`, `${freeDisplayed.y}px`]);
+    assert.equal(groupOverlaps(groupExpanded, {
+        left: freeDisplayed.x, top: freeDisplayed.y, width: freeDisplayed.width, height: freeDisplayed.height
+    }), false, 'the free activity clears the expanded group');
+    const overlay = overlays.find(item => item.dataset.activityId === 'free-activity');
+    assert.deepEqual([overlay.style.left, overlay.style.top], [freeButton.style.left, freeButton.style.top]);
+    assert.deepEqual([app.activityLayouts.get('free-activity').x, app.activityLayouts.get('free-activity').y],
+        [512, 320], 'temporary displacement does not rewrite the free activity layout');
+    assert.deepEqual([storageData.layout.find(layout => layout.activityId === 'free-activity').x,
+        storageData.layout.find(layout => layout.activityId === 'free-activity').y], [512, 320]);
+
+    await app.toggleGroupCollapsed('free-group');
+    freeButton = buttons.find(button => button.dataset.activityId === 'free-activity');
+    assert.equal(freeButton.style.left, `${freeBase.x}px`, 'collapsing restores the free activity');
+    assert.equal(freeButton.style.top, `${freeBase.y}px`);
+    assert.deepEqual({ ...app.activityDisplayOffset('free-activity') }, { x: 0, y: 0 });
+
+    await app.toggleGroupCollapsed('free-group');
+    const afterReloadExpectation = app.getActivityCanvasLayout(free, 1);
+    app.activities = [];
+    app.groups = [];
+    await app.loadActivities();
+    await app.loadGroups();
+    app.renderMain();
+    const reloadedFree = app.getActivityCanvasLayout(
+        app.activities.find(activity => activity.id === 'free-activity'), 0
+    );
+    assert.deepEqual(
+        [reloadedFree.x, reloadedFree.y, reloadedFree.width, reloadedFree.height],
+        [afterReloadExpectation.x, afterReloadExpectation.y, afterReloadExpectation.width, afterReloadExpectation.height],
+        'reloading an expanded group recomputes the same free-activity displacement'
+    );
+});
+
 test('child geometry changes run the shared positioning pass for nested groups', async () => {
     const harness = createGroupCanvasHarness();
     const { app, buttons, handles, containers, overlays, pointer, storageData } = harness;

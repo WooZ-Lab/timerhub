@@ -2020,6 +2020,7 @@ class TimerHubApp {
         // may be displaced right/down until the conflicting expansion collapses.
         this.groupExpansionOrder = [];
         this.groupExpansionDesiredOffsets = new Map();
+        this.freeActivityDisplayOffsets = new Map();
         this.suppressActivityClick = null;
         this.editingActivityId = null;
         this.editingEntryId = null;
@@ -4339,6 +4340,10 @@ class TimerHubApp {
         return this.groupDisplayOffsets?.get(groupId) || { x: 0, y: 0 };
     }
 
+    activityDisplayOffset(activityId) {
+        return this.freeActivityDisplayOffsets?.get(activityId) || { x: 0, y: 0 };
+    }
+
     groupContainerBounds(boxes) {
         return CanvasGeometry.groupOuterBounds(boxes, CANVAS_GROUP_PADDING, CANVAS_GROUP_HEADER);
     }
@@ -4733,6 +4738,33 @@ class TimerHubApp {
             });
         }
         this.groupDisplayBounds = displayBounds;
+        this.freeActivityDisplayOffsets = new Map();
+        const groupObstacles = [];
+        for (const group of this.groups) {
+            if (!this.isGroupVisible(group)) continue;
+            const bounds = displayBounds.get(group.id);
+            if (!bounds) continue;
+            const offset = offsets.get(group.id) || { x: 0, y: 0 };
+            groupObstacles.push({
+                ...bounds,
+                origin: { left: bounds.left - offset.x, top: bounds.top - offset.y }
+            });
+        }
+        if (groupObstacles.length) {
+            for (const activity of this.activities) {
+                if (activity.groupId && this._canvasIndex?.groupsById?.has(activity.groupId)) continue;
+                const base = this.getActivityCanvasLayout(activity, this.activityIndexOf(activity), false);
+                const resolved = this.resolveGroupCollision({
+                    left: base.x,
+                    top: base.y,
+                    width: base.width,
+                    height: base.height,
+                    origin: { left: base.x, top: base.y }
+                }, groupObstacles);
+                const own = { x: resolved.left - base.x, y: resolved.top - base.y };
+                if (own.x || own.y) this.freeActivityDisplayOffsets.set(activity.id, own);
+            }
+        }
         return offsets;
     }
 
@@ -5231,6 +5263,10 @@ class TimerHubApp {
                     layout.x += offset.x;
                     layout.y += offset.y;
                 }
+            } else if (includeDisplayOffset) {
+                const offset = this.activityDisplayOffset(activity.id);
+                layout.x += offset.x;
+                layout.y += offset.y;
             }
             return layout;
         }
@@ -5284,6 +5320,10 @@ class TimerHubApp {
                 layout.x += offset.x;
                 layout.y += offset.y;
             }
+        } else if (includeDisplayOffset) {
+            const offset = this.activityDisplayOffset(activity.id);
+            layout.x += offset.x;
+            layout.y += offset.y;
         }
         return layout;
     }
@@ -7186,7 +7226,14 @@ class TimerHubApp {
     toStoredActivityLayout(layout) {
         const activity = this.activities.find(item => item.id === layout.activityId);
         const group = this.activityGroup(activity);
-        if (!group) return layout;
+        if (!group) {
+            const offset = this.activityDisplayOffset(layout.activityId);
+            return {
+                ...layout,
+                x: layout.x - offset.x,
+                y: layout.y - offset.y
+            };
+        }
         const offset = this.groupDisplayOffset(group.id);
         return {
             ...layout,
