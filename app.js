@@ -6289,6 +6289,14 @@ class TimerHubApp {
         stage.style.transform =
             `translate(${this.canvasPan.x}px, ${this.canvasPan.y}px) scale(${this.canvasZoom})`;
         stage.style.transformOrigin = '0 0';
+        // The dots live on the fixed viewport, so apply the stage transform to
+        // their spacing and origin explicitly; otherwise pan/zoom desync them.
+        const viewport = stage.parentElement || document.getElementById('activityCanvasViewport');
+        if (viewport?.style) {
+            const gridSize = CANVAS_GRID_SIZE * this.canvasZoom;
+            viewport.style.backgroundSize = `${gridSize}px ${gridSize}px`;
+            viewport.style.backgroundPosition = `${this.canvasPan.x}px ${this.canvasPan.y}px`;
+        }
         this.updateCanvasControls();
     }
 

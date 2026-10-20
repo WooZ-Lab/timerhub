@@ -2081,7 +2081,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .activities-grid {
     position:absolute; inset:0 auto auto 0; display:block; width:3600px; height:2200px; padding:0;
     transform-origin:0 0; background-image:radial-gradient(color-mix(in srgb, var(--text-tertiary) 25%, transparent) .8px, transparent .8px);
-    background-size:24px 24px; touch-action:none; will-change:transform;
+    background-size:16px 16px; touch-action:none; will-change:transform;
 }
 .activity-btn.activity-node {
     position:absolute; min-width:160px; min-height:110px; max-width:none; max-height:none;
@@ -2734,7 +2734,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
             color-mix(in srgb, var(--text-tertiary) 24%, transparent) .75px,
             transparent .75px
         );
-    background-size: 24px 24px;
+    background-size: 16px 16px;
     background-position: 0 0;
     transform-origin: 0 0;
     touch-action: none;
@@ -2776,7 +2776,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 #activityCanvasViewport {
     background-image:
         radial-gradient(circle, color-mix(in srgb, currentColor 18%, transparent) 1px, transparent 1px);
-    background-size: 24px 24px;
+    background-size: 16px 16px;
     background-position: 0 0;
     touch-action: none;
 }

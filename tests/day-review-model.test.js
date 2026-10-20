@@ -1675,6 +1675,23 @@ test('canvas taps start the timer; movement and resize gestures only save their 
     assert.deepEqual([app.readCanvasPan().x, app.readCanvasPan().y], [35, 25]);
 });
 
+test('canvas grid dots follow the same pan and zoom as group coordinates', () => {
+    const harness = createGroupCanvasHarness();
+    const { app, stage, viewport } = harness;
+    app.canvasPan = { x: 32, y: -16 };
+    app.canvasZoom = 2;
+    app.applyCanvasTransform(stage);
+    assert.equal(stage.style.transform, 'translate(32px, -16px) scale(2)');
+    assert.equal(viewport.style.backgroundSize, '32px 32px', 'the 16px grid scales with the canvas');
+    assert.equal(viewport.style.backgroundPosition, '32px -16px', 'the grid origin follows canvas pan');
+
+    app.canvasPan = { x: -8, y: 24 };
+    app.canvasZoom = 0.5;
+    app.applyCanvasTransform(stage);
+    assert.equal(viewport.style.backgroundSize, '8px 8px');
+    assert.equal(viewport.style.backgroundPosition, '-8px 24px');
+});
+
 test('canvas selection helpers normalize rectangles and detect bounding-box intersection', () => {
     const { app } = createTestApp();
     assert.deepEqual(
