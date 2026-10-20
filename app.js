@@ -2020,7 +2020,7 @@ class TimerHubApp {
         // may be displaced right/down until the conflicting expansion collapses.
         this.groupExpansionOrder = [];
         this.groupExpansionDesiredOffsets = new Map();
-        this.freeActivityDisplayOffsets = new Map();
+        this.activityDisplayOffsets = new Map();
         this.suppressActivityClick = null;
         this.editingActivityId = null;
         this.editingEntryId = null;
@@ -4341,7 +4341,7 @@ class TimerHubApp {
     }
 
     activityDisplayOffset(activityId) {
-        return this.freeActivityDisplayOffsets?.get(activityId) || { x: 0, y: 0 };
+        return this.activityDisplayOffsets?.get(activityId) || { x: 0, y: 0 };
     }
 
     groupContainerBounds(boxes) {
@@ -4352,14 +4352,27 @@ class TimerHubApp {
     // nested child container, recursively. Children are measured first so a
     // parent always wraps its hierarchy.
     groupBaseBounds(group, index = this._canvasIndex) {
-        const boxes = this.groupMemberBoxes(group, false).map(box => ({
-            x: box.x,
-            y: box.y,
-            width: box.width,
-            height: box.height
-        }));
+        const boxes = [];
         let displacedRight = Number.NEGATIVE_INFINITY;
         let displacedBottom = Number.NEGATIVE_INFINITY;
+        for (const member of this.groupMembers(group, index)) {
+            const layout = this.getActivityCanvasLayout(member, this.activityIndexOf(member, index), false);
+            boxes.push({
+                x: layout.x,
+                y: layout.y,
+                width: layout.width,
+                height: layout.height
+            });
+            const own = this.activityDisplayOffset(member.id);
+            displacedRight = Math.max(
+                displacedRight,
+                layout.x + layout.width + own.x + CANVAS_GROUP_PADDING
+            );
+            displacedBottom = Math.max(
+                displacedBottom,
+                layout.y + layout.height + own.y + CANVAS_GROUP_PADDING
+            );
+        }
         for (const child of this.groupChildren(group, index)) {
             const childBounds = child.collapsed
                 ? this.groupCollapsedBounds(child)
@@ -4630,7 +4643,7 @@ class TimerHubApp {
         return true;
     }
 
-    computeGroupDisplayOffsets() {
+    computeGroupDisplayOffsets(passesRemaining = 5) {
         this._groupContentAnchorCache = new Map();
         this.normalizeGroupExpansionState();
         const offsets = new Map();
@@ -4738,7 +4751,6 @@ class TimerHubApp {
             });
         }
         this.groupDisplayBounds = displayBounds;
-        this.freeActivityDisplayOffsets = new Map();
         const groupObstacles = [];
         for (const group of this.groups) {
             if (!this.isGroupVisible(group)) continue;
@@ -4747,23 +4759,46 @@ class TimerHubApp {
             const offset = offsets.get(group.id) || { x: 0, y: 0 };
             groupObstacles.push({
                 ...bounds,
+                groupId: group.id,
                 origin: { left: bounds.left - offset.x, top: bounds.top - offset.y }
             });
         }
-        if (groupObstacles.length) {
-            for (const activity of this.activities) {
-                if (activity.groupId && this._canvasIndex?.groupsById?.has(activity.groupId)) continue;
-                const base = this.getActivityCanvasLayout(activity, this.activityIndexOf(activity), false);
-                const resolved = this.resolveGroupCollision({
-                    left: base.x,
-                    top: base.y,
-                    width: base.width,
-                    height: base.height,
-                    origin: { left: base.x, top: base.y }
-                }, groupObstacles);
-                const own = { x: resolved.left - base.x, y: resolved.top - base.y };
-                if (own.x || own.y) this.freeActivityDisplayOffsets.set(activity.id, own);
+        const previousOffsets = this.activityDisplayOffsets instanceof Map
+            ? this.activityDisplayOffsets
+            : new Map();
+        const nextOffsets = new Map();
+        for (const activity of this.activities) {
+            if (!this.isActivityVisible(activity)) continue;
+            const group = this.activityGroup(activity);
+            const excluded = new Set();
+            let ancestor = group;
+            while (ancestor) {
+                excluded.add(ancestor.id);
+                ancestor = this.groupParent(ancestor, index);
             }
+            const obstacles = groupObstacles.filter(obstacle => !excluded.has(obstacle.groupId));
+            if (!obstacles.length) continue;
+            const base = this.getActivityCanvasLayout(activity, this.activityIndexOf(activity), false);
+            const groupOffset = group ? (offsets.get(group.id) || { x: 0, y: 0 }) : { x: 0, y: 0 };
+            const start = {
+                left: base.x + groupOffset.x,
+                top: base.y + groupOffset.y,
+                width: base.width,
+                height: base.height,
+                origin: { left: base.x + groupOffset.x, top: base.y + groupOffset.y }
+            };
+            const resolved = this.resolveGroupCollision(start, obstacles);
+            const own = { x: resolved.left - start.left, y: resolved.top - start.top };
+            if (own.x || own.y) nextOffsets.set(activity.id, own);
+        }
+        this.activityDisplayOffsets = nextOffsets;
+        const offsetsChanged = previousOffsets.size !== nextOffsets.size
+            || [...nextOffsets].some(([id, offset]) => {
+                const previous = previousOffsets.get(id);
+                return !previous || previous.x !== offset.x || previous.y !== offset.y;
+            });
+        if (passesRemaining > 1 && offsetsChanged) {
+            return this.computeGroupDisplayOffsets(passesRemaining - 1);
         }
         return offsets;
     }
@@ -5263,7 +5298,8 @@ class TimerHubApp {
                     layout.x += offset.x;
                     layout.y += offset.y;
                 }
-            } else if (includeDisplayOffset) {
+            }
+            if (includeDisplayOffset) {
                 const offset = this.activityDisplayOffset(activity.id);
                 layout.x += offset.x;
                 layout.y += offset.y;
@@ -5320,7 +5356,8 @@ class TimerHubApp {
                 layout.x += offset.x;
                 layout.y += offset.y;
             }
-        } else if (includeDisplayOffset) {
+        }
+        if (includeDisplayOffset) {
             const offset = this.activityDisplayOffset(activity.id);
             layout.x += offset.x;
             layout.y += offset.y;
@@ -7226,19 +7263,19 @@ class TimerHubApp {
     toStoredActivityLayout(layout) {
         const activity = this.activities.find(item => item.id === layout.activityId);
         const group = this.activityGroup(activity);
+        const activityOffset = this.activityDisplayOffset(layout.activityId);
         if (!group) {
-            const offset = this.activityDisplayOffset(layout.activityId);
             return {
                 ...layout,
-                x: layout.x - offset.x,
-                y: layout.y - offset.y
+                x: layout.x - activityOffset.x,
+                y: layout.y - activityOffset.y
             };
         }
         const offset = this.groupDisplayOffset(group.id);
         return {
             ...layout,
-            x: layout.x - group.x - offset.x,
-            y: layout.y - group.y - offset.y
+            x: layout.x - group.x - offset.x - activityOffset.x,
+            y: layout.y - group.y - offset.y - activityOffset.y
         };
     }
 

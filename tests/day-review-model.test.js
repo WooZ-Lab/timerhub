@@ -2557,6 +2557,56 @@ test('dragging a collapsed group follows the 16px grid without a release jump', 
     assert.equal(group.y % 16, 0);
     assert.deepEqual([savedGroups.at(-1).x, savedGroups.at(-1).y], [176, 112], 'the snapped position is persisted');
 });
+test('a child group expanding pushes a sibling activity inside the same parent', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, buttons, containers, storageData } = harness;
+    app.groups = [
+        { id: 'inside-parent', name: 'Parent', x: 96, y: 96, collapsed: false },
+        { id: 'inside-child', name: 'Child', x: 208, y: 208, collapsed: true, parentId: 'inside-parent' }
+    ];
+    app.activities = [
+        { id: 'inside-member', name: 'Child content', shape: 'rounded', position: 0, groupId: 'inside-child' },
+        { id: 'inside-sibling', name: 'Parent activity', shape: 'rounded', position: 1, groupId: 'inside-parent' }
+    ];
+    app.activityLayouts = new Map([
+        ['inside-member', { activityId: 'inside-member', x: 0, y: 0, width: 400, height: 300 }],
+        ['inside-sibling', { activityId: 'inside-sibling', x: 320, y: 64, width: 160, height: 112 }]
+    ]);
+    storageData.groups = structuredClone(app.groups);
+    storageData.activities = structuredClone(app.activities);
+    storageData.layout = [...app.activityLayouts.values()].map(layout => structuredClone(layout));
+    app.renderMain();
+    const sibling = app.activities.find(activity => activity.id === 'inside-sibling');
+    const base = app.getActivityCanvasLayout(sibling, 1, false);
+    let siblingButton = buttons.find(button => button.dataset.activityId === 'inside-sibling');
+    assert.equal(app.activityDisplayOffset('inside-sibling').x, 0, 'the sibling starts outside the collapsed child');
+    const parentBefore = groupRect(containers, 'inside-parent');
+
+    await app.toggleGroupCollapsed('inside-child');
+    const offset = app.activityDisplayOffset('inside-sibling');
+    siblingButton = buttons.find(button => button.dataset.activityId === 'inside-sibling');
+    const displayed = app.getActivityCanvasLayout(sibling, 1);
+    assert.ok(offset.x > 0 || offset.y > 0, 'the sibling activity is displaced by the nested child group');
+    assert.deepEqual([siblingButton.style.left, siblingButton.style.top], [`${displayed.x}px`, `${displayed.y}px`]);
+    assert.deepEqual([app.activityLayouts.get('inside-sibling').x, app.activityLayouts.get('inside-sibling').y],
+        [320, 64], 'the sibling saved layout is unchanged');
+    const childBounds = groupRect(containers, 'inside-child');
+    assert.equal(groupOverlaps(childBounds, {
+        left: displayed.x, top: displayed.y, width: displayed.width, height: displayed.height
+    }), false, 'the sibling clears the expanded nested group');
+    const parentAfter = groupRect(containers, 'inside-parent');
+    assert.ok(parentAfter.right >= displayed.x + displayed.width,
+        'the parent wraps the displaced sibling activity');
+    assert.equal(parentAfter.left, parentBefore.left, 'the parent anchor is stable');
+    assert.equal(parentAfter.top, parentBefore.top);
+
+    await app.toggleGroupCollapsed('inside-child');
+    siblingButton = buttons.find(button => button.dataset.activityId === 'inside-sibling');
+    assert.equal(siblingButton.style.left, `${base.x}px`, 'collapsing restores the sibling activity');
+    assert.equal(siblingButton.style.top, `${base.y}px`);
+    assert.deepEqual({ ...app.activityDisplayOffset('inside-sibling') }, { x: 0, y: 0 });
+});
+
 test('expanding a group displaces conflicting free activities temporarily', async () => {
     const harness = createGroupCanvasHarness();
     const { app, buttons, containers, overlays, storageData } = harness;
