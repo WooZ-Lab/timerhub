@@ -2335,6 +2335,178 @@ test('expanding and collapsing overlapping groups makes room and restores positi
     assert.deepEqual(rects(), initial, 'all groups return to their saved positions');
 });
 
+test('touching groups above an expanded group keep their vertical order', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, containers } = harness;
+    app.groups = [
+        { id: 'touch-top', name: 'Top', x: 100, y: 100, collapsed: true },
+        { id: 'touch-middle', name: 'Middle', x: 100, y: 146, collapsed: true },
+        { id: 'touch-bottom', name: 'Bottom', x: 100, y: 192, collapsed: true }
+    ];
+    app.activities = app.groups.map((group, index) => ({
+        id: `${group.id}-1`, name: `${group.id}-1`, position: index, groupId: group.id, size: 'medium'
+    }));
+    app.activityLayouts = new Map(app.activities.map(activity => [
+        activity.id, { activityId: activity.id, x: 0, y: 0, width: 200, height: 120 }
+    ]));
+    app.renderMain();
+    const ids = ['touch-top', 'touch-middle', 'touch-bottom'];
+    const rects = () => ids.map(id => groupRect(containers, id));
+    const initial = rects();
+    const targetBefore = initial[1];
+    const orderBefore = app.groups.map(group => group.id);
+    const domBefore = containers.map(container => container.dataset.groupId);
+
+    await app.toggleGroupCollapsed('touch-middle');
+    const after = rects();
+    assert.equal(after[1].left, targetBefore.left, 'the expanded group keeps its left edge');
+    assert.equal(after[1].top, targetBefore.top, 'the expanded group keeps its top edge');
+    assert.deepEqual(after[0], initial[0], 'the touching group above is outside the expanded area and stays exactly put');
+    assert.equal(after[2].left, initial[2].left, 'the lower neighbour does not move sideways');
+    assert.equal(after[2].top, after[1].bottom + 20, 'the lower neighbour clears the expanded bounds with the existing gap');
+    assert.equal(groupOverlaps(after[0], after[1]), false, 'the touching group above does not overlap');
+    assert.equal(groupOverlaps(after[1], after[2]), false, 'the touching group below no longer overlaps');
+    assert.equal(groupOverlaps(after[0], after[2]), false, 'the neighbours do not collide');
+    assert.deepEqual(app.groups.map(group => group.id), orderBefore, 'logical order is unchanged');
+    assert.deepEqual(containers.map(container => container.dataset.groupId), domBefore, 'visual DOM order is unchanged');
+    assert.deepEqual(JSON.parse(JSON.stringify(app.groups.map(group => [group.x, group.y]))),
+        [[100, 100], [100, 146], [100, 192]], 'saved coordinates are unchanged');
+
+    await app.toggleGroupCollapsed('touch-middle');
+    assert.deepEqual(rects(), initial, 'collapsing restores the exact pre-expansion geometry');
+    for (let cycle = 0; cycle < 3; cycle += 1) {
+        await app.toggleGroupCollapsed('touch-middle');
+        assert.deepEqual(rects(), after, `cycle ${cycle}: re-expansion is stable`);
+        await app.toggleGroupCollapsed('touch-middle');
+        assert.deepEqual(rects(), initial, `cycle ${cycle}: collapse stays exact`);
+    }
+});
+
+test('a slight overlap above the expanded group does not push the group below it', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, containers } = harness;
+    app.groups = [
+        { id: 'overlap-top', name: 'Top', x: 100, y: 104, collapsed: true },
+        { id: 'overlap-middle', name: 'Middle', x: 100, y: 146, collapsed: true },
+        { id: 'overlap-bottom', name: 'Bottom', x: 100, y: 192, collapsed: true }
+    ];
+    app.activities = app.groups.map((group, index) => ({
+        id: `${group.id}-1`, name: `${group.id}-1`, position: index, groupId: group.id, size: 'medium'
+    }));
+    app.activityLayouts = new Map(app.activities.map(activity => [
+        activity.id, { activityId: activity.id, x: 0, y: 0, width: 200, height: 120 }
+    ]));
+    app.renderMain();
+    const ids = ['overlap-top', 'overlap-middle', 'overlap-bottom'];
+    const rects = () => ids.map(id => groupRect(containers, id));
+    const initial = rects();
+    const targetBefore = initial[1];
+
+    await app.toggleGroupCollapsed('overlap-middle');
+    const after = rects();
+    assert.equal(after[1].left, targetBefore.left);
+    assert.equal(after[1].top, targetBefore.top);
+    assert.equal(after[0].top, initial[0].top, 'the overlapping group above keeps its vertical position');
+    assert.ok(after[0].left >= after[1].left + after[1].width + 20, 'the overlapping group moves right, not below');
+    assert.equal(after[2].top, after[1].bottom + 20, 'the group below clears the expanded bounds with the existing gap');
+    assert.equal(groupOverlaps(after[0], after[1]), false);
+    assert.equal(groupOverlaps(after[1], after[2]), false);
+    assert.equal(groupOverlaps(after[0], after[2]), false);
+    await app.toggleGroupCollapsed('overlap-middle');
+    assert.deepEqual(rects(), initial);
+});
+
+test('a tightly packed grid only moves the neighbours that the expanded area reaches', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, containers } = harness;
+    app.groups = [
+        { id: 'grid-center', name: 'Center', x: 300, y: 300, collapsed: true },
+        { id: 'grid-above', name: 'Above', x: 300, y: 254, collapsed: true },
+        { id: 'grid-below', name: 'Below', x: 300, y: 346, collapsed: true },
+        { id: 'grid-left', name: 'Left', x: 80, y: 300, collapsed: true },
+        { id: 'grid-right', name: 'Right', x: 520, y: 300, collapsed: true }
+    ];
+    app.activities = app.groups.map((group, index) => ({
+        id: `${group.id}-1`, name: `${group.id}-1`, position: index, groupId: group.id, size: 'medium'
+    }));
+    app.activityLayouts = new Map(app.activities.map(activity => [
+        activity.id, { activityId: activity.id, x: 0, y: 0, width: 200, height: 120 }
+    ]));
+    app.renderMain();
+    const ids = app.groups.map(group => group.id);
+    const rects = () => ids.map(id => groupRect(containers, id));
+    const initial = rects();
+    const orderBefore = app.groups.map(group => group.id);
+    const skeleton = JSON.parse(JSON.stringify(app.groups.map(group => [group.id, group.x, group.y])));
+
+    await app.toggleGroupCollapsed('grid-center');
+    const after = rects();
+    const byId = Object.fromEntries(ids.map((id, index) => [id, after[index]]));
+    assert.equal(byId['grid-center'].left, initial[0].left, 'the expanded center keeps its left edge');
+    assert.equal(byId['grid-center'].top, initial[0].top, 'the expanded center keeps its top edge');
+    assert.deepEqual(byId['grid-above'], initial[1], 'the touching top neighbour is outside the expanded area');
+    assert.deepEqual(byId['grid-left'], initial[3], 'the touching left neighbour is outside the expanded area');
+    assert.equal(byId['grid-right'].left, byId['grid-center'].left + byId['grid-center'].width + 20, 'the right neighbour clears the expanded width');
+    assert.equal(byId['grid-right'].top, initial[4].top, 'the right neighbour does not move vertically');
+    assert.equal(byId['grid-below'].top, byId['grid-center'].top + byId['grid-center'].height + 20, 'the below neighbour clears the expanded height');
+    assert.equal(byId['grid-below'].left, initial[2].left, 'the below neighbour does not move sideways');
+    for (const first of ids) {
+        for (const second of ids) {
+            if (first >= second) continue;
+            assert.equal(groupOverlaps(byId[first], byId[second]), false, `${first} and ${second} do not overlap`);
+        }
+    }
+    assert.deepEqual(app.groups.map(group => group.id), orderBefore, 'the logical order is unchanged');
+    assert.deepEqual(JSON.parse(JSON.stringify(app.groups.map(group => [group.id, group.x, group.y]))), skeleton, 'saved coordinates are unchanged');
+
+    await app.toggleGroupCollapsed('grid-center');
+    assert.deepEqual(rects(), initial, 'collapsing restores the exact packed grid');
+});
+
+test('nested touching siblings keep the parent and the upper sibling fixed', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, containers } = harness;
+    app.groups = [
+        { id: 'nested-touch-parent', name: 'Parent', x: 100, y: 100, collapsed: false },
+        { id: 'nested-touch-a', name: 'A', x: 140, y: 140, collapsed: true, parentId: 'nested-touch-parent' },
+        { id: 'nested-touch-b', name: 'B', x: 140, y: 186, collapsed: true, parentId: 'nested-touch-parent' },
+        { id: 'nested-touch-c', name: 'C', x: 140, y: 232, collapsed: true, parentId: 'nested-touch-parent' }
+    ];
+    app.activities = ['a', 'b', 'c'].map((suffix, index) => ({
+        id: `nested-touch-${suffix}1`,
+        name: `N${suffix.toUpperCase()}`,
+        position: index,
+        groupId: `nested-touch-${suffix}`,
+        size: 'medium'
+    }));
+    app.activityLayouts = new Map(app.activities.map(activity => [
+        activity.id, { activityId: activity.id, x: 0, y: 0, width: 200, height: 120 }
+    ]));
+    app.renderMain();
+    const ids = ['nested-touch-a', 'nested-touch-b', 'nested-touch-c'];
+    const rects = () => ids.map(id => groupRect(containers, id));
+    const initial = rects();
+    const parentBefore = groupRect(containers, 'nested-touch-parent');
+    const targetBefore = initial[1];
+
+    await app.toggleGroupCollapsed('nested-touch-b');
+    const after = rects();
+    const parentAfter = groupRect(containers, 'nested-touch-parent');
+    assert.equal(after[1].left, targetBefore.left, 'the expanded nested group keeps its left edge');
+    assert.equal(after[1].top, targetBefore.top, 'the expanded nested group keeps its top edge');
+    assert.deepEqual(after[0], initial[0], 'the touching upper sibling stays exactly put');
+    assert.equal(after[2].top, after[1].bottom + 20, 'the lower sibling clears the expanded bounds');
+    assert.ok(after[0].bottom <= after[1].top, 'the upper sibling remains above the anchor');
+    assert.equal(parentAfter.left, parentBefore.left, 'the parent keeps its left edge');
+    assert.equal(parentAfter.top, parentBefore.top, 'the parent keeps its top edge');
+    assert.deepEqual(JSON.parse(JSON.stringify(app.groups.map(group => [group.x, group.y]))),
+        [[100, 100], [140, 140], [140, 186], [140, 232]], 'nested saved coordinates are unchanged');
+
+    await app.toggleGroupCollapsed('nested-touch-b');
+    assert.deepEqual(rects(), initial, 'collapsing restores the nested chain exactly');
+    assert.deepEqual(groupRect(containers, 'nested-touch-parent'), parentBefore, 'collapsing restores the parent exactly');
+});
+
 test('temporary child displacement never moves a parent top-left', async () => {
     const harness = createGroupCanvasHarness();
     const { app, containers } = harness;
@@ -8700,6 +8872,50 @@ test('root siblings keep the latest expansion anchored and shift the other by th
     assert.equal(groupOverlaps(a, b), false, 'the root siblings do not overlap');
     assert.equal(app.groups[0].x, 100, 'the root anchor is untouched');
     assert.equal(app.groups[1].y, 200, 'the saved layout is untouched');
+});
+
+test('tightly packed random groups keep anchors and restore exactly', async () => {
+    let seed = 987654321;
+    const random = () => {
+        seed = (seed * 1664525 + 1013904223) % 4294967296;
+        return seed / 4294967296;
+    };
+    for (let scenario = 0; scenario < 36; scenario += 1) {
+        const harness = createGroupCanvasHarness();
+        const { app, containers } = harness;
+        app.groups = Array.from({ length: 5 }, (unused, index) => ({
+            id: `packed-${index}`,
+            name: `Packed ${index}`,
+            x: 100 + Math.floor(random() * 7) * 16,
+            y: 100 + Math.floor(random() * 7) * 16,
+            collapsed: true
+        }));
+        app.activities = app.groups.map((group, index) => ({
+            id: `${group.id}-1`, name: `${group.id}-1`, position: index, groupId: group.id, size: 'medium'
+        }));
+        app.activityLayouts = new Map(app.activities.map(activity => [
+            activity.id, { activityId: activity.id, x: 0, y: 0, width: 200, height: 120 }
+        ]));
+        app.renderMain();
+        const ids = app.groups.map(group => group.id);
+        const rects = () => ids.map(id => groupRect(containers, id));
+        for (let step = 0; step < 5; step += 1) {
+            const before = rects();
+            const target = ids[Math.floor(random() * ids.length)];
+            const targetBefore = groupRect(containers, target);
+            await app.toggleGroupCollapsed(target);
+            const expanded = rects();
+            assert.equal(groupRect(containers, target).left, targetBefore.left, `scenario ${scenario}: left anchor`);
+            assert.equal(groupRect(containers, target).top, targetBefore.top, `scenario ${scenario}: top anchor`);
+            for (let first = 0; first < ids.length; first += 1) {
+                for (let second = first + 1; second < ids.length; second += 1) {
+                    assert.equal(groupOverlaps(expanded[first], expanded[second]), false, `scenario ${scenario}: ${ids[first]} and ${ids[second]} overlap`);
+                }
+            }
+            await app.toggleGroupCollapsed(target);
+            assert.deepEqual(rects(), before, `scenario ${scenario}: collapse restores every group exactly`);
+        }
+    }
 });
 
 test('nested expansions keep every anchor and restore every cycle across varied layouts', async () => {

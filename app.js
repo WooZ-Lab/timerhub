@@ -4334,9 +4334,18 @@ class TimerHubApp {
         };
     }
 
+    groupAreasOverlap(first, second) {
+        // Touching edges are not an area conflict. Group placement uses a
+        // positive-area test; the shared 20px padding is applied only when the
+        // boxes actually overlap.
+        return first.left < second.right && first.right > second.left
+            && first.top < second.bottom && first.bottom > second.top;
+    }
+
     resolveGroupCollision(bounds, obstacles) {
         let left = bounds.left;
         let top = bounds.top;
+        const origin = bounds.origin || null;
         let shifted = true;
         let guard = 0;
         while (shifted && guard < 500) {
@@ -4344,10 +4353,21 @@ class TimerHubApp {
             guard += 1;
             for (const other of obstacles) {
                 const candidate = { left, top, right: left + bounds.width, bottom: top + bounds.height };
-                if (!this.rectanglesIntersect(candidate, other)) continue;
+                if (!this.groupAreasOverlap(candidate, other)) continue;
                 const shiftRight = other.right + CANVAS_GROUP_PADDING - candidate.left;
                 const shiftDown = other.bottom + CANVAS_GROUP_PADDING - candidate.top;
-                if (shiftRight <= shiftDown) left += shiftRight;
+                // Group layout passes stable base origins. Preserve the side
+                // the group started on: moving a group that was above the
+                // obstacle downward would teleport it past the obstacle and
+                // reverse the visual order.
+                let moveRight = shiftRight <= shiftDown;
+                if (origin && other.origin) {
+                    if (origin.top < other.origin.top) moveRight = true;
+                    else if (origin.top > other.origin.top) moveRight = false;
+                    else if (origin.left < other.origin.left) moveRight = false;
+                    else if (origin.left > other.origin.left) moveRight = true;
+                }
+                if (moveRight) left += shiftRight;
                 else top += shiftDown;
                 shifted = true;
             }
@@ -4400,8 +4420,8 @@ class TimerHubApp {
     }
 
     // Expand a collapsed group at its currently displayed top-left. The
-    // expanded base is measured after the flag flips so content offsets do not
-    // introduce a hidden jump.
+    // offset-free base is measured before the state flips; the same stable
+    // base is used by rendering, so content changes cannot move the anchor.
     expandGroupInPlace(group) {
         if (!group || !group.collapsed) return false;
         const offset = this.groupDisplayOffset(group.id);
@@ -4459,6 +4479,7 @@ class TimerHubApp {
             };
             placedAnchor.right = placedAnchor.left + placedAnchor.width;
             placedAnchor.bottom = placedAnchor.top + placedAnchor.height;
+            placedAnchor.origin = { left: anchorBase.left, top: anchorBase.top };
             if (anchorDesired.x || anchorDesired.y) ownOffsets.set(anchor.id, anchorDesired);
             const obstacles = [placedAnchor];
 
@@ -4471,7 +4492,8 @@ class TimerHubApp {
                     left: base.left + desired.x,
                     top: base.top + desired.y,
                     width: base.width,
-                    height: base.height
+                    height: base.height,
+                    origin: { left: base.left, top: base.top }
                 };
                 const resolved = this.resolveGroupCollision(start, obstacles);
                 const own = { x: resolved.left - base.left, y: resolved.top - base.top };
@@ -4480,7 +4502,8 @@ class TimerHubApp {
                     left: resolved.left,
                     top: resolved.top,
                     width: base.width,
-                    height: base.height
+                    height: base.height,
+                    origin: start.origin
                 };
                 placed.right = placed.left + placed.width;
                 placed.bottom = placed.top + placed.height;
