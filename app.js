@@ -4426,8 +4426,8 @@ class TimerHubApp {
             for (const other of obstacles) {
                 const candidate = { left, top, right: left + bounds.width, bottom: top + bounds.height };
                 if (!this.groupAreasOverlap(candidate, other)) continue;
-                const shiftRight = other.right + CANVAS_GROUP_PADDING - candidate.left;
-                const shiftDown = other.bottom + CANVAS_GROUP_PADDING - candidate.top;
+                const shiftRight = other.right + CANVAS_GRID_SIZE - candidate.left;
+                const shiftDown = other.bottom + CANVAS_GRID_SIZE - candidate.top;
                 // Group layout passes stable base origins. Preserve the side
                 // the group started on: moving a group that was above the
                 // obstacle downward would teleport it past the obstacle and
@@ -4532,7 +4532,6 @@ class TimerHubApp {
         const placeSiblings = siblings => {
             const ordered = [...siblings].sort((a, b) => this.compareGroupLogicalOrder(a, b));
             const expanded = ordered.filter(group => !group.collapsed);
-            if (!expanded.length) return;
             const priority = groupId => this.groupExpansionOrder.indexOf(groupId);
             let anchor = null;
             for (const group of expanded) {
@@ -4540,9 +4539,14 @@ class TimerHubApp {
                 if (!base) continue;
                 if (!anchor || priority(group.id) > priority(anchor.id)) anchor = group;
             }
+            if (!anchor) {
+                // With no expanded group, keep the first logical sibling fixed and
+                // resolve the rest so collapsed cards cannot overlap.
+                anchor = ordered.find(group => group.collapsed ? this.groupCollapsedBounds(group) : this.groupBaseBounds(group, index)) || null;
+            }
             if (!anchor) return;
-            const anchorBase = this.groupBaseBounds(anchor, index);
-            const anchorDesired = this.groupDesiredOffset(anchor.id);
+            const anchorBase = anchor.collapsed ? this.groupCollapsedBounds(anchor) : this.groupBaseBounds(anchor, index);
+            const anchorDesired = anchor.collapsed ? { x: 0, y: 0 } : this.groupDesiredOffset(anchor.id);
             const placedAnchor = {
                 left: anchorBase.left + anchorDesired.x,
                 top: anchorBase.top + anchorDesired.y,
