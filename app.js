@@ -4736,16 +4736,39 @@ class TimerHubApp {
         return offsets;
     }
 
-    // Recompute the transient collision offsets and update the existing DOM
-    // nodes in place. Used for actions that only move groups (drag end, resize)
-    // so they do not pay for a full canvas rebuild.
+    positionActivityVisual(activity, layout = null) {
+        if (!activity) return;
+        const stage = document.getElementById('activitiesGrid');
+        if (!stage) return;
+        const button = stage.querySelector(
+            `.activity-btn[data-activity-id="${CSS.escape(activity.id)}"]`
+        );
+        if (!button) return;
+        const resolved = layout || this.getActivityCanvasLayout(
+            activity,
+            this.activityIndexOf(activity)
+        );
+        button.style.left = `${resolved.x}px`;
+        button.style.top = `${resolved.y}px`;
+        button.style.width = `${resolved.width}px`;
+        button.style.height = `${resolved.height}px`;
+        this.positionActivityResizeHandle(activity.id, resolved);
+    }
+
+    positionCanvasObjects() {
+        for (const group of this.groups) this.positionGroupVisuals(group);
+        for (const activity of this.activities) {
+            if (this.isActivityVisible(activity)) this.positionActivityVisual(activity);
+        }
+    }
+
+    // Recompute transient offsets and reposition every canvas object through the
+    // same post-layout contract. Used after geometry-changing gestures.
     refreshGroupLayout() {
         this._canvasIndex = this.buildCanvasIndex();
         this._baseLayoutCache = new Map();
         this.groupDisplayOffsets = this.computeGroupDisplayOffsets();
-        for (const group of this.groups) {
-            this.positionGroupVisuals(group);
-        }
+        this.positionCanvasObjects();
         this._canvasIndex = null;
         this._baseLayoutCache = null;
     }
@@ -4767,14 +4790,7 @@ class TimerHubApp {
         const boxes = [];
         for (const activity of this.groupMembers(group)) {
             const layout = this.getActivityCanvasLayout(activity, this.activityIndexOf(activity));
-            const button = stage.querySelector(
-                `.activity-btn[data-activity-id="${CSS.escape(activity.id)}"]`
-            );
-            if (button) {
-                button.style.left = `${layout.x}px`;
-                button.style.top = `${layout.y}px`;
-            }
-            this.positionActivityResizeHandle(activity.id, layout);
+            this.positionActivityVisual(activity, layout);
             boxes.push(layout);
         }
         const container = stage.querySelector(
@@ -7008,6 +7024,7 @@ class TimerHubApp {
 
 
                     this.saveActivityCanvasLayout(finalLayout);
+                    this.refreshGroupLayout();
                 }
             }
         };

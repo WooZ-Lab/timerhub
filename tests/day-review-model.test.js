@@ -2557,6 +2557,102 @@ test('dragging a collapsed group follows the 16px grid without a release jump', 
     assert.equal(group.y % 16, 0);
     assert.deepEqual([savedGroups.at(-1).x, savedGroups.at(-1).y], [176, 112], 'the snapped position is persisted');
 });
+test('child geometry changes run the shared positioning pass for nested groups', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, buttons, handles, containers, overlays, pointer, storageData } = harness;
+    app.groups = [
+        { id: 'contract-parent', name: 'Parent', x: 96, y: 96, collapsed: false },
+        { id: 'contract-child', name: 'Child', x: 128, y: 128, collapsed: false, parentId: 'contract-parent' }
+    ];
+    app.activities = [
+        {
+            id: 'contract-member', name: 'Member', shape: 'circle', position: 0,
+            groupId: 'contract-child', customerName: 'Customer', projectName: 'Project'
+        },
+        { id: 'contract-free', name: 'Free', shape: 'rounded', position: 1 }
+    ];
+    app.activityLayouts = new Map([
+        ['contract-member', { activityId: 'contract-member', x: 16, y: 16, width: 160, height: 112 }],
+        ['contract-free', { activityId: 'contract-free', x: 800, y: 640, width: 160, height: 112 }]
+    ]);
+    storageData.groups = structuredClone(app.groups);
+    storageData.activities = structuredClone(app.activities);
+    storageData.layout = [...app.activityLayouts.values()].map(layout => structuredClone(layout));
+    await app.toggleActivityAssignments();
+    app.groupDropTargetAt = () => app.groups.find(group => group.id === 'contract-child');
+    app.renderMain();
+    const freeBefore = buttons.find(button => button.dataset.activityId === 'contract-free').style.cssText;
+    const childBefore = groupRect(containers, 'contract-child');
+    const parentBefore = groupRect(containers, 'contract-parent');
+
+    let member = buttons.find(button => button.dataset.activityId === 'contract-member');
+    pointer('pointerdown', member, 0, 0);
+    pointer('pointermove', member, 64, 48);
+    pointer('pointerup', member, 64, 48);
+
+    member = buttons.find(button => button.dataset.activityId === 'contract-member');
+    const memberLayout = app.getActivityCanvasLayout(
+        app.activities.find(activity => activity.id === 'contract-member'), 0
+    );
+    assert.deepEqual([member.style.left, member.style.top, member.style.width, member.style.height],
+        [`${memberLayout.x}px`, `${memberLayout.y}px`, `${memberLayout.width}px`, `${memberLayout.height}px`],
+        'the nested activity uses the shared post-layout position');
+    const childAfter = groupRect(containers, 'contract-child');
+    const childBase = app.groupBaseBounds(app.groups.find(group => group.id === 'contract-child'));
+    const childOffset = app.groupDisplayOffset('contract-child');
+    assert.notDeepEqual([childAfter.left, childAfter.top], [childBefore.left, childBefore.top],
+        'the child container follows the moved activity immediately');
+    assert.deepEqual([childAfter.left, childAfter.top, childAfter.width, childAfter.height],
+        [childBase.left + childOffset.x, childBase.top + childOffset.y, childBase.width, childBase.height]);
+    const parentAfter = groupRect(containers, 'contract-parent');
+    const parentBase = app.groupBaseBounds(app.groups.find(group => group.id === 'contract-parent'));
+    assert.deepEqual([parentAfter.left, parentAfter.top, parentAfter.width, parentAfter.height],
+        [parentBase.left, parentBase.top, parentBase.width, parentBase.height],
+        'the ancestor is repositioned through the same layout pass');
+    assert.notDeepEqual([parentAfter.left, parentAfter.top], [parentBefore.left, parentBefore.top],
+        'the ancestor participates in the same post-layout pass');
+    assert.equal(buttons.find(button => button.dataset.activityId === 'contract-free').style.cssText, freeBefore,
+        'unrelated free objects are not moved');
+
+    const overlay = overlays.find(item => item.dataset.activityId === 'contract-member');
+    assert.deepEqual([overlay.style.left, overlay.style.top, overlay.style.width, overlay.style.height],
+        [member.style.left, member.style.top, member.style.width, member.style.height],
+        'overlay children follow the shared object position');
+
+    const handle = handles.find(item => item.dataset.activityId === 'contract-member');
+    pointer('pointerdown', handle, 0, 0);
+    pointer('pointermove', handle, 32, 16);
+    pointer('pointerup', handle, 32, 16);
+    member = buttons.find(button => button.dataset.activityId === 'contract-member');
+    const resizedLayout = app.getActivityCanvasLayout(
+        app.activities.find(activity => activity.id === 'contract-member'), 0
+    );
+    assert.deepEqual([member.style.left, member.style.top, member.style.width, member.style.height],
+        [`${resizedLayout.x}px`, `${resizedLayout.y}px`, `${resizedLayout.width}px`, `${resizedLayout.height}px`]);
+    const resizedChild = groupRect(containers, 'contract-child');
+    const resizedBase = app.groupBaseBounds(app.groups.find(group => group.id === 'contract-child'));
+    assert.deepEqual([resizedChild.width, resizedChild.height], [resizedBase.width, resizedBase.height],
+        'resizing a child activity also refreshes ancestor/container geometry');
+    assert.equal(resizedLayout.width % 16, 0);
+    assert.equal(resizedLayout.height % 16, 0);
+    const stored = storageData.layout.find(layout => layout.activityId === 'contract-member');
+    assert.deepEqual([stored.x, stored.y, stored.width, stored.height],
+        [resizedLayout.x - app.groups.find(group => group.id === 'contract-child').x,
+            resizedLayout.y - app.groups.find(group => group.id === 'contract-child').y,
+            resizedLayout.width, resizedLayout.height], 'the shared pass persists the normalized child layout');
+
+    app.activities = [];
+    app.groups = [];
+    await app.loadActivities();
+    await app.loadGroups();
+    app.renderMain();
+    const reloadedMember = app.activities.find(activity => activity.id === 'contract-member');
+    const reloadedLayout = app.getActivityCanvasLayout(reloadedMember, 0);
+    assert.deepEqual([reloadedLayout.x, reloadedLayout.y, reloadedLayout.width, reloadedLayout.height],
+        [resizedLayout.x, resizedLayout.y, resizedLayout.width, resizedLayout.height],
+        'reload preserves the child object position and dimensions');
+});
+
 test('dragging a group moves every member through snapped group coordinates and persists', async () => {
     const harness = createGroupCanvasHarness();
     const { app, containers, buttons, pointer, storageData } = harness;
