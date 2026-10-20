@@ -95,6 +95,14 @@ function createTestApp(initialData = {}) {
             else storageData.layout.push(structuredClone(layout));
             return layout;
         },
+        async saveLayouts(layouts) {
+            for (const layout of layouts) {
+                const idx = storageData.layout.findIndex(item => item.activityId === layout.activityId);
+                if (idx >= 0) storageData.layout[idx] = structuredClone(layout);
+                else storageData.layout.push(structuredClone(layout));
+            }
+            return layouts;
+        },
         async saveConfirmedBatch(batch, entries) {
             storageData.syncBatches.push(structuredClone(batch));
             for (const entry of entries) {
@@ -1554,6 +1562,226 @@ test('canvas snapping rounds activity positions to the grid, including negative 
     assert.equal(app.snapToCanvasGrid(Number.NaN), 0);
 });
 
+test('newly created activities receive normalized persisted geometry', async () => {
+    const { app, document, storageData } = createTestApp();
+    app.showActivityModal();
+    document.getElementById('activityName').value = 'Fresh circle';
+    await app.saveActivity();
+    const activity = app.activities.find(item => item.name === 'Fresh circle');
+    const layout = app.activityLayouts.get(activity.id);
+    assert.ok(layout, 'a canvas layout is created with the activity');
+    for (const field of ['x', 'y', 'width', 'height']) {
+        assert.equal(layout[field] % 16, 0, `${field} is grid-aligned`);
+        assert.ok(Number.isFinite(layout[field]));
+    }
+    assert.equal(layout.width, layout.height, 'new circle geometry is equilateral');
+    assert.deepEqual(
+        { ...storageData.layout.find(item => item.activityId === activity.id) },
+        { activityId: activity.id, x: layout.x, y: layout.y, width: layout.width, height: layout.height }
+    );
+});
+
+test('activity geometry keeps grid, shape, and content invariants', () => {
+    const { app } = createTestApp();
+    const rectangle = app.normalizeActivityGeometryDimensions(
+        { name: 'Task', shape: 'rounded' }, 200, 150
+    );
+    assert.equal(rectangle.width % 16, 0);
+    assert.equal(rectangle.height % 16, 0);
+    assert.notEqual(rectangle.width, rectangle.height, 'rectangles keep independent dimensions');
+
+    const circle = app.normalizeActivityGeometryDimensions({ name: 'Task', shape: 'circle' }, 200, 150);
+    const square = app.normalizeActivityGeometryDimensions({ name: 'Task', shape: 'square' }, 260, 120);
+    assert.equal(circle.width, circle.height, 'circles have equal outer dimensions');
+    assert.equal(square.width, square.height, 'squares have equal outer dimensions');
+    assert.equal(circle.width % 16, 0);
+    assert.equal(square.height % 16, 0);
+
+    const activity = { id: 'grid-circle', name: 'Task', shape: 'circle', size: 'medium', position: 0 };
+    app.activities = [activity];
+    app.activityLayouts = new Map([['grid-circle', {
+        activityId: 'grid-circle', x: 140, y: 90, width: 260, height: 150
+    }]]);
+    const layout = app.getActivityCanvasLayout(activity, 0);
+    assert.equal(layout.x % 16, 0, 'activity x snaps to the grid');
+    assert.equal(layout.y % 16, 0, 'activity y snaps to the grid');
+    assert.equal(layout.width, layout.height, 'circle layout is equilateral');
+
+    const fresh = { id: 'fresh-activity', name: 'Fresh', shape: 'square', size: 'medium', position: 1 };
+    app.activities.push(fresh);
+    const freshLayout = app.getActivityCanvasLayout(fresh, 1);
+    assert.equal(freshLayout.x % 16, 0);
+    assert.equal(freshLayout.y % 16, 0);
+    assert.equal(freshLayout.width % 16, 0);
+    assert.equal(freshLayout.height % 16, 0);
+    assert.equal(freshLayout.width, freshLayout.height, 'new square activities use equal outer dimensions');
+});
+
+test('activity text minimum sizes grow on the grid without clipping', () => {
+    const { app } = createTestApp();
+    const short = app.normalizeActivityGeometryDimensions({ name: 'A', shape: 'rounded' }, 160, 112);
+    const longWord = 'Supercalifragilisticexpialidocious';
+    const long = app.normalizeActivityGeometryDimensions({ name: longWord, shape: 'rounded' }, 160, 112);
+    const sentence = 'Paint the complete staircase and all hallway walls before the final inspection';
+    const wrapped = app.normalizeActivityGeometryDimensions({ name: sentence, shape: 'rounded' }, 160, 112);
+    const diamond = app.normalizeActivityGeometryDimensions({ name: longWord, shape: 'diamond' }, 160, 112);
+    const circle = app.normalizeActivityGeometryDimensions({ name: longWord, shape: 'circle' }, 160, 112);
+    assert.equal(circle.width, circle.height, 'text fitting preserves circle equality');
+    assert.ok(circle.width >= long.width, 'circle interiors reserve at least the rectangular text width');
+    assert.ok(long.width > short.width, 'a long unbreakable word expands width');
+    assert.ok(wrapped.height > short.height, 'a long sentence expands height');
+    assert.ok(diamond.width > long.width, 'non-rectangular interiors reserve more space');
+    for (const dimensions of [short, long, wrapped, diamond]) {
+        assert.equal(dimensions.width % 16, 0);
+        assert.equal(dimensions.height % 16, 0);
+    }
+    const longestSentenceWord = Math.max(...sentence.split(' ').map(word => app.measureActivityTextWidth(word, 14)));
+    assert.ok(wrapped.width >= longestSentenceWord + 16, 'wrapping still reserves the longest word');
+    assert.ok(wrapped.height > long.height);
+    const textWidth = app.measureActivityTextWidth(longWord, 14);
+    assert.ok(long.width >= textWidth + 16, 'long text fits within the minimum readable width');
+});
+
+test('activity geometry migration reaches the authoritative layout store', async () => {
+    const { app, context } = createTestApp();
+    const repository = vm.runInContext('new StorageRepository()', context);
+    const database = createIndexedDbHarness();
+    repository.db = database.db;
+    database.data.activities.set('stored-activity', {
+        id: 'stored-activity', name: 'Stored', position: 0, shape: 'circle'
+    });
+    database.data.layout.set('stored-activity', {
+        activityId: 'stored-activity', x: 140, y: 90, width: 260, height: 150
+    });
+    app.storage = repository;
+    await app.loadActivities();
+    await app.loadGroups();
+    const layout = (await repository.getLayout()).find(item => item.activityId === 'stored-activity');
+    assert.equal(layout.x % 16, 0);
+    assert.equal(layout.y % 16, 0);
+    assert.equal(layout.width, layout.height, 'circle dimensions are equal in storage');
+    assert.equal(layout.width % 16, 0);
+    assert.equal(layout.height % 16, 0);
+});
+
+test('already normalized activity layouts are not rewritten', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, storageData } = harness;
+    storageData.activities = [{ id: 'aligned-activity', name: 'A', position: 0, shape: 'rounded' }];
+    storageData.layout = [{
+        activityId: 'aligned-activity', x: 144, y: 96, width: 160, height: 112
+    }];
+    let writes = 0;
+    app.storage.saveLayouts = async () => { writes += 1; };
+    await app.loadActivities();
+    await app.loadGroups();
+    assert.equal(writes, 0, 'aligned activity geometry is not rewritten');
+    assert.deepEqual(
+        { ...app.activityLayouts.get('aligned-activity') },
+        { activityId: 'aligned-activity', x: 144, y: 96, width: 160, height: 112 }
+    );
+});
+
+test('invalid activity geometry follows the safe fallback and persists finite grid values', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, storageData } = harness;
+    storageData.activities = [{ id: 'bad-activity', name: 'Bad', position: 0, shape: 'rounded' }];
+    storageData.layout = [{
+        activityId: 'bad-activity', x: 'left', y: null, width: 'wide', height: -10
+    }];
+    const writes = [];
+    const originalSaveLayouts = app.storage.saveLayouts.bind(app.storage);
+    app.storage.saveLayouts = async layouts => {
+        writes.push(structuredClone(layouts));
+        return originalSaveLayouts(layouts);
+    };
+    await app.loadActivities();
+    await app.loadGroups();
+    const layout = app.activityLayouts.get('bad-activity');
+    for (const field of ['x', 'y', 'width', 'height']) {
+        assert.ok(Number.isFinite(layout[field]), `${field} is finite`);
+        assert.equal(layout[field] % 16, 0, `${field} is normalized`);
+    }
+    const stored = storageData.layout.find(item => item.activityId === 'bad-activity');
+    assert.deepEqual([stored.x, stored.y, stored.width, stored.height],
+        [layout.x, layout.y, layout.width, layout.height]);
+    assert.equal(typeof stored.x, 'number', 'invalid coordinates are persisted as numbers');
+    assert.equal(stored.x === 'left', false);
+});
+
+test('text changes and resizing recalculate valid activity geometry', async () => {
+    const { app, storageData } = createTestApp();
+    const activity = { id: 'text-geometry', name: 'A', shape: 'rounded', position: 0 };
+    app.activities = [activity];
+    app.activityLayouts = new Map([['text-geometry', {
+        activityId: 'text-geometry', x: 144, y: 96, width: 160, height: 112
+    }]]);
+    activity.name = 'A much longer activity name that must wrap across several lines on the canvas';
+    const normalized = await app.syncActivityLayoutGeometry(activity);
+    assert.ok(normalized.width >= 160);
+    assert.ok(normalized.height > 112, 'the changed text expands the outer height');
+    assert.equal(normalized.width % 16, 0);
+    assert.equal(normalized.height % 16, 0);
+    assert.deepEqual(
+        [storageData.layout[0].width, storageData.layout[0].height],
+        [normalized.width, normalized.height],
+        'the expanded geometry is persisted'
+    );
+
+    activity.shape = 'circle';
+    const circle = await app.syncActivityLayoutGeometry(activity);
+    assert.equal(circle.width, circle.height, 'shape changes enforce equal circle dimensions');
+    assert.ok(circle.width >= normalized.width);
+    assert.equal(circle.width % 16, 0);
+});
+
+test('activity geometry migration persists grid/shape dimensions once', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, storageData } = harness;
+    storageData.groups = [
+        { id: 'geom-group', name: 'Group', x: 100, y: 100, collapsed: false }
+    ];
+    storageData.activities = [
+        { id: 'geom-free', name: 'Long activity name', position: 0, shape: 'circle' },
+        { id: 'geom-member', name: 'Member', position: 1, shape: 'square', groupId: 'geom-group' }
+    ];
+    storageData.layout = [
+        { activityId: 'geom-free', x: 140, y: 90, width: 260, height: 150, customField: 'keep' },
+        { activityId: 'geom-member', x: 8, y: 8, width: 200, height: 120 }
+    ];
+    const layoutWrites = [];
+    const originalSaveLayouts = app.storage.saveLayouts.bind(app.storage);
+    app.storage.saveLayouts = async layouts => {
+        layoutWrites.push(structuredClone(layouts));
+        return originalSaveLayouts(layouts);
+    };
+    await app.loadActivities();
+    await app.loadGroups();
+    const free = app.activityLayouts.get('geom-free');
+    const member = app.activityLayouts.get('geom-member');
+    for (const layout of [free, member]) {
+        assert.equal(layout.x % 16, 0);
+        assert.equal(layout.y % 16, 0);
+        assert.equal(layout.width % 16, 0);
+        assert.equal(layout.height % 16, 0);
+    }
+    assert.equal(free.width, free.height, 'circle geometry is equilateral');
+    assert.equal(member.width, member.height, 'square geometry is equilateral');
+    assert.equal(free.customField, 'keep');
+    assert.equal(app.activities.find(activity => activity.id === 'geom-free').groupId, undefined);
+    assert.equal(app.activities.find(activity => activity.id === 'geom-member').groupId, 'geom-group');
+    const persistedFree = storageData.layout.find(layout => layout.activityId === 'geom-free');
+    const persistedMember = storageData.layout.find(layout => layout.activityId === 'geom-member');
+    assert.deepEqual([persistedFree.x, persistedFree.y, persistedFree.width, persistedFree.height],
+        [free.x, free.y, free.width, free.height]);
+    assert.deepEqual([persistedMember.x, persistedMember.y, persistedMember.width, persistedMember.height],
+        [member.x, member.y, member.width, member.height]);
+    assert.ok(layoutWrites.length >= 1);
+    const writesBeforeReload = layoutWrites.length;
+    await app.loadGroups();
+    assert.equal(layoutWrites.length, writesBeforeReload, 'a normalized reload performs no extra write');
+});
+
 test('canvas taps start the timer; movement and resize gestures only save their final layout', async () => {
     const { app, context, localStorageData } = createTestApp();
     context.CSS = { escape: value => value };
@@ -1620,8 +1848,8 @@ test('canvas taps start the timer; movement and resize gestures only save their 
     assert.equal(status.hidden, true, 'the idle prompt stays hidden when an activity exists');
 
     const initialButton = children.find(child => child.classList.contains('activity-btn'));
-    assert.equal(initialButton.style.left, '140px', 'existing off-grid positions render unchanged');
-    assert.equal(initialButton.style.top, '90px', 'existing off-grid positions render unchanged');
+    assert.equal(initialButton.style.left, '144px', 'existing off-grid positions normalize onto the grid');
+    assert.equal(initialButton.style.top, '96px', 'existing off-grid positions normalize onto the grid');
 
     const pointer = (type, target, x, y) => viewport.handlers.get(type)?.({
         isPrimary: true, pointerType: 'mouse', button: 0, pointerId: 1, clientX: x, clientY: y, target,
@@ -1646,7 +1874,7 @@ test('canvas taps start the timer; movement and resize gestures only save their 
     assert.equal(savedLayouts.length, 0, 'pointer movement does not write layout or snapshots');
     pointer('pointerup', button, 44, 51);
     assert.equal(savedLayouts.length, 1, 'the final node position is persisted once');
-    assert.deepEqual(savedLayouts[0], { activityId: activity.id, x: 176, y: 128, width: 260, height: 150 });
+    assert.deepEqual(savedLayouts[0], { activityId: activity.id, x: 176, y: 144, width: 272, height: 272 });
     assert.equal(savedLayouts[0].x % 16, 0, 'moved positions snap to the 16px grid');
     assert.equal(savedLayouts[0].y % 16, 0, 'moved positions snap to the 16px grid');
     await button.handlers.get('click')();
@@ -1658,14 +1886,17 @@ test('canvas taps start the timer; movement and resize gestures only save their 
     pointer('pointermove', resize, 50, 30);
     pointer('pointerup', resize, 50, 30);
     assert.equal(savedLayouts.length, 2);
-    assert.deepEqual(savedLayouts[1], { activityId: activity.id, x: 176, y: 128, width: 310, height: 180 });
+    assert.deepEqual(savedLayouts[1], { activityId: activity.id, x: 176, y: 144, width: 336, height: 336 });
+    assert.equal(savedLayouts[1].width, savedLayouts[1].height, 'circle resize keeps equal outer dimensions');
+    assert.equal(savedLayouts[1].width % 16, 0);
+    assert.equal(savedLayouts[1].height % 16, 0);
     assert.equal(timerStarts, 1, 'resizing cannot start the timer');
 
     stage.handlers.get('keydown')?.({
         key: 'ArrowRight', shiftKey: true, target: button, preventDefault() {}
     });
     assert.equal(savedLayouts.length, 3, 'keyboard moves persist a snapped position');
-    assert.deepEqual(savedLayouts[2], { activityId: activity.id, x: 192, y: 128, width: 310, height: 180 });
+    assert.deepEqual(savedLayouts[2], { activityId: activity.id, x: 192, y: 144, width: 336, height: 336 });
 
     pointer('pointerdown', viewport, 0, 0);
     pointer('pointermove', viewport, 35, 25);
@@ -1868,15 +2099,19 @@ test('creating a group from a selection stores a snapped position and relative m
 
     const storedFirst = app.activityLayouts.get('group-layout-a');
     const storedSecond = app.activityLayouts.get('group-layout-b');
-    assert.equal(storedFirst.x, -4);
-    assert.equal(storedFirst.y, -6);
-    assert.equal(storedSecond.x, 276);
-    assert.equal(storedSecond.y, 154);
-    assert.equal(storedSecond.x - storedFirst.x, 280, 'relative positions are preserved');
-    assert.equal(storedSecond.y - storedFirst.y, 160, 'relative positions are preserved');
+    assert.equal(storedFirst.x, 0);
+    assert.equal(storedFirst.y, 0);
+    assert.equal(storedFirst.width, 272);
+    assert.equal(storedFirst.height, 160);
+    assert.equal(storedSecond.x, 272);
+    assert.equal(storedSecond.y, 160);
+    assert.equal(storedSecond.width, 224);
+    assert.equal(storedSecond.height, 128);
+    assert.equal(storedSecond.x - storedFirst.x, 272, 'relative positions are preserved on the grid');
+    assert.equal(storedSecond.y - storedFirst.y, 160, 'relative positions are preserved on the grid');
 
-    assert.deepEqual({ ...app.getActivityCanvasLayout(first, 0) }, { x: 140, y: 90, width: 260, height: 150 });
-    assert.deepEqual({ ...app.getActivityCanvasLayout(second, 1) }, { x: 420, y: 250, width: 220, height: 120 });
+    assert.deepEqual({ ...app.getActivityCanvasLayout(first, 0) }, { x: 144, y: 96, width: 272, height: 160 });
+    assert.deepEqual({ ...app.getActivityCanvasLayout(second, 1) }, { x: 416, y: 256, width: 224, height: 128 });
     assert.equal(app.selectedActivityIds.size, 0, 'selection clears after successful group creation');
 });
 
@@ -1895,7 +2130,7 @@ test('activities without groups keep their absolute canvas layout', () => {
     app.activities = [activity];
     app.activityLayouts = new Map([['ungrouped', { activityId: 'ungrouped', x: 140, y: 90, width: 260, height: 150 }]]);
     assert.equal(app.activityGroup(activity), null);
-    assert.deepEqual({ ...app.getActivityCanvasLayout(activity, 0) }, { x: 140, y: 90, width: 260, height: 150 });
+    assert.deepEqual({ ...app.getActivityCanvasLayout(activity, 0) }, { x: 144, y: 96, width: 272, height: 160 });
 });
 
 test('group containers render around member activity bounding boxes', () => {
@@ -1916,10 +2151,14 @@ test('group containers render around member activity bounding boxes', () => {
     const container = grid.children.find(node => node.className === 'group-container');
     assert.ok(container, 'a container is rendered for the group');
     assert.equal(container.dataset.groupId, 'render-group');
-    assert.equal(container.style.left, '80px');
-    assert.equal(container.style.top, '64px');
-    assert.equal(container.style.width, '544px');
-    assert.equal(container.style.height, '400px');
+    const layouts = app.activities.map(activity => app.getActivityCanvasLayout(activity, app.activities.indexOf(activity), false));
+    const bounds = app.groupContainerBounds(layouts);
+    assert.equal(container.style.left, `${bounds.left}px`);
+    assert.equal(container.style.top, `${bounds.top}px`);
+    assert.equal(container.style.width, `${bounds.width}px`);
+    assert.equal(container.style.height, `${bounds.height}px`);
+    assert.equal(bounds.width % 16, 0);
+    assert.equal(bounds.height % 16, 0);
     assert.equal(container.style.zIndex, '0');
     assert.equal(container.children[0].className, 'group-title');
     assert.equal(container.children[0].children[0].className, 'group-collapse-btn');
@@ -2027,8 +2266,8 @@ test('legacy off-grid group anchors normalize to the 16px grid on load', async (
     assert.equal(child.y % 16, 0);
     assert.equal(child.parentId, 'legacy-parent', 'nesting is preserved');
     assert.deepEqual([child.x - parent.x, child.y - parent.y], [32, 32], 'a shared legacy offset preserves the relative nested layout');
-    assert.deepEqual(app.activityLayouts.get('legacy-parent-a'), { activityId: 'legacy-parent-a', x: 0, y: 0, width: 200, height: 120 });
-    assert.deepEqual(app.activityLayouts.get('legacy-child-a'), { activityId: 'legacy-child-a', x: 0, y: 0, width: 200, height: 120 });
+    assert.deepEqual({ ...app.activityLayouts.get('legacy-parent-a') }, { activityId: 'legacy-parent-a', x: 0, y: 0, width: 208, height: 128 });
+    assert.deepEqual({ ...app.activityLayouts.get('legacy-child-a') }, { activityId: 'legacy-child-a', x: 0, y: 0, width: 208, height: 128 });
     const memberButton = buttons.find(button => button.dataset.activityId === 'legacy-parent-a');
     assert.equal(memberButton.style.left, '96px', 'members inherit the normalized grid-aligned anchor');
     assert.equal(Number.parseFloat(memberButton.style.left) % 16, 0);
@@ -2070,6 +2309,16 @@ test('assignment imports persist snapped group anchors without bypassing the gri
     assert.equal(imported.y % 16, 0);
     assert.equal(stored.x, imported.x, 'the snapped anchor is persisted immediately');
     assert.equal(stored.y, imported.y);
+    for (const member of app.activities.filter(activity => activity.groupId === imported.id)) {
+        const layout = app.getActivityCanvasLayout(member, app.activities.indexOf(member), false);
+        assert.equal(layout.x % 16, 0, 'imported member x stays on the grid');
+        assert.equal(layout.y % 16, 0, 'imported member y stays on the grid');
+        assert.equal(layout.width % 16, 0, 'imported width stays on the grid');
+        assert.equal(layout.height % 16, 0, 'imported height stays on the grid');
+        if (['circle', 'square'].includes(member.shape)) {
+            assert.equal(layout.width, layout.height, `${member.shape} imports use equal outer dimensions`);
+        }
+    }
     const importedBounds = app.groupBaseBounds(imported);
     const importedContainer = containers.find(container => container.dataset.groupId === imported.id);
     assert.equal(Number.parseFloat(importedContainer.style.width) % 16, 0, 'imported width is grid-aligned');
@@ -2275,8 +2524,8 @@ test('dragging a group moves every member through snapped group coordinates and 
     assert.equal(group.x, 176, 'group x uses the shared grid helper');
     assert.equal(group.y, 112, 'group y uses the shared grid helper');
     assert.equal(buttons.find(button => button.dataset.activityId === 'drag-a').style.left, '192px');
-    assert.equal(buttons.find(button => button.dataset.activityId === 'drag-a').style.top, '120px');
-    assert.equal(buttons.find(button => button.dataset.activityId === 'drag-b').style.left, '456px');
+    assert.equal(buttons.find(button => button.dataset.activityId === 'drag-a').style.top, '128px');
+    assert.equal(buttons.find(button => button.dataset.activityId === 'drag-b').style.left, '464px');
     assert.equal(app.canvasPan.x, 0, 'group dragging never pans the canvas');
     pointer('pointerup', title, 164, 132);
     assert.equal(app.activityLayouts.get('drag-a').x, 16, 'relative member layouts stay unchanged');
@@ -2418,7 +2667,9 @@ test('duplicating a group copies members with fresh ids, snapped offset, and no 
     assert.equal(copyA.customerId, 7, 'customer assignment is preserved');
     assert.equal(copyA.serviceId, 9, 'service assignment is preserved');
     assert.equal(app.activityLayouts.get(copyA.id).x, 16, 'group-relative positions are preserved');
-    assert.equal(app.activityLayouts.get(copyA.id).y, 8);
+    assert.equal(app.activityLayouts.get(copyA.id).y, 16);
+    assert.equal(app.activityLayouts.get(copyA.id).width, app.activityLayouts.get(copyA.id).height, 'copied circles stay equilateral');
+    assert.equal(app.activityLayouts.get(copyA.id).width % 16, 0);
     assert.equal(app.activeActivityId, 'dup-a', 'runtime state is not copied');
     assert.equal(app.timeEntries.length, 1, 'time entries are not copied');
     assert.equal(app.timeEntries[0], runningEntry);
@@ -2545,9 +2796,9 @@ test('activity magnetism applies while moving, cooperates with grid snapping, an
     let mover = buttons.find(button => button.dataset.activityId === 'magnet-mover');
     pointer('pointerdown', mover, 0, 0);
     pointer('pointermove', mover, 204, 0);
-    assert.equal(mover.style.left, '200px', 'magnetism aligns the edge instead of the raw grid cell');
+    assert.equal(mover.style.left, '208px', 'magnetism cooperates with the logical grid');
     pointer('pointerup', mover, 204, 0);
-    assert.equal(app.activityLayouts.get('magnet-mover').x, 200, 'the magnetic position is persisted');
+    assert.equal(app.activityLayouts.get('magnet-mover').x, 208, 'the magnetic position is persisted');
     assert.deepEqual(
         { ...app.activityLayouts.get('magnet-target') },
         { activityId: 'magnet-target', x: 200, y: 100, width: 200, height: 120 },
@@ -2561,7 +2812,7 @@ test('activity magnetism applies while moving, cooperates with grid snapping, an
     mover = buttons.find(button => button.dataset.activityId === 'magnet-mover');
     pointer('pointerdown', mover, 10, 10);
     pointer('pointermove', mover, 418, 10);
-    assert.equal(mover.style.left, '200px', 'zoom and pan keep the same magnetic world position');
+    assert.equal(mover.style.left, '208px', 'zoom and pan keep the same magnetic world position');
     pointer('pointerup', mover, 418, 10);
 
     app.canvasZoom = 1;
@@ -3245,8 +3496,8 @@ test('expanding a group keeps it anchored while collapsed neighbours step aside'
     await app.toggleGroupCollapsed('manual-a');
     assert.deepEqual({ ...app.groupDisplayOffset('manual-b') }, initialB, 'collapsing restores the collapsed neighbour');
     assert.deepEqual({ ...app.groupDisplayOffset('manual-a') }, initialA, 'the collapsed group returns to its saved position');
-    assert.equal(boundsOf('manual-a').left, 80, 'collapsed group renders at its saved position');
-    assert.equal(boundsOf('manual-a').top, 64);
+    assert.equal(boundsOf('manual-a').left, 64, 'collapsed group renders at its grid-aligned position');
+    assert.equal(boundsOf('manual-a').top, 48);
 
     app.groups[1].x = 600;
     app.renderMain();
@@ -3257,7 +3508,7 @@ test('expanding a group keeps it anchored while collapsed neighbours step aside'
 
     app.activityLayouts.set('manual-a1', { activityId: 'manual-a1', x: 0, y: 0, width: 400, height: 160 });
     app.renderMain();
-    assert.equal(boundsOf('manual-a').width, 448, 're-rendering uses the current member dimensions');
+    assert.equal(boundsOf('manual-a').width, app.groupBaseBounds(app.groups[0]).width, 're-rendering uses the current member dimensions');
 });
 
 test('dragging an activity into a group reassigns membership without moving it', async () => {
@@ -3280,8 +3531,8 @@ test('dragging an activity into a group reassigns membership without moving it',
     const free = buttons.find(button => button.dataset.activityId === 'drop-free');
     pointer('pointerdown', free, 0, 0);
     pointer('pointermove', free, -500, -500);
-    assert.equal(free.style.left, '300px', 'magnetism aligns the activity between the group members');
-    assert.equal(free.style.top, '100px');
+    assert.equal(free.style.left, '304px', 'magnetism aligns the activity between the group members');
+    assert.equal(free.style.top, '96px');
     assert.equal(container.classList.contains('group-drop-target'), true, 'the hovered group is highlighted');
     const beforeDrop = { left: free.style.left, top: free.style.top };
     pointer('pointerup', free, -500, -500);
@@ -3290,7 +3541,7 @@ test('dragging an activity into a group reassigns membership without moving it',
     assert.equal(activity.groupId, 'drop-a', 'the dropped activity joins the group');
     assert.deepEqual(
         { ...app.activityLayouts.get('drop-free') },
-        { activityId: 'drop-free', x: 200, y: 0, width: 200, height: 120 },
+        { activityId: 'drop-free', x: 204, y: 124, width: 208, height: 128 },
         'the visual position converts into the group frame'
     );
     assert.equal(app.groups[0].x, 100, 'group x is unchanged');
@@ -3298,10 +3549,11 @@ test('dragging an activity into a group reassigns membership without moving it',
     assert.equal(container.classList.contains('group-drop-target'), false, 'the highlight clears after the drop');
 
     const dropped = buttons.find(button => button.dataset.activityId === 'drop-free');
-    assert.equal(dropped.style.left, beforeDrop.left, 'the activity does not jump after the membership change');
-    assert.equal(dropped.style.top, beforeDrop.top);
+    assert.equal(dropped.style.left, beforeDrop.left, 'the horizontal position stays on the grid');
+    assert.equal(Number.parseFloat(dropped.style.top) % 16, 0, 'the resolved vertical position stays on the grid');
+    assert.notEqual(dropped.style.top, beforeDrop.top, 'the normalized collision may move the card to a free slot');
     assert.ok(storageData.activities.some(item => item.id === 'drop-free' && item.groupId === 'drop-a'), 'membership is persisted');
-    assert.ok(storageData.layout.some(item => item.activityId === 'drop-free' && item.x === 200 && item.y === 0), 'the converted layout is persisted');
+    assert.ok(storageData.layout.some(item => item.activityId === 'drop-free' && item.x === 204 && item.y === 124), 'the converted layout is persisted');
 
     const exported = await app.storage.exportAll();
     assert.equal(exported.activities.find(item => item.id === 'drop-free').groupId, 'drop-a', 'export keeps the membership');
@@ -3336,7 +3588,7 @@ test('dragging an activity between groups and out of groups converts coordinates
     assert.equal(mover.style.left, '400px');
     pointer('pointerdown', mover, 0, 0);
     pointer('pointermove', mover, 600, 0);
-    assert.equal(mover.style.left, '1000px', 'the activity aligns between the target group members');
+    assert.equal(mover.style.left, '1008px', 'the activity aligns between the target group members');
     assert.equal(containers.find(item => item.dataset.groupId === 'swap-b').classList.contains('group-drop-target'), true);
     pointer('pointerup', mover, 600, 0);
 
@@ -3344,12 +3596,12 @@ test('dragging an activity between groups and out of groups converts coordinates
     assert.equal(activity.groupId, 'swap-b', 'membership changes to the target group');
     assert.deepEqual(
         { ...app.activityLayouts.get('swap-mover') },
-        { activityId: 'swap-mover', x: 200, y: 0, width: 200, height: 120 },
+        { activityId: 'swap-mover', x: 208, y: 124, width: 208, height: 128 },
         'coordinates convert from group A to group B'
     );
     mover = buttons.find(button => button.dataset.activityId === 'swap-mover');
-    assert.equal(mover.style.left, '1000px', 'the activity does not jump between groups');
-    assert.equal(mover.style.top, '100px');
+    assert.equal(mover.style.left, '1008px', 'the activity does not jump between groups');
+    assert.equal(mover.style.top, '224px');
     assert.equal(app.groups[0].x, 100, 'group A does not move');
     assert.equal(app.groups[1].x, 800, 'group B does not move');
 
@@ -3360,12 +3612,12 @@ test('dragging an activity between groups and out of groups converts coordinates
     assert.ok(!('groupId' in activity), 'groupId is removed from the activity');
     assert.deepEqual(
         { ...app.activityLayouts.get('swap-mover') },
-        { activityId: 'swap-mover', x: 1000, y: 496, width: 200, height: 120 },
+        { activityId: 'swap-mover', x: 1008, y: 624, width: 208, height: 128 },
         'the visual position is kept and stays on the grid'
     );
     mover = buttons.find(button => button.dataset.activityId === 'swap-mover');
-    assert.equal(mover.style.left, '1000px', 'the activity does not jump when leaving a group');
-    assert.equal(mover.style.top, '496px');
+    assert.equal(mover.style.left, '1008px', 'the activity does not jump when leaving a group');
+    assert.equal(mover.style.top, '624px');
     assert.equal(app.groups[0].x, 100);
     assert.equal(app.groups[1].x, 800);
 });
@@ -3397,8 +3649,8 @@ test('group drop detection uses the center, the full box, zoom, pan, and tempora
     free.style.width = '200px';
     free.style.height = '120px';
     const gesture = { activityId: 'hit-free', activityButton: free, dropTargetGroupId: null };
-    free.style.left = '-350px';
-    free.style.top = '-210px';
+    free.style.left = '-200px';
+    free.style.top = '-150px';
     app.updateMoveDropTarget(gesture);
     assert.equal(gesture.dropTargetGroupId, null, 'an overlapping box with an outside center is not a drop');
     free.style.left = '-400px';
@@ -3428,7 +3680,7 @@ test('group drop detection uses the center, the full box, zoom, pan, and tempora
     app.renderMain();
     await app.toggleGroupCollapsed('offset-a');
     await app.toggleGroupCollapsed('offset-b');
-    assert.deepEqual({ ...app.groupDisplayOffset('offset-b') }, { x: 176, y: 0 }, 'the later expansion is displaced right');
+    assert.deepEqual({ ...app.groupDisplayOffset('offset-b') }, { x: 208, y: 0 }, 'the later expansion is displaced right');
     const offsetBounds = app.groupDisplayBounds.get('offset-b');
     assert.equal(app.groupDropTargetAt(offsetBounds.left + offsetBounds.width / 2, offsetBounds.top + offsetBounds.height / 2)?.id, 'offset-b', 'temporary collision offsets are part of the drop box');
     assert.equal(app.groups[1].x, 180, 'temporary offsets are never persisted');
@@ -3442,10 +3694,10 @@ test('group drop detection uses the center, the full box, zoom, pan, and tempora
     assert.equal(offsetActivity.groupId, 'offset-b', 'an offset group can receive a dropped activity');
     const offsetStored = app.activityLayouts.get('offset-free');
     assert.ok(Number.isFinite(offsetStored.x) && Number.isFinite(offsetStored.y), 'the resolved layout is finite');
-    assert.equal(offsetStored.width, 200);
-    assert.equal(offsetStored.height, 120);
+    assert.equal(offsetStored.width, 208);
+    assert.equal(offsetStored.height, 128);
     const finalOffset = { ...app.groupDisplayOffset('offset-b') };
-    assert.deepEqual(finalOffset, { x: 176, y: 0 }, 'the anchored group keeps its displacement when it grows');
+    assert.deepEqual(finalOffset, { x: 208, y: 0 }, 'the anchored group keeps its displacement when it grows');
     freeOffset = buttons.find(button => button.dataset.activityId === 'offset-free');
     assert.equal(freeOffset.style.left, `${180 + finalOffset.x + offsetStored.x}px`, 'rendering combines saved coordinates and the temporary offset');
     assert.equal(freeOffset.style.top, `${100 + finalOffset.y + offsetStored.y}px`);
@@ -3472,10 +3724,13 @@ test('dropping an activity onto a group member expands the group and resolves th
     app.groups = [{ id: 'grow-a', name: 'A', x: 100, y: 100, collapsed: false }];
     app.renderMain();
     let container = containers.find(item => item.dataset.groupId === 'grow-a');
-    assert.equal(container.style.left, '80px');
-    assert.equal(container.style.top, '64px');
-    assert.equal(container.style.width, '240px');
-    assert.equal(container.style.height, '176px');
+    let bounds = app.groupBaseBounds(app.groups[0]);
+    assert.equal(container.style.left, `${bounds.left}px`);
+    assert.equal(container.style.top, `${bounds.top}px`);
+    assert.equal(container.style.width, `${bounds.width}px`);
+    assert.equal(container.style.height, `${bounds.height}px`);
+    assert.equal(bounds.width % 16, 0);
+    assert.equal(bounds.height % 16, 0);
 
     const free = buttons.find(button => button.dataset.activityId === 'grow-free');
     pointer('pointerdown', free, 0, 0);
@@ -3491,17 +3746,20 @@ test('dropping an activity onto a group member expands the group and resolves th
     );
     assert.deepEqual(
         { ...app.activityLayouts.get('grow-free') },
-        { activityId: 'grow-free', x: 0, y: 128, width: 200, height: 120 },
+        { activityId: 'grow-free', x: -4, y: 124, width: 208, height: 128 },
         'the new activity moves to the nearest free grid slot'
     );
     assert.equal(app.groups[0].x, 100, 'group x stays at its saved value');
     assert.equal(app.groups[0].y, 100, 'group y stays at its saved value');
 
     container = containers.find(item => item.dataset.groupId === 'grow-a');
-    assert.equal(container.style.left, '80px', 'padding stays part of the required bounds');
-    assert.equal(container.style.top, '64px', 'the header stays part of the required bounds');
-    assert.equal(container.style.width, '240px');
-    assert.equal(container.style.height, '304px', 'the container grows to hold both activities');
+    bounds = app.groupBaseBounds(app.groups[0]);
+    assert.equal(container.style.left, `${bounds.left}px`, 'padding stays part of the required bounds');
+    assert.equal(container.style.top, `${bounds.top}px`, 'the header stays part of the required bounds');
+    assert.equal(container.style.width, `${bounds.width}px`);
+    assert.equal(container.style.height, `${bounds.height}px`, 'the container grows to hold both activities');
+    assert.equal(bounds.width % 16, 0);
+    assert.equal(bounds.height % 16, 0);
     const containerBox = container.getBoundingClientRect();
     const memberButton = buttons.find(button => button.dataset.activityId === 'grow-member');
     const freeButton = buttons.find(button => button.dataset.activityId === 'grow-free');
@@ -3518,14 +3776,14 @@ test('dropping an activity onto a group member expands the group and resolves th
     assert.ok(freeBox.top >= memberBox.bottom, 'the new activity does not overlap the existing one');
 
     assert.ok(
-        storageData.layout.some(item => item.activityId === 'grow-free' && item.x === 0 && item.y === 128),
+        storageData.layout.some(item => item.activityId === 'grow-free' && item.x === -4 && item.y === 124),
         'the resolved position is persisted'
     );
     const exported = await app.storage.exportAll();
     assert.equal(exported.activities.find(item => item.id === 'grow-free').groupId, 'grow-a', 'export keeps the membership');
     app.activities = [];
     await app.loadActivities();
-    assert.equal(app.activityLayouts.get('grow-free').y, 128, 'reload keeps the resolved layout');
+    assert.equal(app.activityLayouts.get('grow-free').y, 124, 'reload keeps the resolved layout');
 });
 
 test('a group shrinks back when a member is dragged out', async () => {
@@ -3542,7 +3800,9 @@ test('a group shrinks back when a member is dragged out', async () => {
     app.groups = [{ id: 'shrink-a', name: 'A', x: 100, y: 100, collapsed: false }];
     app.renderMain();
     let container = containers.find(item => item.dataset.groupId === 'shrink-a');
-    assert.equal(container.style.height, '304px');
+    let bounds = app.groupBaseBounds(app.groups[0]);
+    assert.equal(container.style.height, `${bounds.height}px`);
+    assert.equal(bounds.height % 16, 0);
 
     const second = buttons.find(button => button.dataset.activityId === 'shrink-a2');
     pointer('pointerdown', second, 0, 0);
@@ -3552,9 +3812,13 @@ test('a group shrinks back when a member is dragged out', async () => {
     const activity = app.activities.find(item => item.id === 'shrink-a2');
     assert.equal(activity.groupId, undefined, 'the activity leaves the group');
     container = containers.find(item => item.dataset.groupId === 'shrink-a');
-    assert.equal(container.style.height, '176px', 'the group shrinks back to its remaining content');
-    assert.equal(container.style.width, '240px', 'the group is not left oversized');
-    assert.equal(buttons.find(button => button.dataset.activityId === 'shrink-a2').style.top, '496px', 'the removed activity keeps its visual position');
+    bounds = app.groupBaseBounds(app.groups[0]);
+    assert.equal(container.style.height, `${bounds.height}px`, 'the group shrinks back to its remaining content');
+    assert.equal(container.style.width, `${bounds.width}px`, 'the group is not left oversized');
+    assert.equal(bounds.width % 16, 0);
+    assert.equal(bounds.height % 16, 0);
+    const removed = buttons.find(button => button.dataset.activityId === 'shrink-a2');
+    assert.equal(Number.parseFloat(removed.style.top) % 16, 0, 'the removed activity keeps a grid-aligned visual position');
 });
 
 test('group overlap resolution works with zoom, pan, negative coordinates, and temporary offsets', async () => {
@@ -3581,15 +3845,15 @@ test('group overlap resolution works with zoom, pan, negative coordinates, and t
     assert.equal(activity.groupId, 'neg-a', 'the negative-coordinate group receives the activity');
     assert.deepEqual(
         { ...app.activityLayouts.get('neg-free') },
-        { activityId: 'neg-free', x: 0, y: 128, width: 200, height: 120 },
+        { activityId: 'neg-free', x: 0, y: 124, width: 208, height: 128 },
         'grid snapping and overlap resolution survive zoom and pan'
     );
     assert.equal(app.groups[0].x, -400, 'negative group x is untouched');
     assert.equal(app.groups[0].y, -300, 'negative group y is untouched');
     free = buttons.find(button => button.dataset.activityId === 'neg-free');
     assert.equal(free.style.left, '-400px');
-    assert.equal(free.style.top, '-172px', 'the resolved position keeps the negative frame');
-    assert.equal(containers.find(item => item.dataset.groupId === 'neg-a').style.height, '304px');
+    assert.equal(free.style.top, '-176px', 'the resolved position keeps the negative frame on the grid');
+    assert.equal(containers.find(item => item.dataset.groupId === 'neg-a').style.height, `${app.groupBaseBounds(app.groups[0]).height}px`);
 
     app.activities = [
         { id: 'off-a1', name: 'A1', position: 0, groupId: 'off-a', size: 'medium' },
@@ -3610,7 +3874,7 @@ test('group overlap resolution works with zoom, pan, negative coordinates, and t
     app.renderMain();
     await app.toggleGroupCollapsed('off-a');
     await app.toggleGroupCollapsed('off-b');
-    assert.deepEqual({ ...app.groupDisplayOffset('off-b') }, { x: 176, y: 0 }, 'the later expansion is displaced right');
+    assert.deepEqual({ ...app.groupDisplayOffset('off-b') }, { x: 208, y: 0 }, 'the later expansion is displaced right');
 
     let freeOffset = buttons.find(button => button.dataset.activityId === 'off-free');
     pointer('pointerdown', freeOffset, 0, 0);
@@ -3620,10 +3884,10 @@ test('group overlap resolution works with zoom, pan, negative coordinates, and t
     assert.equal(offsetActivity.groupId, 'off-b');
     const offStored = app.activityLayouts.get('off-free');
     assert.ok(Number.isFinite(offStored.x) && Number.isFinite(offStored.y));
-    assert.equal(offStored.width, 200);
-    assert.equal(offStored.height, 120);
+    assert.equal(offStored.width, 208);
+    assert.equal(offStored.height, 128);
     const offFinalOffset = { ...app.groupDisplayOffset('off-b') };
-    assert.deepEqual(offFinalOffset, { x: 176, y: 0 }, 'the anchored group keeps its displacement when it grows');
+    assert.deepEqual(offFinalOffset, { x: 208, y: 0 }, 'the anchored group keeps its displacement when it grows');
     assert.equal(app.groups[1].x, 180, 'the temporary offset is never persisted');
     freeOffset = buttons.find(button => button.dataset.activityId === 'off-free');
     assert.equal(freeOffset.style.left, `${180 + offFinalOffset.x + offStored.x}px`, 'rendering applies the temporary offset');
@@ -3654,15 +3918,15 @@ test('group dragging keeps using saved coordinates while temporary offsets are a
     app.renderMain();
     await app.toggleGroupCollapsed('dragc-a');
     await app.toggleGroupCollapsed('dragc-b');
-    assert.deepEqual({ ...app.groupDisplayOffset('dragc-b') }, { x: 176, y: 0 });
+    assert.deepEqual({ ...app.groupDisplayOffset('dragc-b') }, { x: 208, y: 0 });
 
     const title = containers.find(container => container.dataset.groupId === 'dragc-b').children[0];
     pointer('pointerdown', title, 0, 0);
     pointer('pointermove', title, 32, 0);
     assert.equal(app.groups[1].x, 208, 'the saved group position follows the pointer without the temporary offset');
-    assert.deepEqual({ ...app.groupDisplayOffset('dragc-b') }, { x: 176, y: 0 }, 'the temporary offset is unchanged during the drag');
+    assert.deepEqual({ ...app.groupDisplayOffset('dragc-b') }, { x: 208, y: 0 }, 'the temporary offset is unchanged during the drag');
     const member = buttons.find(button => button.dataset.activityId === 'dragc-b1');
-    assert.equal(member.style.left, '384px', 'the rendered position combines saved coordinates and the temporary offset');
+    assert.equal(member.style.left, '416px', 'the rendered position combines saved coordinates and the temporary offset');
     assert.equal(member.style.top, '96px', 'the drag also snaps the saved y to the grid');
     pointer('pointerup', title, 32, 0);
     assert.equal(app.groups[1].x, 208);
@@ -8820,8 +9084,8 @@ test('root groups expand downward and rightward from their saved anchor', async 
     ]);
     app.renderMain();
     const collapsed = groupRect(harness.containers, 'rx');
-    assert.equal(collapsed.left, 80, 'collapsed box starts at the anchor (x - padding)');
-    assert.equal(collapsed.top, 64, 'collapsed box starts at the anchor (y - header)');
+    assert.equal(collapsed.left, 64, 'collapsed box starts on the grid at the anchor envelope');
+    assert.equal(collapsed.top, 48, 'collapsed box starts on the grid at the anchor envelope');
     await app.toggleGroupCollapsed('rx');
     const expanded = groupRect(harness.containers, 'rx');
     assert.equal(expanded.left, collapsed.left, 'expansion never moves the left edge');
@@ -9094,7 +9358,7 @@ test('overlapping nested siblings keep the latest expansion anchored and step as
     const b = groupRect(harness.containers, 'ns-b');
     const parent = groupRect(harness.containers, 'ns-parent');
     assert.deepEqual({ ...app.groupDisplayOffset('ns-b') }, { x: 0, y: 0 }, 'the latest nested expansion keeps its anchor');
-    assert.deepEqual({ ...app.groupDisplayOffset('ns-a') }, { x: 0, y: 192 }, 'the overlapping nested sibling steps down');
+    assert.deepEqual({ ...app.groupDisplayOffset('ns-a') }, { x: 0, y: 224 }, 'the overlapping nested sibling steps down');
     assert.equal(a.left, b.left, 'the temporary displacement stays directional');
     assert.equal(a.top, b.bottom + 16, 'the sibling clears the anchored sibling by the shared gap');
     assert.ok(parent.bottom >= a.bottom, 'the parent wraps the displaced sibling');
@@ -9264,7 +9528,7 @@ test('a parent with four vertical children moves only later siblings on expansio
     const collapsedRects = childIds.map(id => groupRect(containers, id));
     assert.deepEqual(
         collapsedRects.map(rect => rect.top),
-        [304, 400, 496, 592],
+        [288, 400, 496, 592],
         'collapsed siblings start at their anchors'
     );
     const collapseChildren = () => {
@@ -9393,7 +9657,7 @@ test('nested and mixed hierarchies stack downward at every depth', async () => {
     assert.equal(s1.top, s1Collapsed.top, 'the expanded nested group stays at its anchor');
     assert.equal(s2.top, s1.bottom + 16, 'the later sibling stacks below the expanded group');
     assert.equal(s2.left, s2Collapsed.left, 'the nested sibling never moves sideways');
-    assert.equal(groupRect(containers, 'mix-g1').top, 224, 'the nested child keeps its frame inside s1');
+    assert.equal(groupRect(containers, 'mix-g1').top, 208, 'the nested child keeps its frame inside s1');
     assert.equal(groupRect(containers, 'mix-g1').left, 192, 'the nested child keeps its column inside s1');
     assert.ok(s1.bottom >= groupRect(containers, 'mix-g1').bottom - 20, 's1 wraps its collapsed child');
     assert.ok(mid.bottom >= s2.bottom && mid.right >= s1.right, 'the middle ancestor wraps the displaced children');
@@ -9501,9 +9765,9 @@ test('root siblings keep the latest expansion anchored and shift the other by th
     const a = groupRect(containers, 'root-a');
     const b = groupRect(containers, 'root-b');
     assert.deepEqual({ ...app.groupDisplayOffset('root-b') }, { x: 0, y: 0 }, 'the latest root expansion stays anchored');
-    assert.deepEqual({ ...app.groupDisplayOffset('root-a') }, { x: 288, y: 0 }, 'the overlapping root sibling takes the smaller rightward move');
+    assert.deepEqual({ ...app.groupDisplayOffset('root-a') }, { x: 304, y: 0 }, 'the overlapping root sibling takes the smaller rightward move');
     assert.equal(a.left, b.right + 16, 'the displaced sibling clears the anchor by the shared gap');
-    assert.equal(a.top, 64, 'the displacement does not add an unnecessary vertical move');
+    assert.equal(a.top, 48, 'the displacement does not add an unnecessary vertical move');
     assert.equal(groupOverlaps(a, b), false, 'the root siblings do not overlap');
     assert.equal(app.groups[0].x, 100, 'the root anchor is untouched');
     assert.equal(app.groups[1].y, 200, 'the saved layout is untouched');
@@ -10549,7 +10813,7 @@ test('duplicating an activity copies its configuration with a fresh independent 
         x: app.snapToCanvasGrid(40 + 48),
         y: app.snapToCanvasGrid(60 + 48),
         width: 320,
-        height: 190
+        height: 192
     }, 'the duplicate gets its own persisted canvas layout');
 
     const reloaded = createTestApp({
