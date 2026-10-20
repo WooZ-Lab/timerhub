@@ -4335,11 +4335,14 @@ class TimerHubApp {
     groupContentAnchor(group, index = this._canvasIndex) {
         if (!group) return null;
         if (!this._groupContentAnchorCache) this._groupContentAnchorCache = new Map();
-        if (this._groupContentAnchorCache.has(group.id)) return this._groupContentAnchorCache.get(group.id);
+        // Group dragging mutates x/y between full layout passes; the cached
+        // anchor must follow or collapsed nodes render at their old position.
+        const cached = this._groupContentAnchorCache.get(group.id);
+        if (cached && cached.x === group.x && cached.y === group.y) return cached;
         const base = this.groupBaseBounds(group, index);
         const anchor = base
-            ? { left: base.left, top: base.top }
-            : { left: group.x - CANVAS_GROUP_PADDING, top: group.y - CANVAS_GROUP_HEADER };
+            ? { left: base.left, top: base.top, x: group.x, y: group.y }
+            : { left: group.x - CANVAS_GROUP_PADDING, top: group.y - CANVAS_GROUP_HEADER, x: group.x, y: group.y };
         this._groupContentAnchorCache.set(group.id, anchor);
         return anchor;
     }

@@ -1946,6 +1946,35 @@ test('groups and memberships persist, export, and stay compatible with legacy ba
     assert.equal((await migrated.getActivities())[0].name, 'Legacy');
 });
 
+test('dragging a collapsed group follows the 16px grid without a release jump', () => {
+    const harness = createGroupCanvasHarness();
+    const { app, containers, pointer } = harness;
+    const group = { id: 'snap-collapsed', name: 'Crew', x: 144, y: 96, collapsed: true };
+    app.activities = [{ id: 'snap-a', name: 'A', position: 0, groupId: group.id, size: 'medium' }];
+    app.activityLayouts = new Map([['snap-a', { activityId: 'snap-a', x: 16, y: 8, width: 200, height: 120 }]]);
+    app.groups = [group];
+    const savedGroups = [];
+    app.storage.saveGroup = async saved => { savedGroups.push(structuredClone(saved)); };
+    app.renderMain();
+    const before = groupRect(containers, group.id);
+    const title = containers[0].children[0];
+
+    pointer('pointerdown', title, 0, 0);
+    pointer('pointermove', title, 31, 17);
+    const during = groupRect(containers, group.id);
+    assert.equal(group.x, 176, 'dragged group x snaps to the 16px grid');
+    assert.equal(group.y, 112, 'dragged group y snaps to the 16px grid');
+    assert.equal(during.left, before.left + 32, 'the collapsed group visually follows the snapped x');
+    assert.equal(during.top, before.top + 16, 'the collapsed group visually follows the snapped y');
+
+    pointer('pointermove', title, 33, 19);
+    assert.deepEqual(groupRect(containers, group.id), during, 'movement inside the same grid cell causes no drift');
+    pointer('pointerup', title, 33, 19);
+    assert.deepEqual(groupRect(containers, group.id), during, 'release does not jump away from the snapped position');
+    assert.equal(group.x % 16, 0);
+    assert.equal(group.y % 16, 0);
+    assert.deepEqual([savedGroups.at(-1).x, savedGroups.at(-1).y], [176, 112], 'the snapped position is persisted');
+});
 test('dragging a group moves every member through snapped group coordinates and persists', async () => {
     const harness = createGroupCanvasHarness();
     const { app, containers, buttons, pointer, storageData } = harness;
