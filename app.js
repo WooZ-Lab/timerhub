@@ -4060,7 +4060,7 @@ class TimerHubApp {
         // Ancestors first so nested containers stack above their parents.
         const ordered = [...this.groups].sort((a, b) =>
             (this.groupAncestors(a).length - this.groupAncestors(b).length)
-            || (this.groups.indexOf(a) - this.groups.indexOf(b)));
+            || this.compareGroupLogicalOrder(a, b));
         for (const group of ordered) {
             if (!this.isGroupVisible(group)) continue;
             const base = group.collapsed ? null : this.groupBaseBounds(group, index);
@@ -4188,23 +4188,38 @@ class TimerHubApp {
             width: box.width,
             height: box.height
         }));
+        let displacedRight = Number.NEGATIVE_INFINITY;
+        let displacedBottom = Number.NEGATIVE_INFINITY;
         for (const child of this.groupChildren(group, index)) {
             const childBounds = child.collapsed
                 ? this.groupCollapsedBounds(child)
                 : this.groupBaseBounds(child, index);
             if (!childBounds) continue;
-            // Children may carry a temporary collision offset at their own
-            // nesting level; the parent must wrap the displaced child too.
-            const own = this.groupOwnDisplayOffsets?.get(child.id) || { x: 0, y: 0 };
+            // The parent's top-left is its stable identity anchor: temporary
+            // right/down child offsets may extend its bounds, but must never
+            // feed back into the min() that computes that anchor.
             boxes.push({
-                x: childBounds.left + own.x,
-                y: childBounds.top + own.y,
+                x: childBounds.left,
+                y: childBounds.top,
                 width: childBounds.width,
                 height: childBounds.height
             });
+            const own = this.groupOwnDisplayOffsets?.get(child.id) || { x: 0, y: 0 };
+            displacedRight = Math.max(
+                displacedRight,
+                childBounds.right + own.x + CANVAS_GROUP_PADDING
+            );
+            displacedBottom = Math.max(
+                displacedBottom,
+                childBounds.bottom + own.y + CANVAS_GROUP_PADDING
+            );
         }
         if (!boxes.length) return null;
         const bounds = this.groupContainerBounds(boxes);
+        if (Number.isFinite(displacedRight)) bounds.right = Math.max(bounds.right, displacedRight);
+        if (Number.isFinite(displacedBottom)) bounds.bottom = Math.max(bounds.bottom, displacedBottom);
+        bounds.width = bounds.right - bounds.left;
+        bounds.height = bounds.bottom - bounds.top;
         const minWidth = this.groupTitleMinWidth(group);
         if (bounds.width < minWidth) {
             bounds.width = minWidth;
@@ -4340,25 +4355,18 @@ class TimerHubApp {
         return { left, top };
     }
 
-    // Stable layout order: saved anchor top-to-bottom, then left-to-right, with
-    // the id as a deterministic tiebreaker. This keeps collision resolution
-    // independent of IndexedDB getAll() order and of incidental array order.
-    compareGroupLayoutOrder(first, second) {
-        const firstY = Number(first?.y);
-        const secondY = Number(second?.y);
-        if (Number.isFinite(firstY) && Number.isFinite(secondY) && firstY !== secondY) {
-            return firstY - secondY;
-        }
-        const firstX = Number(first?.x);
-        const secondX = Number(second?.x);
-        if (Number.isFinite(firstX) && Number.isFinite(secondX) && firstX !== secondX) {
-            return firstX - secondX;
-        }
-        return String(first?.id || '').localeCompare(String(second?.id || ''));
+    // Logical group order comes from the persisted identity (creation-time id),
+    // not from incidental storage order. Geometry, expansion state, selection
+    // and dimensions must never reorder groups.
+    compareGroupLogicalOrder(first, second) {
+        const firstId = String(first?.id || '');
+        const secondId = String(second?.id || '');
+        if (firstId === secondId) return 0;
+        return firstId < secondId ? -1 : 1;
     }
 
     sortedGroupsForLayout() {
-        return [...this.groups].sort((first, second) => this.compareGroupLayoutOrder(first, second));
+        return [...this.groups].sort((first, second) => this.compareGroupLogicalOrder(first, second));
     }
 
     groupDesiredOffset(groupId) {
@@ -4400,14 +4408,16 @@ class TimerHubApp {
         const collapsed = this.groupCollapsedBounds(group);
         const displayedLeft = collapsed.left + offset.x;
         const displayedTop = collapsed.top + offset.y;
-        group.collapsed = false;
+        // Measure the expanded bounds before changing state. The base top-left
+        // is the same while collapsed and expanded; using one stable value
+        // prevents title/content changes from moving the anchor.
         const base = this.groupBaseBounds(group, this._canvasIndex);
-        const desired = base
-            ? { x: displayedLeft - base.left, y: displayedTop - base.top }
-            : { x: 0, y: 0 };
         this.groupExpansionOrder = this.groupExpansionOrder.filter(id => id !== group.id);
         this.groupExpansionOrder.push(group.id);
-        this.groupExpansionDesiredOffsets.set(group.id, desired);
+        this.groupExpansionDesiredOffsets.set(group.id, base
+            ? { x: displayedLeft - base.left, y: displayedTop - base.top }
+            : { x: 0, y: 0 });
+        group.collapsed = false;
         return true;
     }
 
@@ -4428,7 +4438,7 @@ class TimerHubApp {
         // Offsets are recomputed from saved anchors on every render, so a
         // collapse restores positions that no remaining expansion needs.
         const placeSiblings = siblings => {
-            const ordered = [...siblings].sort((a, b) => this.compareGroupLayoutOrder(a, b));
+            const ordered = [...siblings].sort((a, b) => this.compareGroupLogicalOrder(a, b));
             const expanded = ordered.filter(group => !group.collapsed);
             if (!expanded.length) return;
             const priority = groupId => this.groupExpansionOrder.indexOf(groupId);
@@ -4481,7 +4491,7 @@ class TimerHubApp {
         // Deepest first: a group's sibling bounds must include the downward
         // displacement its own children already received.
         const byDepth = [...this.groups].sort((a, b) =>
-            (this.groupDepth(b) - this.groupDepth(a)) || this.compareGroupLayoutOrder(a, b));
+            (this.groupDepth(b) - this.groupDepth(a)) || this.compareGroupLogicalOrder(a, b));
         for (const group of byDepth) {
             if (group.collapsed || !this.isGroupVisible(group)) continue;
             const children = this.groupChildren(group, index);
@@ -4493,7 +4503,7 @@ class TimerHubApp {
         // Top-down: every group's total offset is its ancestor total plus its
         // own local displacement; publish display bounds for hit testing.
         const ordered = [...this.groups].sort((a, b) =>
-            (this.groupDepth(a) - this.groupDepth(b)) || this.compareGroupLayoutOrder(a, b));
+            (this.groupDepth(a) - this.groupDepth(b)) || this.compareGroupLogicalOrder(a, b));
         for (const group of ordered) {
             const parent = this.groupParent(group, index);
             const parentTotal = parent ? (offsets.get(parent.id) || { x: 0, y: 0 }) : { x: 0, y: 0 };
