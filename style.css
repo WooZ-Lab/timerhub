@@ -2825,37 +2825,44 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     text-align: center;
 }
 
-#activitiesGrid .activity-btn.activity-node.has-assignment-labels {
-    padding-top: clamp(22px, 12cqmin, 30px);
-    padding-bottom: clamp(22px, 12cqmin, 30px);
+#activitiesGrid .activity-assignment-overlay {
+    position: absolute;
+    z-index: 1000000;
+    pointer-events: none;
+    overflow: visible;
 }
 
-#activitiesGrid .activity-btn.activity-node > .activity-assignment-label {
+#activitiesGrid .activity-assignment-overlay > .activity-assignment-label {
     position: absolute;
-    left: 10px;
-    right: 10px;
-    z-index: 3;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
     display: block;
+    box-sizing: border-box;
+    width: max-content;
+    max-width: min(640px, 80vw);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: clamp(9px, 3.2cqmin, 14px) !important;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, .78);
+    color: #fff;
+    font-size: 12px;
     font-weight: 600;
-    line-height: 1.2;
+    line-height: 1.25;
     letter-spacing: .01em;
-    opacity: .82;
     text-align: center;
     pointer-events: none;
-    color: inherit;
-    text-shadow: 0 1px 1px color-mix(in srgb, var(--activity-text-color, #000) 18%, transparent);
+    text-shadow: none;
 }
 
-#activitiesGrid .activity-btn.activity-node > .activity-customer-label {
-    top: 6px;
+#activitiesGrid .activity-assignment-overlay > .activity-customer-label {
+    top: 2px;
 }
 
-#activitiesGrid .activity-btn.activity-node > .activity-project-label {
-    bottom: 6px;
+#activitiesGrid .activity-assignment-overlay > .activity-project-label {
+    bottom: 2px;
 }
 
 #activitiesGrid .activity-btn.activity-node .btn-time {

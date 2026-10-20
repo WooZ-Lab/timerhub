@@ -4122,24 +4122,6 @@ class TimerHubApp {
             }
             btn.appendChild(name);
 
-            const assignmentLabels = this.activityAssignmentLabels(activity);
-            if (this.showActivityAssignments && (assignmentLabels.customerName || assignmentLabels.projectName)) {
-                btn.classList.add('has-assignment-labels');
-                for (const [kind, text] of [
-                    ['customer', assignmentLabels.customerName],
-                    ['project', assignmentLabels.projectName]
-                ]) {
-                    if (!text) continue;
-                    const label = document.createElement('span');
-                    label.className = `activity-assignment-label activity-${kind}-label`;
-                    label.textContent = text;
-                    label.title = text;
-                    label.setAttribute('aria-hidden', 'true');
-                    label.setAttribute('dir', 'auto');
-                    btn.appendChild(label);
-                }
-            }
-
             if (activity.notes) {
                 const noteMark = document.createElement('span');
                 noteMark.className = 'btn-note-mark';
@@ -4206,6 +4188,35 @@ class TimerHubApp {
             resize.title = this.t('activityResize', { activity: activity.name });
             resize.addEventListener('click', event => event.stopPropagation());
             grid.appendChild(resize);
+
+            const assignmentLabels = this.activityAssignmentLabels(activity);
+            if (this.showActivityAssignments && (assignmentLabels.customerName || assignmentLabels.projectName)) {
+                // Labels are siblings of the clipped activity node so shapes can
+                // never cut off the debug text.
+                const overlay = document.createElement('div');
+                overlay.className = 'activity-assignment-overlay';
+                overlay.dataset.activityId = activity.id;
+                overlay.setAttribute('aria-hidden', 'true');
+                overlay.style.left = `${layout.x}px`;
+                overlay.style.top = `${layout.y}px`;
+                overlay.style.width = `${layout.width}px`;
+                overlay.style.height = `${layout.height}px`;
+                overlay.style.zIndex = '1000000';
+                for (const [kind, text] of [
+                    ['customer', assignmentLabels.customerName],
+                    ['project', assignmentLabels.projectName]
+                ]) {
+                    if (!text) continue;
+                    const label = document.createElement('span');
+                    label.className = `activity-assignment-label activity-${kind}-label`;
+                    label.textContent = text;
+                    label.title = text;
+                    label.setAttribute('aria-hidden', 'true');
+                    label.setAttribute('dir', 'auto');
+                    overlay.appendChild(label);
+                }
+                grid.appendChild(overlay);
+            }
         });
 
         this.populateActivityFilter();
@@ -6544,10 +6555,18 @@ class TimerHubApp {
 
     positionActivityResizeHandle(activityId, layout, zIndex) {
         const handle = document.querySelector(`.activity-resize-handle[data-activity-id="${CSS.escape(activityId)}"]`);
-        if (!handle) return;
-        handle.style.left = `${layout.x + layout.width}px`;
-        handle.style.top = `${layout.y + layout.height}px`;
-        if (zIndex !== undefined) handle.style.zIndex = String(zIndex + 1);
+        if (handle) {
+            handle.style.left = `${layout.x + layout.width}px`;
+            handle.style.top = `${layout.y + layout.height}px`;
+            if (zIndex !== undefined) handle.style.zIndex = String(zIndex + 1);
+        }
+        const overlay = document.querySelector(`.activity-assignment-overlay[data-activity-id="${CSS.escape(activityId)}"]`);
+        if (overlay) {
+            overlay.style.left = `${layout.x}px`;
+            overlay.style.top = `${layout.y}px`;
+            overlay.style.width = `${layout.width}px`;
+            overlay.style.height = `${layout.height}px`;
+        }
     }
 
     setupActivityCanvasInteractions() {

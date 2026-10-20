@@ -473,6 +473,7 @@ function createGroupCanvasHarness() {
     const buttons = [];
     const handles = [];
     const containers = [];
+    const overlays = [];
     const stage = makeElement();
     stage.querySelector = selector => {
         const id = /data-activity-id="([^"]+)"/.exec(selector)?.[1]
@@ -483,15 +484,19 @@ function createGroupCanvasHarness() {
         if (selector.startsWith('.activity-resize-handle')) {
             return handles.find(node => node.dataset.activityId === id) || null;
         }
+        if (selector.startsWith('.activity-assignment-overlay')) {
+            return overlays.find(node => node.dataset.activityId === id) || null;
+        }
         return buttons.find(node => node.dataset.activityId === id) || null;
     };
     stage.appendChild = item => {
         if (item.classList.contains('group-container')) containers.push(item);
         else if (item.classList.contains('activity-resize-handle')) handles.push(item);
+        else if (item.classList.contains('activity-assignment-overlay')) overlays.push(item);
         else buttons.push(item);
         return item;
     };
-    stage.replaceChildren = () => { buttons.length = 0; handles.length = 0; containers.length = 0; };
+    stage.replaceChildren = () => { buttons.length = 0; handles.length = 0; containers.length = 0; overlays.length = 0; };
 
     const status = makeElement();
     const filter = makeElement();
@@ -528,7 +533,7 @@ function createGroupCanvasHarness() {
 
     return {
         app, context, storageData, viewport, stage,
-        buttons, handles, containers, status, addActivityBtn, createGroupBtn, groupToggleAllBtn,
+        buttons, handles, containers, overlays, status, addActivityBtn, createGroupBtn, groupToggleAllBtn,
         activityAssignmentsToggleBtn, pointer, makeElement
     };
 }
@@ -6638,7 +6643,7 @@ test('idle activity buttons no longer render the activityStartHint instructional
 
 test('activity assignment labels toggle without moving canvas nodes or groups', async () => {
     const harness = createGroupCanvasHarness();
-    const { app, buttons, containers, storageData, activityAssignmentsToggleBtn } = harness;
+    const { app, buttons, containers, overlays, storageData, activityAssignmentsToggleBtn } = harness;
     app.groups = [{ id: 'assign-group', name: 'Assignments', x: 100, y: 100, collapsed: false }];
     app.activities = [
         {
@@ -6657,10 +6662,14 @@ test('activity assignment labels toggle without moving canvas nodes or groups', 
     app.renderMain();
 
     const findButton = id => buttons.find(button => button.dataset.activityId === id);
-    const labels = button => button.children.filter(child => child.classList.contains('activity-assignment-label'));
+    const findOverlay = id => overlays.find(overlay => overlay.dataset.activityId === id);
+    const labels = id => {
+        const overlay = findOverlay(id);
+        return overlay ? overlay.children.filter(child => child.classList.contains('activity-assignment-label')) : [];
+    };
     assert.equal(app.showActivityAssignments, false);
     assert.equal(activityAssignmentsToggleBtn['aria-pressed'], 'false');
-    assert.equal(labels(findButton('assign-customer')).length, 0, 'labels are hidden by default');
+    assert.equal(labels('assign-customer').length, 0, 'labels are hidden by default');
     const groupBefore = groupRect(containers, 'assign-group');
     const positionBefore = {
         left: findButton('assign-customer').style.left,
@@ -6677,12 +6686,17 @@ test('activity assignment labels toggle without moving canvas nodes or groups', 
     assert.equal(activityAssignmentsToggleBtn['aria-pressed'], 'true', 'the toggle exposes its on state');
     assert.equal(activityAssignmentsToggleBtn['aria-label'], 'Hide assignments');
     const assigned = findButton('assign-customer');
-    const customerLabel = assigned.children.find(child => child.classList.contains('activity-customer-label'));
-    const projectLabel = assigned.children.find(child => child.classList.contains('activity-project-label'));
+    const overlay = findOverlay('assign-customer');
+    assert.ok(overlay, 'assignment labels render in a sibling overlay');
+    assert.equal(assigned.children.some(child => child.classList.contains('activity-assignment-label')), false,
+        'labels are outside the shape-clipped button');
+    const customerLabel = overlay.children.find(child => child.classList.contains('activity-customer-label'));
+    const projectLabel = overlay.children.find(child => child.classList.contains('activity-project-label'));
     assert.equal(customerLabel.textContent, 'Customer Example GmbH');
     assert.equal(projectLabel.textContent, 'Musterstraße 11–15');
-    assert.equal(assigned.classList.contains('has-assignment-labels'), true);
-    assert.equal(labels(findButton('assign-plain')).length, 0, 'missing assignments stay empty without placeholders');
+    assert.deepEqual([overlay.style.left, overlay.style.top, overlay.style.width, overlay.style.height],
+        [assigned.style.left, assigned.style.top, assigned.style.width, assigned.style.height]);
+    assert.equal(labels('assign-plain').length, 0, 'missing assignments stay empty without placeholders');
     assert.deepEqual(groupRect(containers, 'assign-group'), groupBefore, 'the group does not move');
     assert.deepEqual({
         left: findButton('assign-customer').style.left,
@@ -6695,7 +6709,8 @@ test('activity assignment labels toggle without moving canvas nodes or groups', 
     assert.equal(storageData.settings.showActivityAssignments, false);
     assert.equal(activityAssignmentsToggleBtn['aria-pressed'], 'false');
     assert.equal(activityAssignmentsToggleBtn['aria-label'], 'Show assignments');
-    assert.equal(labels(findButton('assign-customer')).length, 0, 'labels disappear immediately');
+    assert.equal(labels('assign-customer').length, 0, 'labels disappear immediately');
+    assert.equal(findOverlay('assign-customer'), undefined);
     assert.deepEqual(groupRect(containers, 'assign-group'), groupBefore);
     assert.deepEqual(app.activityLayouts.get('assign-customer'),
         { activityId: 'assign-customer', x: 0, y: 0, width: 260, height: 150 });
@@ -6706,7 +6721,7 @@ test('activity assignment labels toggle without moving canvas nodes or groups', 
 
 test('assignment labels preserve activity content and update after edits and lookup fallback', async () => {
     const harness = createGroupCanvasHarness();
-    const { app, buttons } = harness;
+    const { app, buttons, overlays } = harness;
     app.activities = [{
         id: 'assign-live', name: 'Treppenhäuser', notes: 'Door code 1234', icon: 'car',
         color: '#18794e', shape: 'rounded', size: 'medium', position: 0,
@@ -6730,8 +6745,16 @@ test('assignment labels preserve activity content and update after edits and loo
     assert.equal(button.children.some(child => child.classList.contains('activity-icon')), true, 'the icon stays');
     assert.equal(button.children.some(child => child.className === 'btn-note-mark'), true, 'the note marker stays');
     assert.equal(button.children.some(child => child.className === 'btn-duration'), true, 'the running timer stays');
-    let customerLabel = button.children.find(child => child.classList.contains('activity-customer-label'));
-    let projectLabel = button.children.find(child => child.classList.contains('activity-project-label'));
+    const readLabels = id => {
+        const overlay = overlays.find(item => item.dataset.activityId === id);
+        return {
+            customer: overlay?.children.find(child => child.classList.contains('activity-customer-label')),
+            project: overlay?.children.find(child => child.classList.contains('activity-project-label'))
+        };
+    };
+    let labelsNow = readLabels('assign-live');
+    let customerLabel = labelsNow.customer;
+    let projectLabel = labelsNow.project;
     assert.equal(customerLabel.textContent, 'Old Customer');
     assert.equal(projectLabel.textContent, 'Old Project');
 
@@ -6740,8 +6763,9 @@ test('assignment labels preserve activity content and update after edits and loo
     activity.projectName = 'New Project 17';
     app.renderMain();
     button = buttons.find(item => item.dataset.activityId === 'assign-live');
-    customerLabel = button.children.find(child => child.classList.contains('activity-customer-label'));
-    projectLabel = button.children.find(child => child.classList.contains('activity-project-label'));
+    labelsNow = readLabels('assign-live');
+    customerLabel = labelsNow.customer;
+    projectLabel = labelsNow.project;
     assert.equal(customerLabel.textContent, 'New Customer GmbH', 'customer labels refresh after assignment edits');
     assert.equal(projectLabel.textContent, 'New Project 17', 'project labels refresh after assignment edits');
 
@@ -6753,8 +6777,9 @@ test('assignment labels preserve activity content and update after edits and loo
     app.clockodoProjects = [{ id: 99, name: 'Lookup Project' }];
     app.renderMain();
     button = buttons.find(item => item.dataset.activityId === 'assign-live');
-    customerLabel = button.children.find(child => child.classList.contains('activity-customer-label'));
-    projectLabel = button.children.find(child => child.classList.contains('activity-project-label'));
+    labelsNow = readLabels('assign-live');
+    customerLabel = labelsNow.customer;
+    projectLabel = labelsNow.project;
     assert.equal(customerLabel.textContent, 'Lookup Customer', 'customer fallback uses the Clockodo lookup data');
     assert.equal(projectLabel.textContent, 'Lookup Project', 'project fallback uses the Clockodo lookup data');
     assert.equal(activity.customerName, '', 'lookup fallback does not duplicate assignment state');
@@ -6765,8 +6790,78 @@ test('assignment labels preserve activity content and update after edits and loo
     app.clockodoProjects = [];
     app.renderMain();
     button = buttons.find(item => item.dataset.activityId === 'assign-live');
-    assert.equal(button.children.some(child => child.classList.contains('activity-assignment-label')), false, 'empty assignments render no labels');
-    assert.equal(button.classList.contains('has-assignment-labels'), false, 'compact spacing returns with no labels');
+    assert.equal(button.children.some(child => child.classList.contains('activity-assignment-label')), false, 'labels never live inside the clipped button');
+    assert.equal(overlays.some(overlay => overlay.dataset.activityId === 'assign-live'), false, 'empty assignments render no overlay');
+});
+
+test('assignment labels stay outside every clipped activity shape and follow geometry', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, buttons, handles, overlays, pointer } = harness;
+    const shapes = ['circle', 'diamond', 'triangle', 'hexagon', 'star'];
+    app.activities = shapes.map((shape, index) => ({
+        id: `shape-${shape}`,
+        name: `Activity ${shape}`,
+        shape,
+        color: index % 2 ? '#ffffff' : '#000000',
+        position: index,
+        customerName: `Customer ${shape}`,
+        projectName: `Project ${shape}`
+    }));
+    app.activityLayouts = new Map(app.activities.map((activity, index) => [
+        activity.id,
+        {
+            activityId: activity.id,
+            x: 160 + (index % 2) * 320,
+            y: 160 + index * 160,
+            width: 224,
+            height: 224
+        }
+    ]));
+    await app.toggleActivityAssignments();
+
+    for (const activity of app.activities) {
+        const button = buttons.find(item => item.dataset.activityId === activity.id);
+        const overlay = overlays.find(item => item.dataset.activityId === activity.id);
+        assert.ok(overlay, `${activity.shape} has a label overlay`);
+        assert.equal(button.children.includes(overlay), false, `${activity.shape} labels are not inside the clipped button`);
+        assert.deepEqual([overlay.style.left, overlay.style.top, overlay.style.width, overlay.style.height],
+            [button.style.left, button.style.top, button.style.width, button.style.height]);
+        assert.equal(overlay.children.find(child => child.classList.contains('activity-customer-label')).textContent,
+            `Customer ${activity.shape}`);
+        assert.equal(overlay.children.find(child => child.classList.contains('activity-project-label')).textContent,
+            `Project ${activity.shape}`);
+    }
+
+    const circle = app.activities.find(activity => activity.shape === 'circle');
+    let button = buttons.find(item => item.dataset.activityId === circle.id);
+    pointer('pointerdown', button, 0, 0);
+    pointer('pointermove', button, 32, 16);
+    pointer('pointerup', button, 32, 16);
+    button = buttons.find(item => item.dataset.activityId === circle.id);
+    let overlay = overlays.find(item => item.dataset.activityId === circle.id);
+    assert.deepEqual([overlay.style.left, overlay.style.top], [button.style.left, button.style.top],
+        'labels stay anchored while dragging');
+
+    const handle = handles.find(item => item.dataset.activityId === circle.id);
+    pointer('pointerdown', handle, 0, 0);
+    pointer('pointermove', handle, 16, 16);
+    pointer('pointerup', handle, 16, 16);
+    button = buttons.find(item => item.dataset.activityId === circle.id);
+    overlay = overlays.find(item => item.dataset.activityId === circle.id);
+    assert.deepEqual([overlay.style.width, overlay.style.height], [button.style.width, button.style.height],
+        'labels stay anchored while resizing');
+    assert.equal(Number.parseFloat(overlay.style.width) % 16, 0);
+    assert.equal(Number.parseFloat(overlay.style.height) % 16, 0);
+
+    app.canvasZoom = 0.75;
+    app.canvasPan = { x: 48, y: -32 };
+    app.applyCanvasTransform(harness.stage);
+    const overlayBox = overlay.getBoundingClientRect();
+    const buttonBox = button.getBoundingClientRect();
+    assert.equal(overlayBox.left, buttonBox.left, 'labels share the activity pan/zoom transform');
+    assert.equal(overlayBox.top, buttonBox.top);
+    assert.equal(overlayBox.width, buttonBox.width);
+    assert.equal(overlayBox.height, buttonBox.height);
 });
 
 test('assignment visibility preference persists across reloads', async () => {
