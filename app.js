@@ -1641,6 +1641,16 @@ class StorageRepository {
         return this.persistMutation(['groups'], tx => { tx.objectStore('groups').put(group); });
     }
 
+    async saveGroups(groups) {
+        const list = Array.isArray(groups) ? groups : [];
+        if (!list.length) return list;
+        return this.persistMutation(['groups'], tx => {
+            const store = tx.objectStore('groups');
+            list.forEach(group => store.put(group));
+            return list;
+        });
+    }
+
     async deleteGroup(id) {
         return this.persistMutation(['groups'], tx => { tx.objectStore('groups').delete(id); });
     }
@@ -2249,8 +2259,8 @@ class TimerHubApp {
                         id: String(group.id || this.generateId()),
                         name: String(group.name || ''),
                         // Group creation and dragging both snap anchors to the
-                        // shared canvas grid. Normalize legacy records in memory
-                        // to the same invariant without rewriting stored data.
+                        // shared canvas grid. Normalize legacy records and write
+                        // the corrected coordinates back below.
                         x: this.snapToCanvasGrid(this.clampCanvasCoordinate(group.x, 0, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY)),
                         y: this.snapToCanvasGrid(this.clampCanvasCoordinate(group.y, 0, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY)),
                         collapsed: group.collapsed === true
@@ -2301,6 +2311,34 @@ class TimerHubApp {
             : [];
         this.sanitizeGroupParents();
         this.resetGroupExpansionState();
+
+        if (Array.isArray(groups)) {
+            const normalizedById = new Map(this.groups.map(group => [group.id, group]));
+            const migrated = [];
+            for (const original of groups) {
+                if (!original || typeof original !== 'object' || original.id === undefined || original.id === null) continue;
+                const normalized = normalizedById.get(String(original.id));
+                if (!normalized) continue;
+                const alreadyNormalized = typeof original.x === 'number' && Number.isFinite(original.x)
+                    && typeof original.y === 'number' && Number.isFinite(original.y)
+                    && original.x === normalized.x && original.y === normalized.y;
+                if (alreadyNormalized) continue;
+                // Preserve every unrelated persisted field by updating a copy of
+                // the original record instead of writing the normalized view.
+                migrated.push({ ...original, x: normalized.x, y: normalized.y });
+            }
+            if (migrated.length) {
+                try {
+                    if (typeof this.storage.saveGroups === 'function') {
+                        await this.storage.saveGroups(migrated);
+                    } else {
+                        for (const group of migrated) await this.storage.saveGroup?.(group);
+                    }
+                } catch (error) {
+                    console.warn('TimerHub group grid migration failed:', error);
+                }
+            }
+        }
     }
 
     normalizeClockodoId(value) {

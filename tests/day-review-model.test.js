@@ -77,6 +77,14 @@ function createTestApp(initialData = {}) {
             else storageData.groups.push(structuredClone(group));
             return group;
         },
+        async saveGroups(groups) {
+            for (const group of groups) {
+                const idx = storageData.groups.findIndex(item => item.id === group.id);
+                if (idx >= 0) storageData.groups[idx] = structuredClone(group);
+                else storageData.groups.push(structuredClone(group));
+            }
+            return groups;
+        },
         async deleteGroup(id) {
             storageData.groups = storageData.groups.filter(group => group.id !== id);
         },
@@ -1950,7 +1958,10 @@ test('legacy off-grid group anchors normalize to the 16px grid on load', async (
     const harness = createGroupCanvasHarness();
     const { app, storageData, buttons, containers } = harness;
     storageData.groups = [
-        { id: 'legacy-parent', name: 'Legacy Parent', x: 101, y: 189, collapsed: false },
+        {
+            id: 'legacy-parent', name: 'Legacy Parent', x: 101, y: 189, collapsed: false,
+            color: '#123456', assignment: 'Legacy job', importedAt: 7, customField: 'keep-me'
+        },
         { id: 'legacy-child', name: 'Legacy Child', x: 133, y: 221, collapsed: true, parentId: 'legacy-parent' }
     ];
     storageData.activities = [
@@ -1961,18 +1972,28 @@ test('legacy off-grid group anchors normalize to the 16px grid on load', async (
         { activityId: 'legacy-parent-a', x: 0, y: 0, width: 200, height: 120 },
         { activityId: 'legacy-child-a', x: 0, y: 0, width: 200, height: 120 }
     ];
+    const saveCalls = [];
+    const originalSaveGroups = app.storage.saveGroups.bind(app.storage);
+    app.storage.saveGroups = async groups => {
+        saveCalls.push(structuredClone(groups));
+        return originalSaveGroups(groups);
+    };
     await app.loadActivities();
     await app.loadGroups();
     app.renderMain();
 
     const parent = app.groups.find(group => group.id === 'legacy-parent');
     const child = app.groups.find(group => group.id === 'legacy-child');
-    assert.deepEqual(
-        [storageData.groups.find(group => group.id === 'legacy-parent').x,
-            storageData.groups.find(group => group.id === 'legacy-parent').y],
-        [101, 189],
-        'loading normalizes in memory without rewriting persisted user data'
-    );
+    assert.equal(saveCalls.length, 1, 'the migration writes once');
+    assert.equal(saveCalls[0].length, 2, 'both off-grid groups are migrated');
+    const storedParent = storageData.groups.find(group => group.id === 'legacy-parent');
+    const storedChild = storageData.groups.find(group => group.id === 'legacy-child');
+    assert.deepEqual([storedParent.x, storedParent.y], [96, 192], 'the persisted parent anchor is normalized');
+    assert.deepEqual([storedChild.x, storedChild.y], [128, 224], 'the persisted child anchor is normalized');
+    assert.equal(storedParent.color, '#123456', 'unrelated persisted fields are preserved');
+    assert.equal(storedParent.assignment, 'Legacy job');
+    assert.equal(storedParent.importedAt, 7);
+    assert.equal(storedParent.customField, 'keep-me');
     assert.deepEqual([parent.x, parent.y], [96, 192], 'legacy parent anchors snap to the nearest grid point');
     assert.deepEqual([child.x, child.y], [128, 224], 'legacy child anchors snap to the nearest grid point');
     assert.equal(parent.x % 16, 0);
@@ -1998,7 +2019,76 @@ test('legacy off-grid group anchors normalize to the 16px grid on load', async (
     await app.loadGroups();
     assert.deepEqual([parent.x, parent.y], [96, 192], 'normalization is idempotent');
     assert.deepEqual([child.x, child.y], [128, 224], 'normalization is idempotent for nested groups');
+    assert.equal(saveCalls.length, 1, 'an already-normalized reload does not rewrite storage');
 });
+test('already aligned groups are not rewritten on load', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, storageData } = harness;
+    storageData.groups = [
+        { id: 'aligned-group', name: 'Aligned', x: 96, y: 192, collapsed: false, customField: 'keep' }
+    ];
+    let saveCalls = 0;
+    app.storage.saveGroups = async () => { saveCalls += 1; };
+    await app.loadGroups();
+    assert.deepEqual([app.groups[0].x, app.groups[0].y], [96, 192]);
+    assert.equal(saveCalls, 0, 'aligned storage is not rewritten');
+    assert.deepEqual([storageData.groups[0].x, storageData.groups[0].y], [96, 192]);
+    assert.equal(storageData.groups[0].customField, 'keep');
+});
+
+test('invalid or missing legacy coordinates migrate to the existing fallback', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, storageData } = harness;
+    storageData.groups = [
+        { id: 'bad-coords', name: 'Bad', x: 'left', y: 'bottom' },
+        { id: 'missing-coords', name: 'Missing' },
+        { id: 'null-coords', name: 'Null', x: null, y: null },
+        { id: 'aligned-coords', name: 'Aligned', x: 32, y: 48 }
+    ];
+    const saveCalls = [];
+    const originalSaveGroups = app.storage.saveGroups.bind(app.storage);
+    app.storage.saveGroups = async groups => {
+        saveCalls.push(structuredClone(groups));
+        return originalSaveGroups(groups);
+    };
+    await app.loadGroups();
+    assert.equal(saveCalls.length, 1);
+    assert.deepEqual(saveCalls[0].map(group => group.id).sort(), ['bad-coords', 'missing-coords', 'null-coords'], 'only invalid groups are migrated');
+    for (const group of app.groups) {
+        if (group.id === 'aligned-coords') {
+            assert.deepEqual([group.x, group.y], [32, 48], 'aligned groups keep their coordinates');
+            continue;
+        }
+        assert.deepEqual([group.x, group.y], [0, 0], `${group.id} uses the existing zero fallback`);
+        assert.ok(Number.isFinite(group.x) && Number.isFinite(group.y));
+    }
+    for (const group of storageData.groups) {
+        assert.ok(Number.isFinite(group.x) && Number.isFinite(group.y), `${group.id} has finite persisted coordinates`);
+        assert.equal(group.x % 16, 0);
+        assert.equal(group.y % 16, 0);
+    }
+    assert.deepEqual([storageData.groups.find(group => group.id === 'aligned-coords').x,
+        storageData.groups.find(group => group.id === 'aligned-coords').y], [32, 48]);
+});
+
+test('group grid migration persists through the application StorageRepository', async () => {
+    const { app, context } = createTestApp();
+    const repository = vm.runInContext('new StorageRepository()', context);
+    const database = createIndexedDbHarness();
+    repository.db = database.db;
+    database.data.groups.set('stored-legacy', {
+        id: 'stored-legacy', name: 'Stored legacy', x: 101, y: 189,
+        collapsed: false, customField: 'keep', assignment: 'Job'
+    });
+    app.storage = repository;
+    await app.loadGroups();
+    assert.deepEqual([app.groups[0].x, app.groups[0].y], [96, 192]);
+    const persisted = (await repository.getGroups()).find(group => group.id === 'stored-legacy');
+    assert.deepEqual([persisted.x, persisted.y], [96, 192], 'the same IndexedDB record is updated');
+    assert.equal(persisted.customField, 'keep');
+    assert.equal(persisted.assignment, 'Job');
+});
+
 test('dragging a collapsed group follows the 16px grid without a release jump', () => {
     const harness = createGroupCanvasHarness();
     const { app, containers, pointer } = harness;
