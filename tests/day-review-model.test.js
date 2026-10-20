@@ -113,6 +113,9 @@ function createTestApp(initialData = {}) {
         async setSetting(k, v) {
             storageData.settings[k] = v;
         },
+        async removeSettingWithoutSnapshot(k) {
+            delete storageData.settings[k];
+        },
         async exportAll() {
             return structuredClone({
                 activities: storageData.activities,
@@ -189,7 +192,8 @@ function createTestApp(initialData = {}) {
         'createGroupFromGroupsBtn', 'deleteGroupsBtn', 'groupDeleteModal', 'groupDeleteModalTitle',
         'groupDeleteModalCloseBtn', 'groupDeleteSummary', 'groupDeleteOutcome', 'groupDeleteLockedWarning',
         'groupDeleteActivitiesKeep', 'groupDeleteActivitiesDelete', 'groupDeleteNestedKeep', 'groupDeleteNestedDelete',
-        'groupDeleteCancelBtn', 'groupDeleteConfirmBtn', 'groupEditLockedInput', 'undoCanvasBtn', 'redoCanvasBtn', 'iconPicker'
+        'groupDeleteCancelBtn', 'groupDeleteConfirmBtn', 'groupEditLockedInput', 'undoCanvasBtn', 'redoCanvasBtn', 'iconPicker',
+        'activityAssignmentsToggleBtn'
     ]) {
         elements.set(id, {
             id,
@@ -482,6 +486,7 @@ function createGroupCanvasHarness() {
     createGroupBtn.hidden = true;
     const groupToggleAllBtn = makeElement();
     groupToggleAllBtn.hidden = true;
+    const activityAssignmentsToggleBtn = makeElement();
     const originalGetById = context.document.getElementById;
     context.document.getElementById = id => ({
         activityCanvasViewport: viewport,
@@ -490,7 +495,8 @@ function createGroupCanvasHarness() {
         logActivityFilter: filter,
         addActivityBtn,
         createGroupBtn,
-        groupToggleAllBtn
+        groupToggleAllBtn,
+        activityAssignmentsToggleBtn
     })[id] || originalGetById(id);
     context.document.querySelector = selector => stage.querySelector(selector);
     context.document.querySelectorAll = selector => selector === '.activity-btn' ? buttons : [];
@@ -507,7 +513,7 @@ function createGroupCanvasHarness() {
     return {
         app, context, storageData, viewport, stage,
         buttons, handles, containers, status, addActivityBtn, createGroupBtn, groupToggleAllBtn,
-        pointer, makeElement
+        activityAssignmentsToggleBtn, pointer, makeElement
     };
 }
 
@@ -5846,6 +5852,152 @@ test('idle activity buttons no longer render the activityStartHint instructional
     assert.equal(Object.hasOwn(dictionaries.en, 'activityStartHint'), false);
     assert.equal(Object.hasOwn(dictionaries.de, 'activityStartHint'), false);
     assert.equal(Object.hasOwn(dictionaries.ru, 'activityStartHint'), false);
+});
+
+test('activity assignment labels toggle without moving canvas nodes or groups', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, buttons, containers, storageData, activityAssignmentsToggleBtn } = harness;
+    app.groups = [{ id: 'assign-group', name: 'Assignments', x: 100, y: 100, collapsed: false }];
+    app.activities = [
+        {
+            id: 'assign-customer', name: 'Treppenhäuser', color: '#18794e', shape: 'rounded', size: 'medium',
+            position: 0, groupId: 'assign-group', customerName: 'Customer Example GmbH', projectName: 'Musterstraße 11–15'
+        },
+        { id: 'assign-plain', name: 'No assignment', color: '#18794e', shape: 'rounded', size: 'medium', position: 1, groupId: 'assign-group' }
+    ];
+    app.activityLayouts = new Map([
+        ['assign-customer', { activityId: 'assign-customer', x: 0, y: 0, width: 260, height: 150 }],
+        ['assign-plain', { activityId: 'assign-plain', x: 0, y: 160, width: 260, height: 150 }]
+    ]);
+    storageData.groups = structuredClone(app.groups);
+    storageData.activities = structuredClone(app.activities);
+    storageData.layout = [...app.activityLayouts.values()].map(layout => structuredClone(layout));
+    app.renderMain();
+
+    const findButton = id => buttons.find(button => button.dataset.activityId === id);
+    const labels = button => button.children.filter(child => child.classList.contains('activity-assignment-label'));
+    assert.equal(app.showActivityAssignments, false);
+    assert.equal(activityAssignmentsToggleBtn['aria-pressed'], 'false');
+    assert.equal(labels(findButton('assign-customer')).length, 0, 'labels are hidden by default');
+    const groupBefore = groupRect(containers, 'assign-group');
+    const positionBefore = {
+        left: findButton('assign-customer').style.left,
+        top: findButton('assign-customer').style.top
+    };
+    const savedBefore = JSON.parse(JSON.stringify(app.groups.map(group => [group.id, group.x, group.y])));
+    const activitiesBefore = JSON.stringify(app.activities);
+    const storedActivitiesBefore = JSON.stringify(storageData.activities);
+    const activeActivityBefore = app.activeActivityId;
+
+    await app.toggleActivityAssignments();
+    assert.equal(app.showActivityAssignments, true);
+    assert.equal(storageData.settings.showActivityAssignments, true, 'the preference is persisted');
+    assert.equal(activityAssignmentsToggleBtn['aria-pressed'], 'true', 'the toggle exposes its on state');
+    assert.equal(activityAssignmentsToggleBtn['aria-label'], 'Hide assignments');
+    const assigned = findButton('assign-customer');
+    const customerLabel = assigned.children.find(child => child.classList.contains('activity-customer-label'));
+    const projectLabel = assigned.children.find(child => child.classList.contains('activity-project-label'));
+    assert.equal(customerLabel.textContent, 'Customer Example GmbH');
+    assert.equal(projectLabel.textContent, 'Musterstraße 11–15');
+    assert.equal(assigned.classList.contains('has-assignment-labels'), true);
+    assert.equal(labels(findButton('assign-plain')).length, 0, 'missing assignments stay empty without placeholders');
+    assert.deepEqual(groupRect(containers, 'assign-group'), groupBefore, 'the group does not move');
+    assert.deepEqual({
+        left: findButton('assign-customer').style.left,
+        top: findButton('assign-customer').style.top
+    }, positionBefore, 'the activity position does not move');
+    assert.deepEqual(JSON.parse(JSON.stringify(app.groups.map(group => [group.id, group.x, group.y]))), savedBefore);
+
+    await app.toggleActivityAssignments();
+    assert.equal(app.showActivityAssignments, false);
+    assert.equal(storageData.settings.showActivityAssignments, false);
+    assert.equal(activityAssignmentsToggleBtn['aria-pressed'], 'false');
+    assert.equal(activityAssignmentsToggleBtn['aria-label'], 'Show assignments');
+    assert.equal(labels(findButton('assign-customer')).length, 0, 'labels disappear immediately');
+    assert.deepEqual(groupRect(containers, 'assign-group'), groupBefore);
+    assert.deepEqual(app.activityLayouts.get('assign-customer'),
+        { activityId: 'assign-customer', x: 0, y: 0, width: 260, height: 150 });
+    assert.equal(JSON.stringify(app.activities), activitiesBefore, 'visibility does not modify activities');
+    assert.equal(JSON.stringify(storageData.activities), storedActivitiesBefore, 'visibility does not write activities');
+    assert.equal(app.activeActivityId, activeActivityBefore, 'visibility does not start or stop a timer');
+});
+
+test('assignment labels preserve activity content and update after edits and lookup fallback', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, buttons } = harness;
+    app.activities = [{
+        id: 'assign-live', name: 'Treppenhäuser', notes: 'Door code 1234', icon: 'car',
+        color: '#18794e', shape: 'rounded', size: 'medium', position: 0,
+        customerName: 'Old Customer', projectName: 'Old Project'
+    }];
+    app.activityLayouts = new Map([
+        ['assign-live', { activityId: 'assign-live', x: 160, y: 160, width: 320, height: 190 }]
+    ]);
+    app.activeActivityId = 'assign-live';
+    app.timeEntries = [{
+        id: 'assign-entry', activityId: 'assign-live', startTimestamp: Date.now() - 60000,
+        endTimestamp: null, createdAt: Date.now() - 60000, updatedAt: Date.now(), notes: ''
+    }];
+    app.setCanvasSelection(['assign-live']);
+    await app.toggleActivityAssignments();
+    let button = buttons.find(item => item.dataset.activityId === 'assign-live');
+    assert.ok(button, 'the activity still renders');
+    assert.equal(button.classList.contains('active'), true, 'timer state survives the toggle');
+    assert.equal(button.classList.contains('selected'), true, 'selection survives the toggle');
+    assert.equal(button.children.some(child => child.className === 'btn-name' && child.textContent === 'Treppenhäuser'), true);
+    assert.equal(button.children.some(child => child.classList.contains('activity-icon')), true, 'the icon stays');
+    assert.equal(button.children.some(child => child.className === 'btn-note-mark'), true, 'the note marker stays');
+    assert.equal(button.children.some(child => child.className === 'btn-duration'), true, 'the running timer stays');
+    let customerLabel = button.children.find(child => child.classList.contains('activity-customer-label'));
+    let projectLabel = button.children.find(child => child.classList.contains('activity-project-label'));
+    assert.equal(customerLabel.textContent, 'Old Customer');
+    assert.equal(projectLabel.textContent, 'Old Project');
+
+    const activity = app.activities[0];
+    activity.customerName = 'New Customer GmbH';
+    activity.projectName = 'New Project 17';
+    app.renderMain();
+    button = buttons.find(item => item.dataset.activityId === 'assign-live');
+    customerLabel = button.children.find(child => child.classList.contains('activity-customer-label'));
+    projectLabel = button.children.find(child => child.classList.contains('activity-project-label'));
+    assert.equal(customerLabel.textContent, 'New Customer GmbH', 'customer labels refresh after assignment edits');
+    assert.equal(projectLabel.textContent, 'New Project 17', 'project labels refresh after assignment edits');
+
+    activity.customerName = '';
+    activity.projectName = '';
+    activity.customerId = '88';
+    activity.projectId = '99';
+    app.clockodoCustomers = [{ id: 88, name: 'Lookup Customer' }];
+    app.clockodoProjects = [{ id: 99, name: 'Lookup Project' }];
+    app.renderMain();
+    button = buttons.find(item => item.dataset.activityId === 'assign-live');
+    customerLabel = button.children.find(child => child.classList.contains('activity-customer-label'));
+    projectLabel = button.children.find(child => child.classList.contains('activity-project-label'));
+    assert.equal(customerLabel.textContent, 'Lookup Customer', 'customer fallback uses the Clockodo lookup data');
+    assert.equal(projectLabel.textContent, 'Lookup Project', 'project fallback uses the Clockodo lookup data');
+    assert.equal(activity.customerName, '', 'lookup fallback does not duplicate assignment state');
+
+    activity.customerId = '';
+    activity.projectId = '';
+    app.clockodoCustomers = [];
+    app.clockodoProjects = [];
+    app.renderMain();
+    button = buttons.find(item => item.dataset.activityId === 'assign-live');
+    assert.equal(button.children.some(child => child.classList.contains('activity-assignment-label')), false, 'empty assignments render no labels');
+    assert.equal(button.classList.contains('has-assignment-labels'), false, 'compact spacing returns with no labels');
+});
+
+test('assignment visibility preference persists across reloads', async () => {
+    const first = createGroupCanvasHarness();
+    await first.app.toggleActivityAssignments();
+    assert.equal(first.storageData.settings.showActivityAssignments, true);
+
+    const reloaded = createTestApp({ settings: structuredClone(first.storageData.settings) });
+    await reloaded.app.loadSettings();
+    assert.equal(reloaded.app.showActivityAssignments, true, 'the saved preference is restored');
+    const fresh = createTestApp();
+    await fresh.app.loadSettings();
+    assert.equal(fresh.app.showActivityAssignments, false, 'the default remains off');
 });
 
 function createActivityEntryNoteApp() {

@@ -2073,6 +2073,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .canvas-tool-btn[hidden] { display:none; }
 .canvas-tool-btn:hover { background:var(--bg-tertiary); }
 .canvas-tool-btn:active { background:var(--brand-soft); }
+.canvas-tool-btn[aria-pressed="true"] {
+    background:var(--brand-soft);
+    border-color:color-mix(in srgb, var(--brand) 35%, var(--border-color));
+    color:var(--brand-strong);
+}
 .activities-grid {
     position:absolute; inset:0 auto auto 0; display:block; width:3600px; height:2200px; padding:0;
     transform-origin:0 0; background-image:radial-gradient(color-mix(in srgb, var(--text-tertiary) 25%, transparent) .8px, transparent .8px);
@@ -2818,6 +2823,39 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     font-size: clamp(14px, 7cqmin, 42px) !important;
     line-height: 1.12;
     text-align: center;
+}
+
+#activitiesGrid .activity-btn.activity-node.has-assignment-labels {
+    padding-top: clamp(22px, 12cqmin, 30px);
+    padding-bottom: clamp(22px, 12cqmin, 30px);
+}
+
+#activitiesGrid .activity-btn.activity-node > .activity-assignment-label {
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    z-index: 3;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: clamp(9px, 3.2cqmin, 14px) !important;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: .01em;
+    opacity: .82;
+    text-align: center;
+    pointer-events: none;
+    color: inherit;
+    text-shadow: 0 1px 1px color-mix(in srgb, var(--activity-text-color, #000) 18%, transparent);
+}
+
+#activitiesGrid .activity-btn.activity-node > .activity-customer-label {
+    top: 6px;
+}
+
+#activitiesGrid .activity-btn.activity-node > .activity-project-label {
+    bottom: 6px;
 }
 
 #activitiesGrid .activity-btn.activity-node .btn-time {

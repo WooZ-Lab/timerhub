@@ -510,6 +510,7 @@ const extendedTranslations = {
         selectActivitiesFirst: 'Select at least one activity first',
         collapseGroup: 'Collapse group', expandGroup: 'Expand group',
         collapseAllGroups: 'Collapse all', expandAllGroups: 'Expand all',
+        showAssignments: 'Show assignments', hideAssignments: 'Hide assignments',
         duplicateGroup: 'Duplicate group', groupCopyName: '{name} (copy)',
         duplicateActivity: 'Duplicate',
         activityCopyName: '{name} (copy)',
@@ -886,6 +887,7 @@ const extendedTranslations = {
         selectActivitiesFirst: 'Wähle zuerst mindestens eine Aktivität aus',
         collapseGroup: 'Gruppe einklappen', expandGroup: 'Gruppe ausklappen',
         collapseAllGroups: 'Alle einklappen', expandAllGroups: 'Alle ausklappen',
+        showAssignments: 'Zuordnungen anzeigen', hideAssignments: 'Zuordnungen ausblenden',
         duplicateGroup: 'Gruppe duplizieren', groupCopyName: '{name} (Kopie)',
         duplicateActivity: 'Duplizieren',
         activityCopyName: '{name} (Kopie)',
@@ -1262,6 +1264,7 @@ const extendedTranslations = {
         selectActivitiesFirst: 'Сначала выберите хотя бы одно занятие',
         collapseGroup: 'Свернуть группу', expandGroup: 'Развернуть группу',
         collapseAllGroups: 'Свернуть все', expandAllGroups: 'Развернуть все',
+        showAssignments: 'Показать назначения', hideAssignments: 'Скрыть назначения',
         duplicateGroup: 'Дублировать группу', groupCopyName: '{name} (копия)',
         duplicateActivity: 'Дублировать',
         activityCopyName: '{name} (копия)',
@@ -1908,6 +1911,7 @@ class TimerHubApp {
         this.firstDayOfWeek = 1; // Monday
         this.confirmDelete = true;
         this.currentScreen = 'main';
+        this.showActivityAssignments = false;
         this.activityLayouts = new Map();
         this.canvasPan = this.readCanvasPan();
         this.canvasZoom = this.readCanvasZoom();
@@ -2128,6 +2132,8 @@ class TimerHubApp {
         document.querySelectorAll('.color-option[data-color]').forEach(element => {
             element.setAttribute('aria-label', this.t('colorSample', { color: element.dataset.color }));
         });
+
+        this.updateActivityAssignmentsToggle();
     }
 
     notificationError(key, error) {
@@ -2205,6 +2211,8 @@ class TimerHubApp {
         const firstDay = Number(await this.storage.getSetting('firstDayOfWeek', 1));
         this.firstDayOfWeek = [0, 1].includes(firstDay) ? firstDay : 1;
         this.confirmDelete = await this.storage.getSetting('confirmDelete', true);
+        this.showActivityAssignments =
+            await this.storage.getSetting('showActivityAssignments', false) === true;
         this.notificationInterval =
             await this.storage.getSetting('notificationInterval', 20);
         this.notificationCustomMinutes =
@@ -2754,6 +2762,7 @@ class TimerHubApp {
 
         // Add activity button
         sel('addActivityBtn')?.addEventListener('click', () => this.showActivityModal());
+        sel('activityAssignmentsToggleBtn')?.addEventListener('click', () => this.toggleActivityAssignments());
 
         // Activity modal
         sel('modalCloseBtn')?.addEventListener('click', () => this.closeActivityModal());
@@ -3896,6 +3905,7 @@ class TimerHubApp {
         this.updateTimerStatus();
         if (!grid) return;
         this.updateCanvasGroupAction();
+        this.updateActivityAssignmentsToggle();
         grid.setAttribute('aria-busy', String(Boolean(this.timerActionInProgress)));
         grid.replaceChildren();
         this.canvasZIndex = 1;
@@ -3981,6 +3991,24 @@ class TimerHubApp {
                 btn.appendChild(iconElement);
             }
             btn.appendChild(name);
+
+            const assignmentLabels = this.activityAssignmentLabels(activity);
+            if (this.showActivityAssignments && (assignmentLabels.customerName || assignmentLabels.projectName)) {
+                btn.classList.add('has-assignment-labels');
+                for (const [kind, text] of [
+                    ['customer', assignmentLabels.customerName],
+                    ['project', assignmentLabels.projectName]
+                ]) {
+                    if (!text) continue;
+                    const label = document.createElement('span');
+                    label.className = `activity-assignment-label activity-${kind}-label`;
+                    label.textContent = text;
+                    label.title = text;
+                    label.setAttribute('aria-hidden', 'true');
+                    label.setAttribute('dir', 'auto');
+                    btn.appendChild(label);
+                }
+            }
 
             if (activity.notes) {
                 const noteMark = document.createElement('span');
@@ -5423,6 +5451,35 @@ class TimerHubApp {
             button.classList.toggle('selected', this.selectedActivityIds.has(button.dataset.activityId));
         }
         this.updateCanvasGroupAction();
+    }
+
+    updateActivityAssignmentsToggle() {
+        const button = document.getElementById('activityAssignmentsToggleBtn');
+        if (!button) return;
+        const visible = this.showActivityAssignments === true;
+        const label = visible ? this.t('hideAssignments') : this.t('showAssignments');
+        button.setAttribute('aria-pressed', String(visible));
+        button.setAttribute('aria-label', label);
+        button.title = label;
+    }
+
+    async toggleActivityAssignments() {
+        this.showActivityAssignments = !this.showActivityAssignments;
+        this.updateActivityAssignmentsToggle();
+        this.renderMain();
+        try {
+            await this.storage.setSetting('showActivityAssignments', this.showActivityAssignments);
+        } catch { /* display preference only */ }
+    }
+
+    activityAssignmentLabels(activity) {
+        const lookupName = (items, id) => (Array.isArray(items) ? items : [])
+            .find(item => String(item.id) === String(id))?.name || '';
+        const customerName = String(activity?.customerName || '').trim()
+            || String(lookupName(this.clockodoCustomers, activity?.customerId)).trim();
+        const projectName = String(activity?.projectName || activity?.project || '').trim()
+            || String(lookupName(this.clockodoProjects, activity?.projectId)).trim();
+        return { customerName, projectName };
     }
 
     updateCanvasGroupAction() {
