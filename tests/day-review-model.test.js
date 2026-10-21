@@ -10950,6 +10950,135 @@ test('activity project assignments persist into entries and reach the Clockodo p
     assert.equal(payload.services_id, 9);
 });
 
+test('new timer and manual entries copy the activity project assignment', async () => {
+    const activity = {
+        id: 'project-act', name: 'Painting', position: 0,
+        projectId: '4', projectName: 'Object A',
+        customerId: '5', customerName: 'Beta', serviceId: '9', serviceName: 'Repair'
+    };
+    const { app, storageData } = createTestApp({ activities: [activity] });
+    app.cancelBackgroundAlarm = async () => {};
+    app.scheduleBackgroundAlarm = async () => {};
+    await app.loadActivities();
+
+    await app.toggleActivity(activity.id);
+    const timerEntry = app.timeEntries.find(entry => entry.activityId === activity.id);
+    assert.equal(timerEntry.projectId, '4', 'the timer entry inherits the project ID');
+    assert.equal(timerEntry.project, 'Object A', 'the timer entry inherits the project name');
+    assert.equal(storageData.timeEntries.find(entry => entry.id === timerEntry.id).projectId, '4');
+
+    const manual = await app.addEntry({
+        activityId: activity.id,
+        startTimestamp: new Date(2026, 0, 9, 8, 0).getTime(),
+        endTimestamp: new Date(2026, 0, 9, 9, 0).getTime(),
+        customerId: '7', serviceId: '9'
+    });
+    assert.equal(manual.projectId, '4', 'the project is inherited even when customer and service were supplied');
+    assert.equal(manual.project, 'Object A');
+});
+
+test('Day Review migration fills missing project assignments and preserves explicit choices', async () => {
+    const activity = {
+        id: 'migrate-act', name: 'Painting', position: 0,
+        projectId: '4', projectName: 'Object A',
+        customerId: '5', customerName: 'Beta', serviceId: '9', serviceName: 'Repair'
+    };
+    const start = new Date(2026, 0, 10, 8, 0).getTime();
+    const makeEntry = (id, offset, extra = {}) => ({
+        id, activityId: activity.id, activityNameSnapshot: 'Painting',
+        startTimestamp: start + offset, endTimestamp: start + offset + 60 * 60 * 1000,
+        ...extra
+    });
+    const entries = [
+        makeEntry('migrate-first', 0),
+        makeEntry('migrate-second', 60 * 60 * 1000),
+        makeEntry('explicit-project', 2 * 60 * 60 * 1000, { projectId: '9', project: 'Explicit Site' }),
+        makeEntry('legacy-free-text', 3 * 60 * 60 * 1000, { project: 'Legacy Site' })
+    ];
+    const { app, storageData, document } = createTestApp({ activities: [activity], timeEntries: entries });
+    await app.loadActivities();
+    await app.loadTimeEntries();
+
+    for (const id of ['migrate-first', 'migrate-second']) {
+        const entry = app.timeEntries.find(item => item.id === id);
+        assert.equal(entry.projectId, '4', `${id} recovers the project ID`);
+        assert.equal(entry.project, 'Object A', `${id} recovers the project name`);
+        const persisted = storageData.timeEntries.find(item => item.id === id);
+        assert.equal(persisted.projectId, '4', `${id} is persisted`);
+        assert.equal(persisted.project, 'Object A', `${id} persists the project name`);
+    }
+    const explicit = app.timeEntries.find(item => item.id === 'explicit-project');
+    assert.equal(explicit.projectId, '9', 'an explicit project ID is never replaced');
+    assert.equal(explicit.project, 'Explicit Site');
+    const freeText = app.timeEntries.find(item => item.id === 'legacy-free-text');
+    assert.equal(freeText.projectId, null, 'legacy free text is not guessed into another project');
+    assert.equal(freeText.project, 'Legacy Site');
+
+    app.reviewDate = '2026-01-10';
+    app.renderReview();
+    assert.match(document.getElementById('reviewEntriesList').innerHTML, /Object A/);
+});
+
+test('Day Review migration skips conflicting activity projects', async () => {
+    const entries = [{
+        id: 'conflict-entry', activityId: 'conflict-act', activityNameSnapshot: 'Painting',
+        startTimestamp: new Date(2026, 0, 11, 8, 0).getTime(),
+        endTimestamp: new Date(2026, 0, 11, 9, 0).getTime()
+    }];
+    const { app, storageData } = createTestApp({
+        activities: [
+            { id: 'conflict-act', name: 'Painting', projectId: '4', projectName: 'Object A' },
+            { id: 'conflict-act', name: 'Painting', projectId: '9', projectName: 'Object B' }
+        ],
+        timeEntries: entries
+    });
+    await app.loadActivities();
+    await app.loadTimeEntries();
+
+    assert.equal(app.timeEntries[0].projectId, null);
+    assert.equal(app.timeEntries[0].project, '');
+    assert.deepEqual(storageData.timeEntries, entries, 'conflicting review data is left untouched');
+    assert.deepEqual(JSON.parse(JSON.stringify(app.projectAssignmentMigration.conflicts)),
+        [{ entryId: 'conflict-entry', activityId: 'conflict-act' }]);
+});
+
+test('project assignment migration is idempotent and survives reload', async () => {
+    const entry = {
+        id: 'migration-idempotent', activityId: 'migration-act', activityNameSnapshot: 'Painting',
+        startTimestamp: new Date(2026, 0, 12, 8, 0).getTime(),
+        endTimestamp: new Date(2026, 0, 12, 9, 0).getTime()
+    };
+    const { app, storageData } = createTestApp({
+        activities: [{ id: 'migration-act', name: 'Painting', projectId: '4', projectName: 'Object A' }],
+        timeEntries: [entry]
+    });
+    await app.loadActivities();
+    const saves = [];
+    const saveTimeEntry = app.storage.saveTimeEntry.bind(app.storage);
+    app.storage.saveTimeEntry = async saved => {
+        saves.push(structuredClone(saved));
+        return saveTimeEntry(saved);
+    };
+
+    await app.loadTimeEntries();
+    assert.equal(saves.length, 1, 'the missing project is migrated once');
+    const persisted = structuredClone(storageData.timeEntries[0]);
+    await app.loadTimeEntries();
+    assert.equal(saves.length, 1, 'rerunning the migration does not rewrite entries');
+    assert.deepEqual(storageData.timeEntries[0], persisted);
+    assert.equal(storageData.timeEntries.length, 1, 'no duplicate entry is created');
+
+    const { app: reloaded } = createTestApp({
+        activities: storageData.activities,
+        timeEntries: storageData.timeEntries,
+        settings: storageData.settings
+    });
+    await reloaded.loadActivities();
+    await reloaded.loadTimeEntries();
+    assert.equal(reloaded.timeEntries[0].projectId, '4');
+    assert.equal(reloaded.timeEntries[0].project, 'Object A');
+});
+
 test('entry editor saves a selected project and preserves legacy free text', async () => {
     const entry = {
         id: 'legacy-project-entry', activityId: 'act-1', activityNameSnapshot: 'Painting',

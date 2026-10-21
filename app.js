@@ -1407,6 +1407,7 @@ const CanvasGeometry = Object.freeze({
     }
 });
 const REQUIRED_WORKER_VERSION = '2026-10-18-projects-v4';
+const DAY_REVIEW_PROJECT_MIGRATION_VERSION = 1;
 
 // ============================================================================
 // STORAGE REPOSITORY
@@ -2678,9 +2679,9 @@ class TimerHubApp {
 
     async addEntry(data) {
         const entryData = { ...data };
-        if (entryData.activityId &&
-            (entryData.customerId === undefined || entryData.serviceId === undefined)) {
-            const activity = this.activities.find(item => item.id === entryData.activityId);
+        if (entryData.activityId) {
+            const activity = this.activities.find(item => item.id === entryData.activityId)
+                || this.archivedActivities?.find(item => item.id === entryData.activityId);
             if (activity) {
                 if (entryData.customerId === undefined) entryData.customerId = activity.customerId || '';
                 if (entryData.serviceId === undefined) entryData.serviceId = activity.serviceId || '';
@@ -2688,7 +2689,7 @@ class TimerHubApp {
                 if (entryData.serviceName === undefined) entryData.serviceName = activity.serviceName || '';
                 if (entryData.projectId === undefined) entryData.projectId = activity.projectId || '';
                 if (entryData.projectName === undefined) entryData.projectName = activity.projectName || '';
-                if (entryData.project === undefined) entryData.project = activity.projectName || '';
+                if (entryData.project === undefined) entryData.project = activity.projectName || activity.project || '';
             }
         }
         const entry = this.createTimeEntry(entryData);
@@ -2762,6 +2763,7 @@ class TimerHubApp {
             durationMs: entry.endTimestamp - entry.startTimestamp,
             notes: entry.notes,
             project: entry.project,
+            projectId: entry.projectId,
             service: entry.service,
             customerId: entry.customerId,
             serviceId: entry.serviceId,
@@ -2788,12 +2790,154 @@ class TimerHubApp {
         return removed;
     }
 
+    activityAssignmentForEntry(activityId, activityList = null) {
+        const id = String(activityId ?? '');
+        if (!id) return { status: 'unresolved' };
+        const list = Array.isArray(activityList)
+            ? activityList
+            : [...(this.activities || []), ...(this.archivedActivities || [])];
+        const candidates = list.filter(activity => activity && String(activity.id) === id);
+        if (!candidates.length) return { status: 'unresolved' };
+        const projects = candidates.map(activity => ({
+            projectId: this.normalizeClockodoId(activity.projectId),
+            projectName: typeof activity.projectName === 'string'
+                ? activity.projectName.trim()
+                : typeof activity.project === 'string'
+                    ? activity.project.trim()
+                    : ''
+        })).filter(project => project.projectId || project.projectName);
+        if (!projects.length) return { status: 'empty' };
+        const projectIds = [...new Set(projects.map(project => project.projectId).filter(Boolean))];
+        const projectNames = [...new Set(projects.map(project => project.projectName).filter(Boolean)
+            .map(name => name.toLowerCase()))];
+        if (projectIds.length > 1 || projectNames.length > 1) return { status: 'conflict' };
+        return {
+            status: 'resolved',
+            projectId: projectIds[0] || null,
+            projectName: projects.find(project => project.projectName)?.projectName || ''
+        };
+    }
+
+    async migrateDayReviewProjectAssignments(rawEntries = []) {
+        const markerKey = 'dayReviewProjectAssignmentMigration';
+        const currentVersion = Number(await this.storage.getSetting(markerKey, 0)) || 0;
+        if (currentVersion >= DAY_REVIEW_PROJECT_MIGRATION_VERSION) {
+            return { migrated: 0, conflicts: [], unresolved: [] };
+        }
+        if (!this.timeEntries.length) {
+            return { migrated: 0, conflicts: [], unresolved: [] };
+        }
+
+        let activityList = [...(this.activities || []), ...(this.archivedActivities || [])];
+        if (!activityList.length && typeof this.storage.getActivities === 'function') {
+            try {
+                const storedActivities = await this.storage.getActivities();
+                if (Array.isArray(storedActivities)) activityList = storedActivities;
+            } catch (error) {
+                console.warn('TimerHub project assignment migration could not read activities:', error);
+            }
+        }
+        const needsInference = entry => !this.normalizeClockodoId(entry.projectId)
+            && !String(entry.project || '').trim();
+        if (!activityList.length && this.timeEntries.some(needsInference)) {
+            // Do not mark the migration complete before activities are available.
+            return { migrated: 0, conflicts: [], unresolved: this.timeEntries.filter(needsInference).map(entry => entry.id) };
+        }
+
+        const migrated = [];
+        const conflicts = [];
+        const unresolved = [];
+        this.timeEntries.forEach((entry, index) => {
+            const currentProjectId = this.normalizeClockodoId(entry.projectId);
+            const currentProjectName = String(entry.project || '').trim();
+            if (currentProjectId) {
+                if (!currentProjectName) {
+                    const source = this.activityAssignmentForEntry(entry.activityId, activityList);
+                    if (source.status === 'resolved' && source.projectId === currentProjectId && source.projectName) {
+                        const updated = { ...entry, project: source.projectName };
+                        this.timeEntries[index] = updated;
+                        migrated.push({ index, entry: updated });
+                    }
+                }
+                return;
+            }
+            if (currentProjectName) {
+                const source = this.activityAssignmentForEntry(entry.activityId, activityList);
+                const sameName = source.status === 'resolved' && source.projectName
+                    && source.projectName.toLowerCase() === currentProjectName.toLowerCase();
+                const sameId = source.status === 'resolved' && source.projectId
+                    && source.projectId === currentProjectName;
+                if ((sameName || sameId) && source.projectId) {
+                    const updated = {
+                        ...entry,
+                        projectId: source.projectId,
+                        project: source.projectName || currentProjectName
+                    };
+                    this.timeEntries[index] = updated;
+                    migrated.push({ index, entry: updated });
+                }
+                return;
+            }
+            const source = this.activityAssignmentForEntry(entry.activityId, activityList);
+            if (source.status === 'conflict') {
+                conflicts.push({ entryId: entry.id, activityId: entry.activityId });
+                return;
+            }
+            if (source.status === 'unresolved') {
+                unresolved.push({ entryId: entry.id, activityId: entry.activityId });
+                return;
+            }
+            if (source.status !== 'resolved') return;
+            const updated = {
+                ...entry,
+                projectId: source.projectId,
+                project: source.projectName || ''
+            };
+            this.timeEntries[index] = updated;
+            migrated.push({ index, entry: updated });
+        });
+
+        const errors = [];
+        for (const change of migrated) {
+            const raw = Array.isArray(rawEntries) && rawEntries[change.index]
+                ? rawEntries[change.index]
+                : change.entry;
+            try {
+                await this.storage.saveTimeEntry({
+                    ...raw,
+                    projectId: change.entry.projectId,
+                    project: change.entry.project
+                });
+            } catch (error) {
+                errors.push(change.entry.id);
+                console.warn('TimerHub project assignment migration could not save entry:', change.entry.id, error);
+            }
+        }
+        if (!errors.length) {
+            try {
+                await this.storage.setSetting(markerKey, DAY_REVIEW_PROJECT_MIGRATION_VERSION);
+            } catch (error) {
+                console.warn('TimerHub project assignment migration marker could not be saved:', error);
+            }
+        }
+        if (conflicts.length) {
+            console.warn('TimerHub project assignment migration skipped conflicting entries:', conflicts);
+        }
+        if (unresolved.length) {
+            console.warn('TimerHub project assignment migration could not find activities for entries:', unresolved);
+        }
+        const result = { migrated: migrated.length, conflicts, unresolved };
+        this.projectAssignmentMigration = result;
+        return result;
+    }
+
     async loadTimeEntries() {
         const rawEntries = await this.storage.getTimeEntries() || [];
         this.timeEntries = rawEntries.map(e => this.normalizeTimeEntry(e));
         this.syncBatches = this.storage.getSyncBatches
             ? await this.storage.getSyncBatches()
             : [];
+        await this.migrateDayReviewProjectAssignments(rawEntries);
         // Find active entry
         const activeEntry = this.timeEntries.find(e => e.endTimestamp === null);
         if (activeEntry) {
@@ -7726,7 +7870,8 @@ class TimerHubApp {
                     updatedAt: now,
                     source: 'timer',
                     notes: activityNote,
-                    project: activity.project || '',
+                    project: activity.projectName || activity.project || '',
+                    projectId: activity.projectId || '',
                     service: activity.service || '',
                     customerId: activity.customerId || '',
                     serviceId: activity.serviceId || '',
