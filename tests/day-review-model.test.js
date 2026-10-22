@@ -1424,9 +1424,10 @@ test('manual backup downloads a valid, restorable file without credentials', asy
     };
     repository.db = {
         transaction(storeNames) {
-            const storeName = storeNames[0];
+            const names = Array.isArray(storeNames) ? storeNames : [storeNames];
             return {
-                objectStore() {
+                objectStore(name = names[0]) {
+                    const storeName = names.includes(name) ? name : names[0];
                     return {
                         getAll() {
                             const request = {};
@@ -1481,14 +1482,15 @@ test('successful repository mutations snapshot locally, safely, and without recu
 
     await repository.saveActivity({ id: 'first', name: 'Work' });
     await repository.saveActivity({ id: 'second', name: 'Break' });
+    await repository.flushAutomaticSnapshot();
 
     const snapshots = await repository.getAutomaticSnapshots();
-    assert.equal(snapshots.length, 2);
+    assert.equal(snapshots.length, 1, 'rapid mutations are coalesced into one snapshot');
     assert.equal(snapshots[0].format, 'timerhub-snapshot');
     assert.equal(snapshots[0].version, 1);
     assert.equal(snapshots[0].data.activities.length, 2);
     assert.equal(JSON.stringify(snapshots).includes('must-not-be-snapshotted'), false);
-    assert.equal(harness.stats.snapshotTransactions, 2, 'snapshot writes must not recursively snapshot themselves');
+    assert.equal(harness.stats.snapshotTransactions, 1, 'snapshot writes must not recursively snapshot themselves');
 });
 
 test('failed writes do not snapshot; reads and unsaved form typing do not snapshot', async () => {
@@ -1517,6 +1519,7 @@ test('automatic snapshots retain only the latest 20 and restore through the norm
 
     for (let i = 0; i < 22; i += 1) {
         await repository.saveActivity({ id: `activity-${i}`, name: `Activity ${i}` });
+        await repository.flushAutomaticSnapshot();
     }
     const snapshots = await repository.getAutomaticSnapshots();
     assert.equal(snapshots.length, 20);
@@ -1528,6 +1531,7 @@ test('automatic snapshots retain only the latest 20 and restore through the norm
     const restored = vm.runInContext('new StorageRepository()', context);
     restored.db = freshHarness.db;
     await restored.importAll(latestData, false);
+    await restored.flushAutomaticSnapshot();
     assert.equal((await restored.getActivities()).length, 22);
     assert.equal((await restored.getAutomaticSnapshots()).length, 1);
 });
@@ -4310,6 +4314,7 @@ test('automatic snapshot failures are observable but do not fail saved user data
 
     const activity = { id: 'kept', name: 'Saved despite snapshot failure' };
     await repository.saveActivity(activity);
+    await repository.flushAutomaticSnapshot();
 
     assert.equal((await repository.getActivities())[0].id, activity.id);
     assert.equal(repository.snapshotStatus, 'failed');
@@ -5243,7 +5248,7 @@ test('moving an existing entry to a non-overlapping interval is accepted', async
     assert.equal(storageData.timeEntries.find(entry => entry.id === 'entry-a').endTimestamp, t(12, 25));
 });
 
-test('entries that only overlap within a five-minute rounding boundary are not conflicts', async () => {
+test('sub-five-minute overlaps are still reported as conflicts', async () => {
     const { app, document, storageData } = createTestApp();
     const t = (h, m, s = 0) => new Date(2026, 8, 28, h, m, s).getTime();
     await app.addEntry({ id: 'entry-a', activityId: 'act-1', activityNameSnapshot: 'A', startTimestamp: t(12, 0), endTimestamp: t(12, 30) });
@@ -5254,15 +5259,15 @@ test('entries that only overlap within a five-minute rounding boundary are not c
     app.renderReview = () => {};
     const toasts = [];
     app.showToast = message => toasts.push(message);
+    assert.deepEqual([...app.getOverlappingEntryIds()].sort(), ['entry-a', 'entry-b']);
     app.showEntryEditModal('entry-a');
     document.getElementById('entryEditDate').value = '2026-09-28';
     document.getElementById('entryEditStart').value = '12:00';
     document.getElementById('entryEditEndDate').value = '2026-09-28';
     document.getElementById('entryEditEnd').value = '12:30';
     await app.saveTimeEntry();
-    assert.deepEqual([...app.getOverlappingEntryIds()], []);
-    assert.equal(document.getElementById('entryConflictWarning').style.display, 'none');
-    assert.deepEqual(toasts, []);
+    assert.equal(document.getElementById('entryConflictWarning').style.display, 'block');
+    assert.deepEqual(toasts, [app.t('overlappingEntry')]);
     assert.equal(storageData.timeEntries.find(entry => entry.id === 'entry-a').endTimestamp, t(12, 30));
 });
 
@@ -5516,7 +5521,7 @@ test('touching boundaries such as 10:00-11:00 and 11:00-12:00 are not overlappin
     assert.equal(document.getElementById('reviewEntriesList').innerHTML.includes('conflict-entry'), false);
 });
 
-test('conflict detection uses five-minute rounded boundaries instead of exact timestamps', async () => {
+test('conflict detection uses exact stored timestamps while Clockodo rounding stays display-only', async () => {
     const { app, document, storageData, toasts, t } = await createConflictApp(t => [
         { id: 'entry-a', activityId: 'act-1', activityNameSnapshot: 'A', startTimestamp: t(12, 36, 0), endTimestamp: t(12, 37, 0) },
         { id: 'entry-b', activityId: 'act-2', activityNameSnapshot: 'B', startTimestamp: t(12, 36, 30), endTimestamp: t(12, 38, 0) }
@@ -5527,13 +5532,13 @@ test('conflict detection uses five-minute rounded boundaries instead of exact ti
     assert.equal(app.roundToFiveMinutes(t(12, 37, 29)), t(12, 35, 0), 'below the midpoint rounds down');
     assert.equal(app.roundToFiveMinutes(t(12, 37, 30)), t(12, 35, 0), 'the exact midpoint rounds down');
     assert.equal(app.roundToFiveMinutes(t(12, 37, 31)), t(12, 40, 0), 'above the midpoint rounds up');
-    assert.deepEqual([...app.getOverlappingEntryIds()], [], 'rounding turns the exact overlap into touching boundaries');
+    assert.deepEqual([...app.getOverlappingEntryIds()].sort(), ['entry-a', 'entry-b'], 'the 30-second real overlap is not hidden by rounding');
 
     app.showEntryEditModal('entry-b');
     await app.saveTimeEntry();
 
-    assert.equal(document.getElementById('entryConflictWarning').style.display, 'none');
-    assert.deepEqual(toasts, []);
+    assert.equal(document.getElementById('entryConflictWarning').style.display, 'block');
+    assert.deepEqual(toasts, [app.t('overlappingEntry')]);
     assert.equal(storageData.timeEntries.find(entry => entry.id === 'entry-b').startTimestamp, t(12, 36, 30));
     assert.equal(storageData.timeEntries.find(entry => entry.id === 'entry-b').endTimestamp, t(12, 38, 0));
 });
@@ -11912,4 +11917,253 @@ test('group headers reserve enough width for the full name in both states', () =
     assert.equal(app.groupCollapsedWidth(app.groups[0]), requiredWidth, 'the collapsed group reserves the full title width');
     assert.equal(Number.parseFloat(collapsed.style.width), requiredWidth);
     assert.equal(collapsed.children[0].children[1].textContent, longName, 'the full name stays in the collapsed header');
+});
+
+test('overnight entries are grouped by local start day without creating false overlaps', async () => {
+    const { app } = createTestApp();
+    const t = (day, hour, minute = 0) => new Date(2026, 9, day, hour, minute, 0).getTime();
+    await app.addEntry({
+        id: 'late', activityId: 'act-1', activityNameSnapshot: 'Late shift',
+        startTimestamp: t(5, 23), endTimestamp: t(6, 0)
+    });
+    await app.addEntry({
+        id: 'early', activityId: 'act-2', activityNameSnapshot: 'Early shift',
+        startTimestamp: t(6, 0), endTimestamp: t(6, 2)
+    });
+    assert.deepEqual([...app.getOverlappingEntryIds()], []);
+    assert.deepEqual(Array.from(app.getDayEntries('2026-10-05'), entry => entry.id), ['late']);
+    assert.deepEqual(Array.from(app.getDayEntries('2026-10-06'), entry => entry.id), ['early']);
+    assert.equal(app.calculateDayTotal('2026-10-05'), 60 * 60 * 1000);
+});
+
+test('entries around a daylight-saving jump stay non-overlapping and keep exact durations', async () => {
+    const { app } = createTestApp();
+    const beforeJump = new Date(2026, 2, 29, 1, 0, 0).getTime();
+    const afterJump = new Date(2026, 2, 29, 3, 0, 0).getTime();
+    await app.addEntry({
+        id: 'before-dst', activityId: 'act-1', activityNameSnapshot: 'Before',
+        startTimestamp: beforeJump, endTimestamp: beforeJump + 30 * 60 * 1000
+    });
+    await app.addEntry({
+        id: 'after-dst', activityId: 'act-2', activityNameSnapshot: 'After',
+        startTimestamp: afterJump, endTimestamp: afterJump + 60 * 60 * 1000
+    });
+    app.reviewDate = '2026-03-29';
+    assert.deepEqual([...app.getOverlappingEntryIds()], []);
+    const entries = app.getDayEntries('2026-03-29');
+    assert.deepEqual(Array.from(entries, entry => entry.id), ['before-dst', 'after-dst']);
+    assert.equal(app.getSuspiciousEntries('2026-03-29').length, 0);
+    assert.equal(app.calculateDayTotal('2026-03-29'), 90 * 60 * 1000);
+});
+
+test('invalid and missing timestamps are preserved, excluded from overlap checks, and never replaced with now', async () => {
+    const { app, storageData } = createTestApp();
+    storageData.timeEntries.push(
+        { id: 'missing-start', activityId: 'act-1', activityNameSnapshot: 'Missing start', endTimestamp: Date.now() },
+        { id: 'reversed', activityId: 'act-1', activityNameSnapshot: 'Reversed', startTimestamp: 2000, endTimestamp: 1000 },
+        { id: 'bad-end', activityId: 'act-1', activityNameSnapshot: 'Bad end', startTimestamp: 3000, endTimestamp: 'not-a-time' }
+    );
+    await app.loadTimeEntries();
+    const missing = app.timeEntries.find(entry => entry.id === 'missing-start');
+    const badEnd = app.timeEntries.find(entry => entry.id === 'bad-end');
+    const reversed = app.timeEntries.find(entry => entry.id === 'reversed');
+    assert.equal(missing.startTimestamp, null);
+    assert.equal(missing.timeDataInvalid, true);
+    assert.equal(badEnd.endTimestamp, null);
+    assert.equal(badEnd.timeDataInvalid, true);
+    assert.equal(reversed.startTimestamp, 2000);
+    assert.equal(reversed.endTimestamp, 1000);
+    assert.deepEqual([...app.getOverlappingEntryIds()], []);
+    assert.deepEqual(Array.from(app.getSuspiciousEntries(app.toDateString(new Date(1970, 0, 1, 0, 0, 2))), item => item.entry.id).sort(), ['bad-end', 'reversed']);
+});
+
+test('a failed add or update never leaves stale in-memory entries that could create false overlaps', async () => {
+    const { app, storageData } = createTestApp();
+    const t = (hour, minute = 0) => new Date(2026, 9, 5, hour, minute, 0).getTime();
+    const originalSave = app.storage.saveTimeEntry;
+    let failNext = true;
+    app.storage.saveTimeEntry = async entry => {
+        if (failNext) {
+            failNext = false;
+            throw new Error('storage_write_failed');
+        }
+        return originalSave(entry);
+    };
+
+    await assert.rejects(() => app.addEntry({
+        id: 'not-saved', activityId: 'act-1', activityNameSnapshot: 'Not saved',
+        startTimestamp: t(10), endTimestamp: t(11)
+    }), /storage_write_failed/);
+    assert.equal(app.timeEntries.some(entry => entry.id === 'not-saved'), false);
+    assert.equal(storageData.timeEntries.some(entry => entry.id === 'not-saved'), false);
+
+    const saved = await app.addEntry({
+        id: 'editable', activityId: 'act-1', activityNameSnapshot: 'Editable',
+        startTimestamp: t(12), endTimestamp: t(13)
+    });
+    failNext = true;
+    await assert.rejects(() => app.updateEntry(saved.id, {
+        startTimestamp: t(14), endTimestamp: t(15)
+    }), /storage_write_failed/);
+    assert.equal(app.timeEntries.find(entry => entry.id === 'editable').startTimestamp, t(12));
+    assert.equal(storageData.timeEntries.find(entry => entry.id === 'editable').startTimestamp, t(12));
+});
+
+test('a failed delete keeps the entry in memory and storage', async () => {
+    const { app, storageData } = createTestApp();
+    const t = (hour, minute = 0) => new Date(2026, 9, 5, hour, minute, 0).getTime();
+    const entry = await app.addEntry({
+        id: 'keep-on-failure', activityId: 'act-1', activityNameSnapshot: 'Keep',
+        startTimestamp: t(8), endTimestamp: t(9)
+    });
+    const originalDelete = app.storage.deleteTimeEntry;
+    app.storage.deleteTimeEntry = async () => { throw new Error('delete_failed'); };
+    await assert.rejects(() => app.deleteEntry(entry.id), /delete_failed/);
+    assert.equal(app.timeEntries.some(item => item.id === entry.id), true);
+    assert.equal(storageData.timeEntries.some(item => item.id === entry.id), true);
+    app.storage.deleteTimeEntry = originalDelete;
+});
+
+test('a restore failure rolls back to the pre-restore snapshot instead of leaving replaced data', async () => {
+    const { app, storageData } = createTestApp();
+    const t = (hour, minute = 0) => new Date(2026, 9, 5, hour, minute, 0).getTime();
+    await app.addEntry({
+        id: 'existing', activityId: 'act-1', activityNameSnapshot: 'Existing',
+        startTimestamp: t(8), endTimestamp: t(9)
+    });
+    app.storage.validateBackupData = data => data;
+    const originalImport = app.storage.importAll.bind(app.storage);
+    let calls = 0;
+    app.storage.importAll = async (data, merge) => {
+        calls += 1;
+        if (calls === 1) {
+            await originalImport(data, merge);
+            throw new Error('restore_verification_failed');
+        }
+        return originalImport(data, merge);
+    };
+    app.loadActivities = async () => {};
+    app.loadGroups = async () => {};
+    app.loadTimeEntries = async () => {};
+    app.migrateMissingGroupLayouts = async () => {};
+    app.migrateActivityCanvasGeometry = async () => {};
+    app.renderAll = () => {};
+    app.refreshAutomaticBackupStatus = async () => {};
+    app.updateExternalBackupStatus = async () => {};
+    app.showToast = () => {};
+    app.openRestoreConfirmation({ format: 'timerhub-backup', version: 1, activities: [{ id: 'restored' }], timeEntries: [], settings: {} });
+    assert.equal(await app.restorePendingData(false), false);
+    assert.equal(calls, 2, 'the safety snapshot is restored after a failed replace');
+    assert.equal(storageData.timeEntries.some(item => item.id === 'existing'), true);
+});
+
+test('startup backup gate refuses unsupported, missing, revoked, and unwritable directories', async () => {
+    const { app } = createTestApp();
+    const makeService = (state, verify) => ({
+        state,
+        directoryHandle: state === 'needs-selection' ? null : { kind: 'directory', name: 'Backups' },
+        getStatus() {
+            return {
+                state, directoryName: state === 'needs-selection' ? '' : 'Backups',
+                lastError: state === 'permission-denied' ? 'permission_prompt' : null,
+                capabilities: { directoryPicker: state !== 'unsupported' }
+            };
+        },
+        async verifyWritable() { if (verify) throw verify; return true; },
+        async cleanupOwnTemporaryFiles() { return 0; }
+    });
+    app.backupService = makeService('unsupported');
+    assert.equal((await app.evaluateBackupGate()).reason, 'unsupported');
+    app.backupService = makeService('needs-selection');
+    assert.equal((await app.evaluateBackupGate()).reason, 'needs-selection');
+    app.backupService = makeService('permission-denied');
+    assert.equal((await app.evaluateBackupGate()).reason, 'permission-denied');
+    app.backupService = makeService('ready');
+    assert.equal((await app.evaluateBackupGate()).ready, true);
+    app.backupService = makeService('ready', Object.assign(new Error('denied'), { code: 'backup_permission_denied' }));
+    const failed = await app.evaluateBackupGate();
+    assert.equal(failed.ready, false);
+    assert.equal(failed.reason, 'permission-denied');
+});
+
+test('external backups are skipped while startup is locked and manual backup failures keep the app usable', async () => {
+    const { app } = createTestApp();
+    const calls = [];
+    app.backupService = {
+        directoryHandle: { kind: 'directory', name: 'Backups' },
+        async createBackup(options) { calls.push(options); return { name: 'backup.json', skipped: false }; },
+        async findLatestVerified() { return null; },
+        async listBackups() { return []; },
+        getStatus() { return { state: 'ready', directoryName: 'Backups' }; }
+    };
+    app.updateExternalBackupStatus = async () => {};
+    app.showToast = () => {};
+    app.startupFinalized = false;
+    app.handleMutationCommitted(1);
+    assert.equal(calls.length, 0, 'mutations during setup do not schedule external backups');
+    app.startupFinalized = true;
+    app.scheduleExternalBackup(2);
+    if (app.autoBackupTimer !== null) clearTimeout(app.autoBackupTimer);
+    await app.flushExternalBackup({ force: true });
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].force, true);
+});
+
+test('an empty local database with a non-empty external backup is treated as recoverable, not as a fresh install', () => {
+    const { app, document, localStorageData } = createTestApp();
+    app.activities = [];
+    app.archivedActivities = [];
+    app.timeEntries = [];
+    app.groups = [];
+    app.missingDataSuspected = false;
+    app.latestExternalBackup = {
+        name: 'timerhub_auto_backup_20260101_000000_x.json',
+        createdAt: Date.now() - 1000,
+        meta: { counts: { activities: 2, timeEntries: 5, groups: 1 } }
+    };
+    app.refreshMissingDataWarning();
+    assert.equal(document.getElementById('missingDataWarning').style.display, 'block');
+    app.dismissMissingDataWarning();
+    assert.ok(Number(localStorageData.get('timerhubExternalEmptyWarningDismissedAt')) > 0);
+    app.refreshMissingDataWarning();
+    assert.equal(document.getElementById('missingDataWarning').style.display, 'none');
+    app.latestExternalBackup = {
+        name: 'newer.json', createdAt: Date.now() + 5000,
+        meta: { counts: { activities: 2, timeEntries: 5, groups: 1 } }
+    };
+    app.refreshMissingDataWarning();
+    assert.equal(document.getElementById('missingDataWarning').style.display, 'block', 'a newer backup reopens the recovery warning');
+});
+
+test('a burst of 50 saves coalesces into one automatic snapshot and one consistent export read', async () => {
+    const { context } = createTestApp();
+    const repository = vm.runInContext('new StorageRepository()', context);
+    const harness = createIndexedDbHarness();
+    repository.db = harness.db;
+    let exportTransactions = 0;
+    const originalTransaction = harness.db.transaction;
+    harness.db.transaction = function (storeNames, mode) {
+        if (mode === 'readonly' && Array.isArray(storeNames) && storeNames.length > 1) exportTransactions += 1;
+        return originalTransaction.call(this, storeNames, mode);
+    };
+    for (let index = 0; index < 50; index += 1) {
+        await repository.saveActivity({ id: `burst-${index}`, name: `Burst ${index}` });
+    }
+    assert.equal(harness.stats.snapshotTransactions, 0, 'no synchronous full-database snapshot is taken per save');
+    await repository.flushAutomaticSnapshot();
+    assert.equal(harness.stats.snapshotTransactions, 1, '50 saves produce exactly one local snapshot');
+    assert.equal(exportTransactions, 1, 'one export transaction captures all stores consistently');
+});
+
+test('duplicate records with the same stable ID do not flag a free interval as overlapping', async () => {
+    const { app } = createTestApp();
+    const t = (hour, minute = 0) => new Date(2026, 9, 5, hour, minute, 0).getTime();
+    const entry = {
+        id: 'duplicate-id', activityId: 'act-1', activityNameSnapshot: 'Painting',
+        startTimestamp: t(9), endTimestamp: t(10)
+    };
+    app.timeEntries = [entry, { ...entry }];
+    app.reviewDate = '2026-10-05';
+    assert.deepEqual([...app.getOverlappingEntryIds()], []);
+    assert.equal(app.getSuspiciousEntries('2026-10-05').length, 0);
 });

@@ -183,9 +183,21 @@ Access via **📋** button in top navigation.
 
 ### Backup & Restore
 
-**Create Backup:**
-1. Settings (⚙️) → "Backup Data"
-2. Save the JSON file
+TimerHub requires a persistent backup folder outside browser storage before the
+main application opens. On first start, choose a folder and allow read/write
+access. Automatic backups are written to that folder, verified with a checksum,
+and checked again on every start. If access is revoked, the app stays locked
+until the folder is reauthorized or another folder is selected.
+
+Persistent folder access uses the File System Access API and is currently
+available in Chromium-based desktop browsers (Chrome and Edge). Browsers without
+that API, including Chrome on Android, stay on the backup setup screen and can
+export the current data as a file. They do not pretend that a local IndexedDB
+snapshot is an external automatic backup.
+
+**Create a manual file:**
+1. Settings (⚙️) → "Create backup"
+2. Save the JSON file outside TimerHub as well
 
 **Restore Backup:**
 1. Settings (⚙️) → "Restore Data"
@@ -235,8 +247,9 @@ All data is stored **locally** in your device's browser using **IndexedDB**:
 - Synced across devices (local only)
 
 **To backup:**
-1. Settings → "Backup Data"
-2. Save the JSON file to cloud storage (Google Drive, Dropbox, OneDrive, etc.)
+1. Select a persistent backup folder when TimerHub starts.
+2. TimerHub writes verified automatic backups there after changes.
+3. Optionally use Settings → "Create backup" to download an additional JSON copy.
 
 **To restore:**
 1. Keep the JSON file safe

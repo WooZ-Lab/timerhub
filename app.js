@@ -228,9 +228,53 @@ const extendedTranslations = {
         missingDataWarningTitle: 'No TimerHub data found on this device',
         missingDataWarningBody: 'Data was stored on this device before, but nothing was found now. Browser storage may have been cleared. Restore a backup file if you have one.',
         missingDataRestore: 'Restore from backup file',
+        missingDataRestoreExternal: 'Restore latest external backup',
         missingDataDismiss: 'Dismiss',
         diagnosticsTitle: 'Local diagnostics',
         diagnosticsSummary: 'Database {name} v{version} · {activities} activities · {entries} time entries · {groups} groups',
+        diagnosticsDescription: 'Recent errors and warnings. Credentials and sensitive payloads are redacted.',
+        diagnosticsEmpty: 'No recent warnings or errors.',
+        diagnosticsExport: 'Export diagnostics', diagnosticsClear: 'Clear diagnostics',
+        diagnosticsExportFailed: 'Could not export the diagnostics file.',
+        diagnosticsCleared: 'Diagnostics cleared.',
+        backupSetupTitle: 'Choose a backup folder',
+        backupSetupIntro: 'TimerHub needs a folder outside browser storage to protect your data.',
+        backupSetupExplanation: 'Automatic backups are written to a folder you control, so they survive browser storage clean-up, app restarts, and database problems.',
+        backupSetupBrowserNote: 'Your browser may ask you to allow access to this folder again when TimerHub starts. Keep the folder available on this device.',
+        backupSetupChoose: 'Choose backup folder', backupSetupReauthorize: 'Reauthorize folder',
+        backupSetupRetry: 'Retry verification', backupSetupExport: 'Export current data',
+        backupSetupExportHelp: 'If the folder is unavailable, export your current data now so it can be recovered later.',
+        backupSetupDirectoryLabel: 'Backup folder: {name}',
+        backupSetupVerifying: 'Verifying folder access and test backup…',
+        backupSetupVerified: 'Backup folder verified. Starting TimerHub…',
+        backupSetupBlocked: 'The main application stays locked until a usable backup folder is verified.',
+        backupSetupUnsupportedTitle: 'Persistent backup folder is not supported',
+        backupSetupUnsupportedBody: 'This browser cannot give TimerHub persistent access to a folder outside browser storage. Automatic external backups cannot be enabled here. Open TimerHub in a Chromium-based desktop browser to select a folder, or export your data now.',
+        backupSetupPermissionTitle: 'Backup folder access is required',
+        backupSetupPermissionBody: 'Access to the selected folder was revoked or has expired. Reauthorize it, choose another folder, or export your data.',
+        backupSetupErrorTitle: 'Backup folder verification failed',
+        backupSetupNoData: 'No local data is available to export.',
+        backupSetupCurrentData: 'Current data: {activities} activities · {entries} entries.',
+        backupSetupSelectFailed: 'The backup folder could not be selected or verified. Nothing was deleted.',
+        backupSetupExportDone: 'Data exported. Keep the file outside browser storage.',
+        backupSetupExportFailed: 'Could not export the current data.',
+        backupRetentionLabel: 'Automatic external backups to keep',
+        externalBackupTitle: 'External automatic backups',
+        externalBackupDescription: 'Verified backups are written to the folder you selected. Manual backups are never removed by retention.',
+        externalBackupStatusNone: 'No verified external backup yet.',
+        externalBackupStatusOk: 'Last verified external backup: {date}',
+        externalBackupStatusFolder: 'Backup folder: {name}',
+        externalBackupNow: 'Back up now', externalBackupChooseFolder: 'Choose or change folder',
+        externalBackupVerify: 'Verify folder', externalBackupRefresh: 'Refresh backup list',
+        externalBackupSelect: 'Choose an external backup',
+        externalBackupRestore: 'Restore selected external backup',
+        externalBackupNone: 'No verified external backups found.',
+        externalBackupListFailed: 'Could not read the backup folder. Previous backups were not changed.',
+        externalBackupSucceeded: 'External backup verified: {name}',
+        externalBackupFailed: 'External backup failed. Previous backups were kept.',
+        externalBackupPermissionLost: 'Backup folder permission was revoked. The main application is locked.',
+        externalBackupSafetyCopyFailed: 'Could not create a safety backup before restoring. Restore was cancelled.',
+        externalBackupNotConfigured: 'No usable backup folder is configured.',
         shareLinkBtn: 'Share link',
         shareLinkTitle: 'Share day as a link',
         shareLinkDesc: 'Selected entries are encrypted on this device before upload. Only encrypted data is stored temporarily, and the link expires automatically.',
@@ -338,6 +382,7 @@ const extendedTranslations = {
         issueRunning: 'Timer currently running',
         issueZeroDuration: 'Zero or negative duration',
         issueOverlapping: 'Overlaps with another entry',
+        issueInvalidTime: 'Invalid or missing time data',
         issueUnusuallyLong: 'Unusually long (>16h)',
         notes: 'Notes', project: 'Project', service: 'Service', customer: 'Customer', endDate: 'End Date',
         entryTooLong: 'An entry cannot be longer than 24 hours.',
@@ -605,9 +650,53 @@ const extendedTranslations = {
         missingDataWarningTitle: 'Keine TimerHub-Daten auf diesem Gerät gefunden',
         missingDataWarningBody: 'Auf diesem Gerät waren zuvor Daten gespeichert, jetzt wurde nichts gefunden. Möglicherweise wurde der Browserspeicher gelöscht. Stellen Sie eine Sicherungsdatei wieder her, falls vorhanden.',
         missingDataRestore: 'Aus Sicherungsdatei wiederherstellen',
+        missingDataRestoreExternal: 'Neueste externe Sicherung wiederherstellen',
         missingDataDismiss: 'Ausblenden',
         diagnosticsTitle: 'Lokale Diagnose',
         diagnosticsSummary: 'Datenbank {name} v{version} · {activities} Aktivitäten · {entries} Zeiteinträge · {groups} Gruppen',
+        diagnosticsDescription: 'Letzte Fehler und Warnungen. Zugangsdaten und sensible Inhalte werden ausgeblendet.',
+        diagnosticsEmpty: 'Keine aktuellen Warnungen oder Fehler.',
+        diagnosticsExport: 'Diagnose exportieren', diagnosticsClear: 'Diagnose löschen',
+        diagnosticsExportFailed: 'Die Diagnosedatei konnte nicht exportiert werden.',
+        diagnosticsCleared: 'Diagnose gelöscht.',
+        backupSetupTitle: 'Sicherungsordner auswählen',
+        backupSetupIntro: 'TimerHub benötigt einen Ordner außerhalb des Browser-Speichers, um deine Daten zu schützen.',
+        backupSetupExplanation: 'Automatische Sicherungen werden in einem Ordner deiner Wahl gespeichert. So überstehen sie das Löschen des Browser-Speichers, App-Neustarts und Datenbankprobleme.',
+        backupSetupBrowserNote: 'Der Browser kann beim Start erneut nach dem Zugriff auf diesen Ordner fragen. Halte den Ordner auf diesem Gerät verfügbar.',
+        backupSetupChoose: 'Sicherungsordner auswählen', backupSetupReauthorize: 'Ordner erneut autorisieren',
+        backupSetupRetry: 'Prüfung wiederholen', backupSetupExport: 'Aktuelle Daten exportieren',
+        backupSetupExportHelp: 'Wenn der Ordner nicht verfügbar ist, exportiere deine aktuellen Daten jetzt, damit du sie später wiederherstellen kannst.',
+        backupSetupDirectoryLabel: 'Sicherungsordner: {name}',
+        backupSetupVerifying: 'Ordnerzugriff und Testsicherung werden geprüft…',
+        backupSetupVerified: 'Sicherungsordner geprüft. TimerHub wird gestartet…',
+        backupSetupBlocked: 'Die Hauptanwendung bleibt gesperrt, bis ein nutzbarer Sicherungsordner geprüft wurde.',
+        backupSetupUnsupportedTitle: 'Dauerhafter Sicherungsordner wird nicht unterstützt',
+        backupSetupUnsupportedBody: 'Dieser Browser kann TimerHub keinen dauerhaften Zugriff auf einen Ordner außerhalb des Browser-Speichers geben. Automatische externe Sicherungen sind hier nicht möglich. Öffne TimerHub in einem Chromium-basierten Desktop-Browser, um einen Ordner auszuwählen, oder exportiere jetzt deine Daten.',
+        backupSetupPermissionTitle: 'Zugriff auf den Sicherungsordner erforderlich',
+        backupSetupPermissionBody: 'Der Zugriff auf den ausgewählten Ordner wurde entzogen oder ist abgelaufen. Autorisiere ihn erneut, wähle einen anderen Ordner oder exportiere deine Daten.',
+        backupSetupErrorTitle: 'Prüfung des Sicherungsordners fehlgeschlagen',
+        backupSetupNoData: 'Keine lokalen Daten zum Exportieren vorhanden.',
+        backupSetupCurrentData: 'Aktuelle Daten: {activities} Aktivitäten · {entries} Einträge.',
+        backupSetupSelectFailed: 'Der Sicherungsordner konnte nicht ausgewählt oder geprüft werden. Es wurde nichts gelöscht.',
+        backupSetupExportDone: 'Daten exportiert. Bewahre die Datei außerhalb des Browser-Speichers auf.',
+        backupSetupExportFailed: 'Die aktuellen Daten konnten nicht exportiert werden.',
+        backupRetentionLabel: 'Automatische externe Sicherungen aufbewahren',
+        externalBackupTitle: 'Externe automatische Sicherungen',
+        externalBackupDescription: 'Geprüfte Sicherungen werden im ausgewählten Ordner gespeichert. Manuelle Sicherungen werden nie automatisch gelöscht.',
+        externalBackupStatusNone: 'Noch keine geprüfte externe Sicherung.',
+        externalBackupStatusOk: 'Letzte geprüfte externe Sicherung: {date}',
+        externalBackupStatusFolder: 'Sicherungsordner: {name}',
+        externalBackupNow: 'Jetzt sichern', externalBackupChooseFolder: 'Ordner auswählen oder ändern',
+        externalBackupVerify: 'Ordner prüfen', externalBackupRefresh: 'Sicherungsliste aktualisieren',
+        externalBackupSelect: 'Externe Sicherung auswählen',
+        externalBackupRestore: 'Ausgewählte externe Sicherung wiederherstellen',
+        externalBackupNone: 'Keine geprüften externen Sicherungen gefunden.',
+        externalBackupListFailed: 'Der Sicherungsordner konnte nicht gelesen werden. Vorhandene Sicherungen wurden nicht verändert.',
+        externalBackupSucceeded: 'Externe Sicherung geprüft: {name}',
+        externalBackupFailed: 'Externe Sicherung fehlgeschlagen. Vorhandene Sicherungen blieben erhalten.',
+        externalBackupPermissionLost: 'Der Zugriff auf den Sicherungsordner wurde entzogen. Die Hauptanwendung ist gesperrt.',
+        externalBackupSafetyCopyFailed: 'Vor der Wiederherstellung konnte keine Schutzsicherung erstellt werden. Die Wiederherstellung wurde abgebrochen.',
+        externalBackupNotConfigured: 'Kein nutzbarer Sicherungsordner konfiguriert.',
         shareLinkBtn: 'Link teilen',
         shareLinkTitle: 'Tag als Link teilen',
         shareLinkDesc: 'Ausgewählte Einträge werden vor dem Hochladen auf diesem Gerät verschlüsselt. Es werden nur verschlüsselte Daten vorübergehend gespeichert, und der Link läuft automatisch ab.',
@@ -715,6 +804,7 @@ const extendedTranslations = {
         issueRunning: 'Timer läuft noch',
         issueZeroDuration: 'Keine oder negative Dauer',
         issueOverlapping: 'Überlappt mit einem anderen Eintrag',
+        issueInvalidTime: 'Ungültige oder fehlende Zeitangaben',
         issueUnusuallyLong: 'Ungewöhnlich lang (>16h)',
         notes: 'Notizen', project: 'Projekt', service: 'Leistung', customer: 'Kunde', endDate: 'Enddatum',
         entryTooLong: 'Ein Eintrag darf nicht länger als 24 Stunden sein.',
@@ -982,9 +1072,53 @@ const extendedTranslations = {
         missingDataWarningTitle: 'Данные TimerHub на этом устройстве не найдены',
         missingDataWarningBody: 'Ранее на этом устройстве были сохранены данные, но сейчас ничего не найдено. Возможно, хранилище браузера было очищено. Восстановите данные из файла резервной копии, если он есть.',
         missingDataRestore: 'Восстановить из файла копии',
+        missingDataRestoreExternal: 'Восстановить последнюю внешнюю копию',
         missingDataDismiss: 'Скрыть',
         diagnosticsTitle: 'Локальная диагностика',
         diagnosticsSummary: 'База {name} v{version} · занятий: {activities} · записей: {entries} · групп: {groups}',
+        diagnosticsDescription: 'Последние ошибки и предупреждения. Учётные данные и конфиденциальные данные скрыты.',
+        diagnosticsEmpty: 'Нет недавних предупреждений или ошибок.',
+        diagnosticsExport: 'Экспортировать диагностику', diagnosticsClear: 'Очистить диагностику',
+        diagnosticsExportFailed: 'Не удалось экспортировать файл диагностики.',
+        diagnosticsCleared: 'Диагностика очищена.',
+        backupSetupTitle: 'Выберите папку для резервных копий',
+        backupSetupIntro: 'TimerHub нужна папка вне хранилища браузера для защиты ваших данных.',
+        backupSetupExplanation: 'Автоматические копии сохраняются в выбранной вами папке, поэтому они переживают очистку хранилища браузера, перезапуск приложения и проблемы с базой данных.',
+        backupSetupBrowserNote: 'Браузер может снова запросить доступ к этой папке при запуске TimerHub. Папка должна оставаться доступной на этом устройстве.',
+        backupSetupChoose: 'Выбрать папку', backupSetupReauthorize: 'Разрешить доступ снова',
+        backupSetupRetry: 'Проверить ещё раз', backupSetupExport: 'Экспортировать текущие данные',
+        backupSetupExportHelp: 'Если папка недоступна, экспортируйте текущие данные сейчас, чтобы восстановить их позже.',
+        backupSetupDirectoryLabel: 'Папка резервных копий: {name}',
+        backupSetupVerifying: 'Проверка доступа к папке и тестовой копии…',
+        backupSetupVerified: 'Папка проверена. Запуск TimerHub…',
+        backupSetupBlocked: 'Основное приложение останется заблокированным, пока не будет проверена доступная папка для копий.',
+        backupSetupUnsupportedTitle: 'Постоянная папка для копий не поддерживается',
+        backupSetupUnsupportedBody: 'Этот браузер не может предоставить TimerHub постоянный доступ к папке вне хранилища браузера. Автоматические внешние копии здесь недоступны. Откройте TimerHub в браузере Chromium на компьютере, чтобы выбрать папку, или экспортируйте данные сейчас.',
+        backupSetupPermissionTitle: 'Требуется доступ к папке резервных копий',
+        backupSetupPermissionBody: 'Доступ к выбранной папке отозван или истёк. Разрешите его снова, выберите другую папку или экспортируйте данные.',
+        backupSetupErrorTitle: 'Не удалось проверить папку резервных копий',
+        backupSetupNoData: 'Нет локальных данных для экспорта.',
+        backupSetupCurrentData: 'Текущие данные: занятий — {activities}, записей — {entries}.',
+        backupSetupSelectFailed: 'Не удалось выбрать или проверить папку. Ничего не было удалено.',
+        backupSetupExportDone: 'Данные экспортированы. Храните файл вне хранилища браузера.',
+        backupSetupExportFailed: 'Не удалось экспортировать текущие данные.',
+        backupRetentionLabel: 'Хранить автоматических внешних копий',
+        externalBackupTitle: 'Внешние автоматические копии',
+        externalBackupDescription: 'Проверенные копии сохраняются в выбранной папке. Ручные копии никогда не удаляются автоматически.',
+        externalBackupStatusNone: 'Проверенных внешних копий пока нет.',
+        externalBackupStatusOk: 'Последняя проверенная внешняя копия: {date}',
+        externalBackupStatusFolder: 'Папка резервных копий: {name}',
+        externalBackupNow: 'Создать копию', externalBackupChooseFolder: 'Выбрать или изменить папку',
+        externalBackupVerify: 'Проверить папку', externalBackupRefresh: 'Обновить список копий',
+        externalBackupSelect: 'Выберите внешнюю копию',
+        externalBackupRestore: 'Восстановить выбранную внешнюю копию',
+        externalBackupNone: 'Проверенные внешние копии не найдены.',
+        externalBackupListFailed: 'Не удалось прочитать папку резервных копий. Существующие копии не изменены.',
+        externalBackupSucceeded: 'Внешняя копия проверена: {name}',
+        externalBackupFailed: 'Не удалось создать внешнюю копию. Предыдущие копии сохранены.',
+        externalBackupPermissionLost: 'Доступ к папке резервных копий отозван. Основное приложение заблокировано.',
+        externalBackupSafetyCopyFailed: 'Не удалось создать защитную копию перед восстановлением. Восстановление отменено.',
+        externalBackupNotConfigured: 'Нет доступной папки для резервных копий.',
         shareLinkBtn: 'Поделиться ссылкой',
         shareLinkTitle: 'Поделиться днём по ссылке',
         shareLinkDesc: 'Выбранные записи шифруются на этом устройстве перед загрузкой. На сервере временно хранятся только зашифрованные данные, а ссылка автоматически истекает.',
@@ -1092,6 +1226,7 @@ const extendedTranslations = {
         issueRunning: 'Таймер ещё работает',
         issueZeroDuration: 'Нулевая или отрицательная длительность',
         issueOverlapping: 'Пересекается с другой записью',
+        issueInvalidTime: 'Недопустимое или отсутствующее время',
         issueUnusuallyLong: 'Необычно долго (>16 ч)',
         notes: 'Заметки', project: 'Проект', service: 'Услуга', customer: 'Клиент', endDate: 'Дата окончания',
         entryTooLong: 'Запись не может длиться более 24 часов.',
@@ -1422,7 +1557,13 @@ class StorageRepository {
         this.snapshotSequence = 0;
         this.snapshotStatus = 'idle';
         this.lastSnapshotAt = null;
+        this.lastSnapshotRevision = -1;
+        this.dataRevision = 0;
+        this.snapshotTimer = null;
+        this.snapshotPending = false;
         this.onSnapshotStatus = null;
+        this.onDiagnostic = null;
+        this.onMutationCommitted = null;
     }
 
     async init() {
@@ -1507,9 +1648,13 @@ class StorageRepository {
                 reject(error);
                 return;
             }
-            tx.oncomplete = async () => {
-                await this.writeAutomaticSnapshotSafely();
+            tx.oncomplete = () => {
+                this.dataRevision += 1;
+                this.scheduleAutomaticSnapshot();
                 resolve(result);
+                Promise.resolve()
+                    .then(() => this.onMutationCommitted?.(this.dataRevision))
+                    .catch(error => this.reportStorageWarning('mutation-listener', error));
             };
             tx.onerror = () => reject(tx.error || new Error('storage_write_failed'));
             tx.onabort = () => reject(tx.error || new Error('storage_write_aborted'));
@@ -1518,7 +1663,41 @@ class StorageRepository {
         return operation;
     }
 
+    reportStorageWarning(operation, error, status = 'failed') {
+        try {
+            this.onDiagnostic?.('warn', operation, error, { status });
+        } catch {
+            // Diagnostics must never affect storage.
+        }
+    }
+
+    scheduleAutomaticSnapshot(delay = 1500) {
+        if (this.snapshotTimer !== null) {
+            this.snapshotPending = true;
+            return;
+        }
+        this.snapshotTimer = setTimeout(() => {
+            this.snapshotTimer = null;
+            this.writeAutomaticSnapshotSafely().finally(() => {
+                if (!this.snapshotPending) return;
+                this.snapshotPending = false;
+                this.scheduleAutomaticSnapshot(0);
+            });
+        }, Math.max(0, Number(delay) || 0));
+    }
+
+    async flushAutomaticSnapshot() {
+        if (this.snapshotTimer !== null) {
+            clearTimeout(this.snapshotTimer);
+            this.snapshotTimer = null;
+        }
+        this.snapshotPending = false;
+        return this.writeAutomaticSnapshotSafely();
+    }
+
     async writeAutomaticSnapshotSafely() {
+        const revision = this.dataRevision;
+        if (revision === this.lastSnapshotRevision) return true;
         try {
             const snapshot = {
                 id: `${Date.now()}-${++this.snapshotSequence}`,
@@ -1531,27 +1710,50 @@ class StorageRepository {
                 const tx = this.db.transaction(['snapshots'], 'readwrite');
                 const store = tx.objectStore('snapshots');
                 store.put(snapshot);
-                const listRequest = store.getAll();
-                listRequest.onsuccess = () => {
-                    const ordered = listRequest.result
-                        .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
-                    ordered.slice(0, Math.max(0, ordered.length - 20))
-                        .forEach(item => store.delete(item.id));
-                };
+                // Count and delete through a cursor so pruning never loads all
+                // previous snapshot payloads into memory at once.
+                if (typeof store.count === 'function' && typeof store.index === 'function') {
+                    const countRequest = store.count();
+                    countRequest.onsuccess = () => {
+                        let excess = Math.max(0, Number(countRequest.result) - 20);
+                        if (!excess) return;
+                        const cursorRequest = store.index('createdAt').openCursor();
+                        cursorRequest.onsuccess = () => {
+                            const cursor = cursorRequest.result;
+                            if (!cursor || excess <= 0) return;
+                            store.delete(cursor.primaryKey);
+                            excess -= 1;
+                            cursor.continue();
+                        };
+                    };
+                } else {
+                    const listRequest = store.getAll();
+                    listRequest.onsuccess = () => {
+                        const ordered = listRequest.result
+                            .sort((a, b) => a.createdAt - b.createdAt || String(a.id).localeCompare(String(b.id)));
+                        ordered.slice(0, Math.max(0, ordered.length - 20))
+                            .forEach(item => store.delete(item.id));
+                    };
+                }
                 tx.oncomplete = resolve;
                 tx.onerror = () => reject(tx.error || new Error('snapshot_write_failed'));
                 tx.onabort = () => reject(tx.error || new Error('snapshot_write_aborted'));
             });
+            this.lastSnapshotRevision = revision;
             this.snapshotStatus = 'saved';
             this.lastSnapshotAt = snapshot.createdAt;
-            Promise.resolve().then(() => this.onSnapshotStatus?.()).catch(() => {
-                console.warn('TimerHub automatic snapshot status refresh failed');
+            Promise.resolve().then(() => this.onSnapshotStatus?.()).catch(error => {
+                this.reportStorageWarning('snapshot-status-refresh', error);
             });
             return true;
-        } catch {
+        } catch (error) {
             this.snapshotStatus = 'failed';
+            try {
+                this.onDiagnostic?.('error', 'automatic-snapshot', error, { status: 'failed' });
+            } catch {
+                // ignore
+            }
             Promise.resolve().then(() => this.onSnapshotStatus?.()).catch(() => {});
-            console.warn('TimerHub automatic snapshot failed (snapshot_write_failed)');
             return false;
         }
     }
@@ -1781,19 +1983,46 @@ class StorageRepository {
     }
 
     async exportAll() {
-        const [activities, timeEntries, settings, syncBatches, layout, groups] = await Promise.all([
-            this.getActivities(),
-            this.getTimeEntries(),
-            new Promise((resolve, reject) => {
-                const request = this.db.transaction(['settings'], 'readonly')
-                    .objectStore('settings').getAll();
-                request.onsuccess = () => resolve(request.result);
-                request.onerror = () => reject(request.error);
-            }),
-            this.getSyncBatches(),
-            this.getLayout(),
-            this.getGroups()
-        ]);
+        // A single readonly transaction gives the backup a consistent view and
+        // avoids six separate database snapshots for the same export.
+        const [activities, timeEntries, settings, syncBatches, layout, groups] = await new Promise((resolve, reject) => {
+            const tx = this.db.transaction(['activities', 'timeEntries', 'settings', 'syncBatches', 'layout', 'groups'], 'readonly');
+            const values = {};
+            let remaining = 6;
+            let settled = false;
+            const finish = () => {
+                if (settled) return;
+                settled = true;
+                resolve([
+                    values.activities, values.timeEntries, values.settings,
+                    values.syncBatches, values.layout, values.groups
+                ]);
+            };
+            const fail = error => {
+                if (settled) return;
+                settled = true;
+                reject(error || new Error('storage_export_failed'));
+            };
+            const requests = [
+                ['activities', tx.objectStore('activities').getAll()],
+                ['timeEntries', tx.objectStore('timeEntries').getAll()],
+                ['settings', tx.objectStore('settings').getAll()],
+                ['syncBatches', tx.objectStore('syncBatches').getAll()],
+                ['layout', tx.objectStore('layout').getAll()],
+                ['groups', tx.objectStore('groups').getAll()]
+            ];
+            requests.forEach(([key, request]) => {
+                request.onsuccess = () => {
+                    values[key] = request.result;
+                    remaining -= 1;
+                    if (remaining === 0) finish();
+                };
+                request.onerror = () => fail(request.error);
+            });
+            tx.oncomplete = finish;
+            tx.onerror = () => fail(tx.error);
+            tx.onabort = () => fail(tx.error || new Error('storage_export_aborted'));
+        });
 
         return {
             format: 'timerhub-backup',
@@ -1980,6 +2209,35 @@ class TimerHubApp {
 
     constructor() {
         this.storage = new StorageRepository();
+        const diagnosticsStorage = typeof localStorage !== 'undefined' ? localStorage : null;
+        this.diagnostics = typeof TimerHubDiagnostics !== 'undefined'
+            ? new TimerHubDiagnostics({ storage: diagnosticsStorage })
+            : {
+                error() {}, warn() {}, info() {}, record() { return null; }, list() { return []; },
+                clear() {}, exportPayload() { return { format: 'timerhub-diagnostics', version: 1, entries: [] }; },
+                installGlobalHandlers() { return false; }
+            };
+        try { this.diagnostics.installGlobalHandlers(window); } catch { /* ignore */ }
+        this.storage.onDiagnostic = (level, operation, error, options) => {
+            try { this.diagnostics[level === 'info' ? 'info' : level === 'warn' ? 'warn' : 'error']('storage', operation, error, options); } catch { /* ignore */ }
+        };
+        this.backupService = typeof TimerHubBackupService !== 'undefined'
+            ? new TimerHubBackupService({
+                diagnostics: this.diagnostics,
+                getSnapshot: () => this.storage.exportAll(),
+                validateSnapshot: data => this.storage.validateBackupData?.(data),
+                retention: 20
+            })
+            : null;
+        this.storage.onMutationCommitted = revision => this.handleMutationCommitted(revision);
+        this.backupSetupMode = 'unknown';
+        this.externalBackups = [];
+        this.latestExternalBackup = null;
+        this.autoBackupTimer = null;
+        this.autoBackupInFlight = null;
+        this.pendingAutoBackupRevision = null;
+        this.startupFinalized = false;
+        this.lastExternalBackupAttempt = 0;
         this.pendingRestoreData = null;
         this.pendingRestoreIsEmpty = false;
         this.pendingRestoreEmptyConfirmed = false;
@@ -2242,44 +2500,29 @@ class TimerHubApp {
 
     async init() {
         try {
+            if (this.backupService) {
+                await this.backupService.init();
+            }
             await this.storage.init();
             this.storage.onSnapshotStatus = () => this.refreshAutomaticBackupStatus();
             await this.loadSettings();
-            await this.refreshClockodoConfigurationStatus();
+            await this.loadBackupRetention();
+            this.applyTranslations();
             await this.loadActivities();
             await this.loadGroups();
-            await this.migrateMissingGroupLayouts();
-            await this.migrateActivityCanvasGeometry();
-            await this.loadTimeEntries();
+            await this.loadTimeEntries({ runMigration: false });
             this.evaluateSuspiciousEmptyState();
             this.updateDataPresenceMarker();
-            this.applyTranslations();
-            this.setupUI();
-            this.applyTheme();
-            this.syncServiceWorkerLocale();
-            this.startUIUpdateLoop();
-            this.renderMain();
-            const sharedLink = this.captureSharedLinkFromLocation();
-            if (sharedLink) this.openSharedDay(sharedLink).catch(() => {});
-            this.refreshStoragePersistenceStatus().catch(() => {});
-            const loading = document.getElementById('appLoading');
-            if (loading) loading.hidden = true;
-
-            // Reconcile a timer restored from IndexedDB with its persisted
-            // server alarm so browser restarts do not silently lose reminders.
-            if (this.activeActivityId) {
-                this.reconcileBackgroundAlarm().catch(error => {
-                    console.error('TimerHub background alarm restore failed:', error);
-                    this.showPushStatus(this.notificationError('notificationNeedsAttention', error));
-                });
+            const gate = await this.evaluateBackupGate();
+            if (!gate.ready) {
+                this.showBackupSetup(gate);
+                const loading = document.getElementById('appLoading');
+                if (loading) loading.hidden = true;
+                return;
             }
-
-            // Show initial onboarding if no activities
-            if (this.activities.length === 0) {
-                this.showOnboarding();
-            }
+            await this.finishStartup();
         } catch (error) {
-            console.error('TimerHub initialization failed:', error?.name || error?.message || 'unknown');
+            this.diagnostics?.error('init', 'application-init', error, { status: 'failed' });
             const loading = document.getElementById('appLoading');
             if (loading) loading.hidden = true;
             const panel = document.getElementById('initErrorPanel');
@@ -2287,6 +2530,604 @@ class TimerHubApp {
             this.applyTranslations();
             document.getElementById('initReloadBtn')?.addEventListener('click', () => window.location.reload());
         }
+    }
+
+    async finishStartup() {
+        if (this.startupFinalized) return true;
+        try {
+            await this.migrateMissingGroupLayouts();
+            await this.migrateActivityCanvasGeometry();
+            await this.migrateDayReviewProjectAssignments(this._rawTimeEntries || []);
+            this.applyTranslations();
+            this.setupUI();
+            this.applyTheme();
+            this.syncServiceWorkerLocale();
+            this.startUIUpdateLoop();
+            this.renderMain();
+            const sharedLink = this.captureSharedLinkFromLocation();
+            if (sharedLink) this.openSharedDay(sharedLink).catch(error => {
+                this.diagnostics?.warn('import', 'shared-day-open', error, { status: 'failed' });
+            });
+            this.refreshStoragePersistenceStatus().catch(() => {});
+            const loading = document.getElementById('appLoading');
+            if (loading) loading.hidden = true;
+            this.startupFinalized = true;
+            this.unlockMainApplication();
+            this.storage.flushAutomaticSnapshot().catch(error => {
+                this.diagnostics?.warn('storage', 'initial-snapshot', error, { status: 'failed' });
+            });
+            this.ensureStartupExternalBackup().then(() => this.refreshMissingDataWarning()).catch(error => {
+                this.diagnostics?.error('backup', 'startup-backup', error, { status: 'failed' });
+                this.updateExternalBackupStatus().catch(() => {});
+                if (error?.code === 'backup_permission_denied') this.lockForBackupProblem('permission-denied');
+            });
+
+            if (this.activeActivityId) {
+                this.reconcileBackgroundAlarm().catch(error => {
+                    this.diagnostics?.error('notifications', 'alarm-restore', error, { status: 'failed' });
+                    this.showPushStatus(this.notificationError('notificationNeedsAttention', error));
+                });
+            }
+
+            if (this.activities.length === 0) {
+                this.showOnboarding();
+            }
+            this.refreshMissingDataWarning();
+            return true;
+        } catch (error) {
+            this.diagnostics?.error('init', 'startup-finalize', error, { status: 'failed' });
+            const loading = document.getElementById('appLoading');
+            if (loading) loading.hidden = true;
+            const panel = document.getElementById('initErrorPanel');
+            if (panel) panel.hidden = false;
+            this.applyTranslations();
+            return false;
+        }
+    }
+
+    async loadBackupRetention() {
+        let retention = 20;
+        try {
+            retention = Number(await this.storage.getSetting('externalBackupRetention', 20));
+        } catch {
+            retention = 20;
+        }
+        if (!Number.isFinite(retention)) retention = 20;
+        retention = Math.max(1, Math.min(100, Math.floor(retention)));
+        if (this.backupService) this.backupService.retention = retention;
+        return retention;
+    }
+
+    async evaluateBackupGate() {
+        if (!this.backupService) {
+            return { ready: false, reason: 'unsupported' };
+        }
+        let status = this.backupService.getStatus();
+        if (status.state === 'unsupported') {
+            return { ready: false, reason: 'unsupported', status };
+        }
+        if (status.state === 'needs-selection') {
+            return { ready: false, reason: 'needs-selection', status };
+        }
+        if (status.state === 'permission-denied') {
+            return { ready: false, reason: 'permission-denied', status };
+        }
+        if (status.state === 'error' && !status.directoryName) {
+            return { ready: false, reason: 'error', status };
+        }
+        if (status.state !== 'ready') {
+            return { ready: false, reason: status.state === 'error' ? 'error' : 'needs-selection', status };
+        }
+        try {
+            await this.backupService.verifyWritable();
+            await this.backupService.cleanupOwnTemporaryFiles();
+            this.backupSetupMode = 'ready';
+            return { ready: true, reason: 'ready', status: this.backupService.getStatus() };
+        } catch (error) {
+            const code = error?.code || error?.name || 'backup_verification_failed';
+            this.diagnostics?.error('backup', 'verify-directory', error, { status: 'failed' });
+            const reason = code === 'backup_permission_denied' ? 'permission-denied' : 'error';
+            return { ready: false, reason, status: this.backupService.getStatus(), error: code };
+        }
+    }
+
+    unlockMainApplication() {
+        document.body?.classList?.remove('backup-locked');
+        const setup = document.getElementById('backupSetupScreen');
+        if (setup) setup.hidden = true;
+    }
+
+    lockMainApplication() {
+        document.body?.classList?.add('backup-locked');
+        const setup = document.getElementById('backupSetupScreen');
+        if (setup) setup.hidden = false;
+        if (this.uiUpdateInterval) {
+            clearInterval(this.uiUpdateInterval);
+            this.uiUpdateInterval = null;
+        }
+    }
+
+    backupSetupElements() {
+        return {
+            screen: document.getElementById('backupSetupScreen'),
+            title: document.getElementById('backupSetupTitle'),
+            status: document.getElementById('backupSetupStatus'),
+            directory: document.getElementById('backupSetupDirectory'),
+            data: document.getElementById('backupSetupData'),
+            error: document.getElementById('backupSetupError'),
+            compatibility: document.getElementById('backupSetupCompatibility'),
+            choose: document.getElementById('backupSetupChooseBtn'),
+            reauthorize: document.getElementById('backupSetupReauthorizeBtn'),
+            retry: document.getElementById('backupSetupRetryBtn'),
+            export: document.getElementById('backupSetupExportBtn')
+        };
+    }
+
+    setupBackupSetupUI() {
+        if (this.backupSetupUIReady) return;
+        this.backupSetupUIReady = true;
+        const elements = this.backupSetupElements();
+        elements.choose?.addEventListener('click', () => this.handleBackupSetupChoice('choose'));
+        elements.reauthorize?.addEventListener('click', () => this.handleBackupSetupChoice('reauthorize'));
+        elements.retry?.addEventListener('click', () => this.handleBackupSetupChoice('retry'));
+        elements.export?.addEventListener('click', () => this.handleBackupSetupExport());
+    }
+
+    showBackupSetup(gate = {}) {
+        this.lockMainApplication();
+        this.setupBackupSetupUI();
+        const elements = this.backupSetupElements();
+        const unsupported = gate.reason === 'unsupported';
+        const permissionDenied = gate.reason === 'permission-denied';
+        const status = gate.status || this.backupService?.getStatus?.() || {};
+        if (elements.title) {
+            elements.title.textContent = unsupported ? this.t('backupSetupUnsupportedTitle')
+                : permissionDenied ? this.t('backupSetupPermissionTitle')
+                : gate.reason === 'error' ? this.t('backupSetupErrorTitle')
+                : this.t('backupSetupTitle');
+        }
+        if (elements.compatibility) {
+            elements.compatibility.textContent = unsupported
+                ? this.t('backupSetupUnsupportedBody')
+                : permissionDenied ? this.t('backupSetupPermissionBody')
+                : this.t('backupSetupBrowserNote');
+        }
+        if (elements.status) {
+            elements.status.textContent = unsupported
+                ? this.t('backupSetupBlocked')
+                : this.t('backupSetupBlocked');
+        }
+        if (elements.directory) {
+            elements.directory.hidden = !status.directoryName;
+            elements.directory.textContent = status.directoryName
+                ? this.t('backupSetupDirectoryLabel', { name: status.directoryName })
+                : '';
+        }
+        if (elements.data) {
+            const activities = this.activities.length + this.archivedActivities.length;
+            elements.data.textContent = activities || this.timeEntries.length || this.groups.length
+                ? this.t('backupSetupCurrentData', { activities, entries: this.timeEntries.length })
+                : this.t('backupSetupNoData');
+        }
+        if (elements.error) {
+            elements.error.textContent = gate.error || status.lastError
+                ? this.t('backupSetupSelectFailed')
+                : '';
+        }
+        if (elements.choose) elements.choose.hidden = unsupported;
+        if (elements.reauthorize) elements.reauthorize.hidden = unsupported || (!permissionDenied && gate.reason !== 'error');
+        if (elements.retry) elements.retry.hidden = unsupported || (!status.directoryName && !permissionDenied);
+        if (elements.export) elements.export.hidden = false;
+    }
+
+    async handleBackupSetupExport() {
+        const elements = this.backupSetupElements();
+        if (elements.status) elements.status.textContent = this.t('backupSetupVerifying');
+        if (elements.error) elements.error.textContent = '';
+        try {
+            await this.exportCurrentDataFile({ setLastBackup: true });
+            if (elements.status) elements.status.textContent = this.t('backupSetupExportDone');
+        } catch (error) {
+            this.diagnostics?.error('backup', 'setup-export', error, { status: 'failed' });
+            if (elements.error) elements.error.textContent = this.t('backupSetupExportFailed');
+        }
+    }
+
+    async handleBackupSetupChoice(action) {
+        const elements = this.backupSetupElements();
+        const setBusy = busy => {
+            [elements.choose, elements.reauthorize, elements.retry, elements.export].forEach(button => {
+                if (button) button.disabled = busy;
+            });
+            if (elements.status && busy) elements.status.textContent = this.t('backupSetupVerifying');
+            if (elements.error) elements.error.textContent = '';
+        };
+        if (!this.backupService) return false;
+        setBusy(true);
+        try {
+            if (action === 'choose') {
+                await this.backupService.selectDirectory();
+            } else if (action === 'reauthorize') {
+                await this.backupService.reauthorize();
+            } else {
+                const gate = await this.evaluateBackupGate();
+                if (!gate.ready) {
+                    this.showBackupSetup(gate);
+                    return false;
+                }
+            }
+            await this.ensureStartupExternalBackup({ force: true });
+            if (elements.status) elements.status.textContent = this.t('backupSetupVerified');
+            this.unlockMainApplication();
+            if (this.startupFinalized) {
+                if (!this.uiUpdateInterval) this.startUIUpdateLoop();
+                this.renderMain();
+                this.updateExternalBackupStatus().catch(() => {});
+                return true;
+            }
+            await this.finishStartup();
+            return true;
+        } catch (error) {
+            this.diagnostics?.error('backup', `setup-${action}`, error, { status: 'failed' });
+            const gate = await this.evaluateBackupGate();
+            this.showBackupSetup({
+                ...gate,
+                reason: gate.ready ? 'error' : gate.reason,
+                error: error?.code || error?.name || 'backup_setup_failed'
+            });
+            if (elements.error) elements.error.textContent = this.t('backupSetupSelectFailed');
+            return false;
+        } finally {
+            setBusy(false);
+            [elements.choose, elements.reauthorize, elements.retry, elements.export].forEach(button => {
+                if (button) button.disabled = false;
+            });
+        }
+    }
+
+    async ensureStartupExternalBackup({ force = false } = {}) {
+        if (!this.backupService || !this.startupFinalized) {
+            if (!force) return null;
+        }
+        if (!this.backupService.directoryHandle) return null;
+        let latest = null;
+        try {
+            latest = await this.backupService.findLatestVerified();
+        } catch (error) {
+            this.diagnostics?.warn('backup', 'find-latest', error, { status: 'failed' });
+        }
+        const hasLocalData = this.hasLocalWorkData();
+        const staleAfter = 24 * 60 * 60 * 1000;
+        const needsBackup = force || !latest || (hasLocalData && Date.now() - Number(latest.createdAt || 0) > staleAfter);
+        if (!needsBackup) {
+            await this.updateExternalBackupStatus();
+            return latest;
+        }
+        const result = await this.backupService.createBackup({
+            kind: 'automatic',
+            reason: force ? 'startup' : 'scheduled',
+            force: true,
+            revision: this.storage.dataRevision
+        });
+        await this.updateExternalBackupStatus();
+        return result;
+    }
+
+    handleMutationCommitted(revision) {
+        if (!this.startupFinalized || !this.backupService) return;
+        this.scheduleExternalBackup(revision);
+    }
+
+    scheduleExternalBackup(revision = null) {
+        if (!this.startupFinalized || !this.backupService) return;
+        this.pendingAutoBackupRevision = revision ?? this.storage.dataRevision;
+        if (this.autoBackupTimer !== null || this.autoBackupInFlight) return;
+        this.autoBackupTimer = setTimeout(() => {
+            this.autoBackupTimer = null;
+            this.flushExternalBackup().catch(error => {
+                this.diagnostics?.warn('backup', 'scheduled-backup', error, { status: 'failed' });
+            });
+        }, 30_000);
+    }
+
+    async flushExternalBackup({ force = false } = {}) {
+        if (!this.startupFinalized || !this.backupService) return null;
+        if (this.autoBackupInFlight) return this.autoBackupInFlight;
+        const revision = this.pendingAutoBackupRevision ?? this.storage.dataRevision;
+        this.pendingAutoBackupRevision = null;
+        this.autoBackupInFlight = (async () => {
+            try {
+                const result = await this.backupService.createBackup({
+                    kind: 'automatic',
+                    reason: 'scheduled',
+                    force,
+                    revision
+                });
+                await this.updateExternalBackupStatus();
+                return result;
+            } catch (error) {
+                this.diagnostics?.error('backup', 'external-backup', error, { status: 'failed' });
+                await this.updateExternalBackupStatus();
+                if (error?.code === 'backup_permission_denied') {
+                    this.lockForBackupProblem('permission-denied');
+                } else if (this.pendingAutoBackupRevision === null) {
+                    this.pendingAutoBackupRevision = this.storage.dataRevision;
+                    this.autoBackupTimer = setTimeout(() => {
+                        this.autoBackupTimer = null;
+                        this.flushExternalBackup().catch(() => {});
+                    }, 120_000);
+                }
+                throw error;
+            } finally {
+                this.autoBackupInFlight = null;
+            }
+        })();
+        return this.autoBackupInFlight;
+    }
+
+    lockForBackupProblem(reason) {
+        this.diagnostics?.warn('backup', 'lock-application', reason, { status: 'failed' });
+        if (reason === 'permission-denied') {
+            this.showToast(this.t('externalBackupPermissionLost'));
+        }
+        const status = this.backupService?.getStatus?.() || {};
+        this.showBackupSetup({ ready: false, reason, status });
+    }
+
+    async manualExternalBackup() {
+        if (!this.startupFinalized) {
+            this.showToast(this.t('externalBackupNotConfigured'));
+            return false;
+        }
+        try {
+            const result = await this.backupService?.createBackup({
+                kind: 'manual', reason: 'manual', force: true, revision: this.storage.dataRevision
+            });
+            if (result?.skipped) return false;
+            await this.updateExternalBackupStatus();
+            this.showToast(this.t('externalBackupSucceeded', { name: result?.name || '' }));
+            return true;
+        } catch (error) {
+            this.diagnostics?.error('backup', 'manual-external-backup', error, { status: 'failed' });
+            this.showToast(this.t('externalBackupFailed'));
+            if (error?.code === 'backup_permission_denied') this.lockForBackupProblem('permission-denied');
+            return false;
+        }
+    }
+
+    async updateExternalBackupStatus() {
+        const statusElement = document.getElementById('externalBackupStatus');
+        const folderElement = document.getElementById('externalBackupFolder');
+        const select = document.getElementById('externalBackupSelect');
+        const restoreButton = document.getElementById('externalBackupRestoreBtn');
+        const diagnosticsLast = document.getElementById('diagnosticsLastVerified');
+        const diagnosticsFolder = document.getElementById('diagnosticsBackupFolder');
+        if (!this.backupService) {
+            if (statusElement) statusElement.textContent = this.t('externalBackupNotConfigured');
+            return;
+        }
+        const status = this.backupService.getStatus();
+        const folderText = status.directoryName
+            ? this.t('externalBackupStatusFolder', { name: status.directoryName })
+            : this.t('externalBackupNotConfigured');
+        if (folderElement) folderElement.textContent = folderText;
+        if (diagnosticsFolder) diagnosticsFolder.textContent = folderText;
+        let latest = null;
+        let backups = [];
+        let listFailed = false;
+        try {
+            latest = await this.backupService.findLatestVerified();
+            backups = await this.backupService.listBackups({ verify: false });
+        } catch (error) {
+            listFailed = true;
+            this.diagnostics?.warn('backup', 'list-backups', error, { status: 'failed' });
+        }
+        this.externalBackups = backups;
+        this.latestExternalBackup = latest || null;
+        if (statusElement) {
+            statusElement.textContent = listFailed
+                ? this.t('externalBackupListFailed')
+                : latest
+                    ? this.t('externalBackupStatusOk', { date: this.formatSnapshotDate(latest.createdAt) })
+                    : this.t('externalBackupStatusNone');
+        }
+        if (diagnosticsLast) {
+            diagnosticsLast.textContent = latest
+                ? this.t('externalBackupStatusOk', { date: this.formatSnapshotDate(latest.createdAt) })
+                : this.t('externalBackupStatusNone');
+        }
+        if (select) {
+            const selected = select.value;
+            select.replaceChildren();
+            const placeholder = document.createElement('option');
+            placeholder.value = '';
+            placeholder.textContent = backups.length ? this.t('externalBackupSelect') : this.t('externalBackupNone');
+            select.appendChild(placeholder);
+            backups.forEach(backup => {
+                const option = document.createElement('option');
+                option.value = backup.name;
+                option.textContent = `${this.formatSnapshotDate(backup.createdAt)} · ${backup.kind === 'automatic' ? this.t('externalBackupTitle') : this.t('backupData')}`;
+                select.appendChild(option);
+            });
+            if (backups.some(backup => backup.name === selected)) select.value = selected;
+        }
+        if (restoreButton) restoreButton.disabled = !select?.value;
+        this.renderDiagnostics();
+        if (this.startupFinalized) this.refreshMissingDataWarning();
+        return { latest, backups, status };
+    }
+
+    async chooseExternalBackupDirectory() {
+        if (!this.backupService) return false;
+        try {
+            const status = await this.backupService.selectDirectory();
+            await this.ensureStartupExternalBackup({ force: true });
+            await this.updateExternalBackupStatus();
+            this.showToast(this.t('backupSetupVerified'));
+            return Boolean(status);
+        } catch (error) {
+            this.diagnostics?.error('backup', 'choose-directory', error, { status: 'failed' });
+            this.showToast(this.t('backupSetupSelectFailed'));
+            if (error?.code === 'directory_picker_unsupported') this.lockForBackupProblem('unsupported');
+            return false;
+        }
+    }
+
+    async verifyExternalBackupDirectory() {
+        if (!this.backupService) return false;
+        try {
+            await this.backupService.verifyWritable();
+            await this.updateExternalBackupStatus();
+            this.showToast(this.t('backupSetupVerified'));
+            return true;
+        } catch (error) {
+            this.diagnostics?.error('backup', 'verify-folder', error, { status: 'failed' });
+            this.showToast(this.t('externalBackupFailed'));
+            if (error?.code === 'backup_permission_denied') this.lockForBackupProblem('permission-denied');
+            return false;
+        }
+    }
+
+    async restoreSelectedExternalBackup() {
+        const select = document.getElementById('externalBackupSelect');
+        const name = select?.value;
+        if (!name || !this.backupService) return false;
+        try {
+            const parsed = await this.backupService.readBackup(name);
+            this.openRestoreConfirmation(parsed.data);
+            return true;
+        } catch (error) {
+            this.diagnostics?.error('restore', 'read-external-backup', error, { status: 'failed' });
+            this.showToast(this.t('invalidBackup'));
+            return false;
+        }
+    }
+
+    async restoreLatestExternalBackup() {
+        if (!this.backupService) return false;
+        try {
+            const latest = await this.backupService.findLatestVerified();
+            if (!latest) {
+                this.showToast(this.t('externalBackupNone'));
+                return false;
+            }
+            const parsed = await this.backupService.readBackup(latest.name);
+            this.openRestoreConfirmation(parsed.data);
+            return true;
+        } catch (error) {
+            this.diagnostics?.error('restore', 'read-latest-external-backup', error, { status: 'failed' });
+            this.showToast(this.t('invalidBackup'));
+            return false;
+        }
+    }
+
+    async exportCurrentDataFile({ setLastBackup = true } = {}) {
+        try {
+            const data = await this.storage.exportAll();
+            this.storage.validateBackupData?.(data);
+            const json = JSON.stringify(data, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const now = new Date();
+            const parts = new Intl.DateTimeFormat('en-CA', {
+                timeZone: 'UTC', year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
+            }).formatToParts(now).reduce((values, part) => ({ ...values, [part.type]: part.value }), {});
+            a.href = url;
+            a.download = `${this.t('backupFilename')}_${parts.year}${parts.month}${parts.day}_${parts.hour}${parts.minute}${parts.second}.json`;
+            a.rel = 'noopener';
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 60_000);
+            if (setLastBackup) {
+                try { localStorage.setItem('timerhubLastBackupAt', String(Date.now())); } catch { /* ignore */ }
+                this.updateBackupStatusTexts();
+            }
+            return true;
+        } catch (error) {
+            this.diagnostics?.error('backup', 'export-data', error, { status: 'failed' });
+            throw error;
+        }
+    }
+
+    renderDiagnostics() {
+        if (!this.diagnostics) return;
+        const list = document.getElementById('diagnosticsList');
+        if (!list) return;
+        const entries = this.diagnostics.list({ limit: 30 });
+        list.replaceChildren();
+        if (!entries.length) {
+            const empty = document.createElement('p');
+            empty.className = 'settings-help';
+            empty.textContent = this.t('diagnosticsEmpty');
+            list.appendChild(empty);
+            return;
+        }
+        entries.forEach(entry => {
+            const item = document.createElement('div');
+            item.className = `diagnostic-entry level-${entry.level}`;
+            item.setAttribute('role', 'listitem');
+            const meta = document.createElement('div');
+            meta.className = 'diagnostic-meta';
+            const category = document.createElement('span');
+            category.className = 'diagnostic-category';
+            category.textContent = `${entry.category} · ${entry.operation}`;
+            const time = document.createElement('time');
+            time.dateTime = new Date(entry.timestamp).toISOString();
+            time.textContent = this.formatSnapshotDate(entry.timestamp);
+            meta.append(category, time);
+            const message = document.createElement('p');
+            message.className = 'diagnostic-message';
+            message.textContent = entry.message || entry.level;
+            const status = document.createElement('p');
+            status.className = 'diagnostic-status';
+            status.textContent = entry.status;
+            item.append(meta, message, status);
+            list.appendChild(item);
+        });
+    }
+
+    async exportDiagnosticsFile() {
+        try {
+            const payload = this.diagnostics?.exportPayload?.() || { entries: [] };
+            const json = JSON.stringify(payload, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `timerhub_diagnostics_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+            a.rel = 'noopener';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 60_000);
+            return true;
+        } catch (error) {
+            this.showToast(this.t('diagnosticsExportFailed'));
+            return false;
+        }
+    }
+
+    refreshMissingDataWarning() {
+        const warning = document.getElementById('missingDataWarning');
+        const localHasData = this.hasLocalWorkData();
+        const latest = this.latestExternalBackup || this.externalBackups?.[0] || null;
+        const counts = latest?.meta?.counts || {};
+        const externalHasData = Number(counts.activities || 0) + Number(counts.timeEntries || 0) + Number(counts.groups || 0) > 0;
+        let dismissedAt = 0;
+        try { dismissedAt = Number(localStorage.getItem('timerhubExternalEmptyWarningDismissedAt') || 0); } catch { dismissedAt = 0; }
+        const externalSuspicious = !localHasData && externalHasData && Number(latest?.createdAt || 0) > dismissedAt;
+        const shouldShow = this.missingDataSuspected || externalSuspicious;
+        if (warning) warning.style.display = shouldShow ? 'block' : 'none';
+        const externalButton = document.getElementById('missingDataRestoreExternalBtn');
+        if (externalButton) {
+            externalButton.hidden = !latest;
+            if (latest) externalButton.textContent = this.t('missingDataRestoreExternal');
+        }
+        if (this.missingDataSuspected) this.updateDataPresenceMarker();
     }
 
     async loadSettings() {
@@ -2462,12 +3303,14 @@ class TimerHubApp {
             raw = {};
         }
         const now = Date.now();
-        const startTimestamp = Number.isFinite(Number(raw.startTimestamp))
-            ? Number(raw.startTimestamp)
-            : now;
-        const endTimestamp = raw.endTimestamp !== null && raw.endTimestamp !== undefined && Number.isFinite(Number(raw.endTimestamp))
-            ? Number(raw.endTimestamp)
+        const rawStart = Number(raw.startTimestamp);
+        const startTimestamp = Number.isFinite(rawStart) && rawStart > 0 ? rawStart : null;
+        const hasEndValue = raw.endTimestamp !== null && raw.endTimestamp !== undefined;
+        const rawEnd = hasEndValue ? Number(raw.endTimestamp) : null;
+        const endTimestamp = !hasEndValue ? null
+            : Number.isFinite(rawEnd) && rawEnd > 0 ? rawEnd
             : null;
+        const timeDataInvalid = startTimestamp === null || (hasEndValue && endTimestamp === null);
 
         const allowedStatuses = Object.values(SYNC_STATUS);
         let syncStatus = typeof raw.syncStatus === 'string' ? raw.syncStatus.toLowerCase() : '';
@@ -2503,7 +3346,8 @@ class TimerHubApp {
             clockodoEntryId,
             clockodoSyncedAt: raw.clockodoSyncedAt && Number.isFinite(Number(raw.clockodoSyncedAt)) ? Number(raw.clockodoSyncedAt) : null,
             clockodoError: raw.clockodoError ? String(raw.clockodoError) : null,
-            clockodoErrorDetails: this.normalizeClockodoErrorDetails(raw.clockodoErrorDetails)
+            clockodoErrorDetails: this.normalizeClockodoErrorDetails(raw.clockodoErrorDetails),
+            timeDataInvalid
         };
     }
 
@@ -2576,8 +3420,8 @@ class TimerHubApp {
     }
 
     getEntryDate(entry) {
-        if (!entry || !entry.startTimestamp) return this.toDateString(new Date());
-        return this.toDateString(new Date(entry.startTimestamp));
+        if (!entry || !Number.isFinite(Number(entry.startTimestamp)) || Number(entry.startTimestamp) <= 0) return '';
+        return this.toDateString(new Date(Number(entry.startTimestamp)));
     }
 
     getDayEntries(dateString) {
@@ -2607,14 +3451,14 @@ class TimerHubApp {
 
     entryInterval(entry) {
         const start = Number(entry?.startTimestamp);
-        if (!Number.isFinite(start)) return null;
+        if (!Number.isFinite(start) || start <= 0) return null;
         const rawEnd = entry?.endTimestamp;
         const end = rawEnd === null || rawEnd === undefined ? Infinity : Number(rawEnd);
-        if (Number.isNaN(end)) return null;
-        return {
-            start: this.roundToFiveMinutes(start),
-            end: end === Infinity ? Infinity : this.roundToFiveMinutes(end)
-        };
+        if (end !== Infinity && (!Number.isFinite(end) || end <= 0 || end <= start)) return null;
+        // Conflict detection uses the exact stored interval. The five-minute
+        // Clockodo rounding is a transport concern and must never hide or
+        // invent a local overlap.
+        return { start, end };
     }
 
     entriesOverlap(first, second) {
@@ -2648,11 +3492,18 @@ class TimerHubApp {
         for (let i = 0; i < entries.length; i++) {
             const entry = entries[i];
             const issues = [];
+            const startValue = Number(entry.startTimestamp);
+            const startValid = Number.isFinite(startValue) && startValue > 0;
+            const endValue = entry.endTimestamp;
+            const hasEndValue = endValue !== null && endValue !== undefined;
+            const endValid = !hasEndValue || (Number.isFinite(Number(endValue)) && Number(endValue) > 0);
 
-            if (entry.endTimestamp === null) {
+            if (!startValid || !endValid) {
+                issues.push('invalidTime');
+            } else if (endValue === null) {
                 issues.push('running');
             } else {
-                const duration = entry.endTimestamp - entry.startTimestamp;
+                const duration = Number(endValue) - startValue;
                 if (duration <= 0) {
                     issues.push('zeroDuration');
                 } else if (duration > 16 * 60 * 60 * 1000) {
@@ -2662,6 +3513,10 @@ class TimerHubApp {
                 for (let j = 0; j < entries.length; j++) {
                     if (i === j) continue;
                     const other = entries[j];
+                    // A stale duplicate of the same record is not a real
+                    // overlap; the ID is the stable identity used everywhere
+                    // else for conflict detection.
+                    if (String(other.id) === String(entry.id)) continue;
                     if (other.endTimestamp !== null && this.entriesOverlap(entry, other)) {
                         issues.push('overlapping');
                         break;
@@ -2697,8 +3552,10 @@ class TimerHubApp {
         if (!validation.valid) {
             throw new Error(`Invalid entry: ${validation.error}`);
         }
-        this.timeEntries.push(entry);
         await this.storage.saveTimeEntry(entry);
+        const existingIndex = this.timeEntries.findIndex(item => String(item.id) === String(entry.id));
+        if (existingIndex >= 0) this.timeEntries[existingIndex] = entry;
+        else this.timeEntries.push(entry);
         return entry;
     }
 
@@ -2742,8 +3599,9 @@ class TimerHubApp {
             throw new Error(`Invalid entry update: ${validation.error}`);
         }
 
-        this.timeEntries[index] = normalized;
         await this.storage.saveTimeEntry(normalized);
+        const currentIndex = this.timeEntries.findIndex(item => String(item.id) === String(id));
+        if (currentIndex >= 0) this.timeEntries[currentIndex] = normalized;
         if (workFieldsChanged) await this.refreshFailedBatchEntry(normalized);
         return normalized;
     }
@@ -2785,8 +3643,9 @@ class TimerHubApp {
         if ([SYNC_STATUS.CONFIRMED, SYNC_STATUS.SYNCING].includes(this.timeEntries[index].syncStatus)) {
             throw new Error('Confirmed time entry is frozen until synchronization resolves');
         }
-        const [removed] = this.timeEntries.splice(index, 1);
+        const removed = this.timeEntries[index];
         await this.storage.deleteTimeEntry(id);
+        this.timeEntries = this.timeEntries.filter(item => String(item.id) !== String(id));
         return removed;
     }
 
@@ -2855,8 +3714,7 @@ class TimerHubApp {
                     const source = this.activityAssignmentForEntry(entry.activityId, activityList);
                     if (source.status === 'resolved' && source.projectId === currentProjectId && source.projectName) {
                         const updated = { ...entry, project: source.projectName };
-                        this.timeEntries[index] = updated;
-                        migrated.push({ index, entry: updated });
+                        migrated.push({ index, entry: updated, previous: entry });
                     }
                 }
                 return;
@@ -2873,8 +3731,7 @@ class TimerHubApp {
                         projectId: source.projectId,
                         project: source.projectName || currentProjectName
                     };
-                    this.timeEntries[index] = updated;
-                    migrated.push({ index, entry: updated });
+                    migrated.push({ index, entry: updated, previous: entry });
                 }
                 return;
             }
@@ -2893,11 +3750,11 @@ class TimerHubApp {
                 projectId: source.projectId,
                 project: source.projectName || ''
             };
-            this.timeEntries[index] = updated;
-            migrated.push({ index, entry: updated });
+            migrated.push({ index, entry: updated, previous: entry });
         });
 
         const errors = [];
+        const applied = [];
         for (const change of migrated) {
             const raw = Array.isArray(rawEntries) && rawEntries[change.index]
                 ? rawEntries[change.index]
@@ -2908,11 +3765,20 @@ class TimerHubApp {
                     projectId: change.entry.projectId,
                     project: change.entry.project
                 });
+                // Update memory only after the write succeeds. A failed
+                // migration must not leave the UI with unsaved assignments.
+                if (this.timeEntries[change.index] === change.previous) {
+                    this.timeEntries[change.index] = change.entry;
+                    applied.push(change);
+                }
             } catch (error) {
                 errors.push(change.entry.id);
-                console.warn('TimerHub project assignment migration could not save entry:', change.entry.id, error);
+                this.diagnostics?.warn('dayReview', 'project-assignment-migration', error, {
+                    status: 'failed', details: { entryId: change.entry.id }
+                });
             }
         }
+        migrated.splice(0, migrated.length, ...applied);
         if (!errors.length) {
             try {
                 await this.storage.setSetting(markerKey, DAY_REVIEW_PROJECT_MIGRATION_VERSION);
@@ -2931,13 +3797,21 @@ class TimerHubApp {
         return result;
     }
 
-    async loadTimeEntries() {
+    async loadTimeEntries({ runMigration = true } = {}) {
         const rawEntries = await this.storage.getTimeEntries() || [];
+        this._rawTimeEntries = rawEntries;
         this.timeEntries = rawEntries.map(e => this.normalizeTimeEntry(e));
+        const invalidEntries = this.timeEntries.filter(entry => entry.timeDataInvalid);
+        if (invalidEntries.length) {
+            this.diagnostics?.warn('dayReview', 'load-time-entries', 'invalid_time_data_preserved', {
+                status: 'failed',
+                details: { count: invalidEntries.length, entryIds: invalidEntries.slice(0, 10).map(entry => entry.id) }
+            });
+        }
         this.syncBatches = this.storage.getSyncBatches
             ? await this.storage.getSyncBatches()
             : [];
-        await this.migrateDayReviewProjectAssignments(rawEntries);
+        if (runMigration) await this.migrateDayReviewProjectAssignments(rawEntries);
         // Find active entry
         const activeEntry = this.timeEntries.find(e => e.endTimestamp === null);
         if (activeEntry) {
@@ -3280,6 +4154,32 @@ class TimerHubApp {
 
         sel('backupBtn')?.addEventListener('click', () => this.backupData());
         sel('restoreBtn')?.addEventListener('click', () => this.restoreData());
+        sel('externalBackupNowBtn')?.addEventListener('click', () => this.manualExternalBackup());
+        sel('externalBackupChooseBtn')?.addEventListener('click', () => this.chooseExternalBackupDirectory());
+        sel('externalBackupVerifyBtn')?.addEventListener('click', () => this.verifyExternalBackupDirectory());
+        sel('externalBackupRefreshBtn')?.addEventListener('click', () => this.updateExternalBackupStatus());
+        sel('externalBackupRestoreBtn')?.addEventListener('click', () => this.restoreSelectedExternalBackup());
+        sel('externalBackupSelect')?.addEventListener('change', event => {
+            const button = document.getElementById('externalBackupRestoreBtn');
+            if (button) button.disabled = !event.target.value;
+        });
+        sel('externalBackupRetentionSelect')?.addEventListener('change', async event => {
+            const retention = Math.max(1, Math.min(100, Number(event.target.value) || 20));
+            if (this.backupService) this.backupService.retention = retention;
+            try {
+                await this.storage.setSetting('externalBackupRetention', retention);
+            } catch (error) {
+                this.diagnostics?.warn('settings', 'save-backup-retention', error, { status: 'failed' });
+            }
+            this.updateExternalBackupStatus().catch(() => {});
+        });
+        sel('diagnosticsExportBtn')?.addEventListener('click', () => this.exportDiagnosticsFile());
+        sel('diagnosticsClearBtn')?.addEventListener('click', () => {
+            this.diagnostics?.clear?.();
+            this.renderDiagnostics();
+            this.showToast(this.t('diagnosticsCleared'));
+        });
+        sel('missingDataRestoreExternalBtn')?.addEventListener('click', () => this.restoreLatestExternalBackup());
         sel('automaticSnapshotSelect')?.addEventListener('change', e => {
             const restoreButton = document.getElementById('restoreSnapshotBtn');
             if (restoreButton) restoreButton.disabled = !e.target.value;
@@ -3558,21 +4458,34 @@ class TimerHubApp {
 
     startUIUpdateLoop() {
         if (this.uiUpdateInterval) clearInterval(this.uiUpdateInterval);
-        
-        this.uiUpdateInterval = setInterval(() => {
+
+        const tick = () => {
+            if (document.hidden) return;
             this.updateTimerStatus();
-            // Update active button duration every second
             if (this.activeActivityId) {
                 const btn = document.querySelector(`[data-activity-id="${this.activeActivityId}"]`);
-                if (btn) {
-                    const duration = this.getActiveDuration();
-                    const durationElement = btn.querySelector('.btn-duration');
-                    if (durationElement) {
-                        durationElement.textContent = this.formatDuration(duration);
-                    }
+                if (!btn) return;
+                const durationElement = btn.querySelector('.btn-duration');
+                if (durationElement) {
+                    durationElement.textContent = this.formatDuration(this.getActiveDuration());
                 }
             }
-        }, 1000);
+        };
+        this.uiUpdateInterval = setInterval(tick, 1000);
+
+        if (!this.visibilityHandlerReady) {
+            this.visibilityHandlerReady = true;
+            document.addEventListener?.('visibilitychange', () => {
+                if (document.hidden) {
+                    this.storage.flushAutomaticSnapshot().catch(() => {});
+                    if (this.pendingAutoBackupRevision !== null) {
+                        this.flushExternalBackup().catch(() => {});
+                    }
+                } else {
+                    tick();
+                }
+            });
+        }
     }
 
     switchScreen(screen) {
@@ -3657,7 +4570,7 @@ class TimerHubApp {
             return;
         }
 
-        const issueKeys = { running: this.t('issueRunning'), zeroDuration: this.t('issueZeroDuration'), overlapping: this.t('issueOverlapping'), unusuallyLong: this.t('issueUnusuallyLong') };
+        const issueKeys = { running: this.t('issueRunning'), zeroDuration: this.t('issueZeroDuration'), overlapping: this.t('issueOverlapping'), unusuallyLong: this.t('issueUnusuallyLong'), invalidTime: this.t('issueInvalidTime') };
         const overlappingIds = this.getOverlappingEntryIds(entries);
         const statusKeys = {
             unsynced: this.t('statusLocal'), pending: this.t('statusPending'), confirmed: this.t('statusConfirmed'),
@@ -4024,6 +4937,10 @@ class TimerHubApp {
                 entry.syncStatus = uncertain ? SYNC_STATUS.UNKNOWN : SYNC_STATUS.FAILED;
                 entry.clockodoError = error?.code || 'request_rejected';
                 entry.clockodoErrorDetails = uncertain ? null : this.normalizeClockodoErrorDetails(error?.details);
+                this.diagnostics?.warn('clockodo', 'create-entry', error, {
+                    status: 'failed',
+                    details: { entryId: entry.id, code: entry.clockodoError, outcome: entry.syncStatus }
+                });
             }
             await this.persistSyncProgress(batch);
         }
@@ -6889,9 +7806,6 @@ class TimerHubApp {
             const activity = activityId && this.activities.find(item => item.id === activityId);
             const mode = resizeHandle ? 'resize' : activityButton ? 'move' : 'pan';
 
-            if (activityButton) {
-            }
-
             const layout = activity
                 ? this.getActivityCanvasLayout(activity, this.activities.indexOf(activity))
                 : null;
@@ -8279,7 +9193,8 @@ class TimerHubApp {
 
         const dateRange = this.getDateRange(filterType);
         let entries = this.timeEntries.filter(e => {
-            if (e.endTimestamp === null) return false;
+            if (!Number.isFinite(Number(e.startTimestamp)) || Number(e.startTimestamp) <= 0) return false;
+            if (e.endTimestamp === null || !Number.isFinite(Number(e.endTimestamp))) return false;
             const date = new Date(e.startTimestamp);
             const end = new Date(e.endTimestamp);
             return date < dateRange[1] && end > dateRange[0];
@@ -8557,10 +9472,16 @@ class TimerHubApp {
             notes: document.getElementById('entryEditNotes').value.trim()
         };
 
-        if (editing) {
-            await this.updateEntry(editing.id, updates);
-        } else {
-            await this.addEntry({ ...updates, source: 'manual' });
+        try {
+            if (editing) {
+                await this.updateEntry(editing.id, updates);
+            } else {
+                await this.addEntry({ ...updates, source: 'manual' });
+            }
+        } catch (error) {
+            this.diagnostics?.error('dayReview', 'save-entry', error, { status: 'rolled_back' });
+            this.showToast(this.t('timerSaveFailed'));
+            return;
         }
         this.closeEntryEditModal();
         this.renderLog();
@@ -8586,9 +9507,16 @@ class TimerHubApp {
                 this.showToast(this.t('confirmedEntryLocked'));
                 return;
             }
+            const previousEntries = this.timeEntries;
             this.deletedEntry = entry;
-            this.timeEntries = this.timeEntries.filter(e => e.id !== entry.id);
-            await this.storage.deleteTimeEntry(entry.id);
+            try {
+                await this.storage.deleteTimeEntry(entry.id);
+            } catch (error) {
+                this.diagnostics?.error('storage', 'delete-entry', error, { status: 'rolled_back' });
+                this.showToast(this.t('timerSaveFailed'));
+                return;
+            }
+            this.timeEntries = previousEntries.filter(e => e.id !== entry.id);
             this.closeEntryEditModal();
             this.renderLog();
             this.renderReview();
@@ -8599,13 +9527,21 @@ class TimerHubApp {
     }
 
     async undoDeleteEntry() {
-        if (this.deletedEntry) {
-            this.timeEntries.push(this.deletedEntry);
+        if (!this.deletedEntry) return;
+        try {
             await this.storage.saveTimeEntry(this.deletedEntry);
-            this.deletedEntry = null;
-            this.renderLog();
-            this.renderReview();
+        } catch (error) {
+            this.diagnostics?.error('storage', 'undo-delete-entry', error, { status: 'failed' });
+            this.showToast(this.t('timerSaveFailed'));
+            return;
         }
+        const entry = this.deletedEntry;
+        this.deletedEntry = null;
+        const existingIndex = this.timeEntries.findIndex(item => String(item.id) === String(entry.id));
+        if (existingIndex >= 0) this.timeEntries[existingIndex] = entry;
+        else this.timeEntries.push(entry);
+        this.renderLog();
+        this.renderReview();
     }
 
     clockodoAssignmentIds(context) {
@@ -9787,6 +10723,15 @@ class TimerHubApp {
         }
 
         this.updateNotificationStatus();
+        const retentionSelect = document.getElementById('externalBackupRetentionSelect');
+        if (retentionSelect) {
+            const retention = Number(this.backupService?.retention || 20);
+            retentionSelect.value = ['5', '10', '20', '50'].includes(String(retention)) ? String(retention) : '20';
+        }
+        this.updateExternalBackupStatus().catch(error => {
+            this.diagnostics?.warn('backup', 'settings-status', error, { status: 'failed' });
+        });
+        this.renderDiagnostics();
     }
 
     populateActivityFilter() {
@@ -11287,7 +12232,9 @@ class TimerHubApp {
     }
 
     exportLog(format) {
-        const entries = [...this.timeEntries].filter(e => e.endTimestamp !== null).sort((a, b) => a.startTimestamp - b.startTimestamp);
+        const entries = [...this.timeEntries]
+            .filter(e => e.endTimestamp !== null && Number.isFinite(Number(e.startTimestamp)) && Number(e.startTimestamp) > 0)
+            .sort((a, b) => a.startTimestamp - b.startTimestamp);
         let content = '';
         let filename = `${this.t('logFilename')}_${Date.now()}`;
 
@@ -11316,8 +12263,10 @@ class TimerHubApp {
     }
 
     getLogAsText() {
-        const entries = [...this.timeEntries].filter(e => e.endTimestamp !== null).sort((a, b) => a.startTimestamp - b.startTimestamp);
-        
+        const entries = [...this.timeEntries]
+            .filter(e => e.endTimestamp !== null && Number.isFinite(Number(e.startTimestamp)) && Number(e.startTimestamp) > 0)
+            .sort((a, b) => a.startTimestamp - b.startTimestamp);
+
         let text = '';
         const byDay = new Map();
         entries.forEach(entry => {
@@ -11363,34 +12312,10 @@ class TimerHubApp {
 
     async backupData() {
         try {
-            const data = await this.storage.exportAll();
-            // Validate the payload before offering it as a backup so a broken
-            // export is never presented as a valid recovery file.
-            this.storage.validateBackupData?.(data);
-            const json = JSON.stringify(data, null, 2);
-            JSON.parse(json);
-            const blob = new Blob([json], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            const now = new Date();
-            const parts = new Intl.DateTimeFormat('en-CA', {
-                timeZone: 'UTC', year: 'numeric', month: '2-digit', day: '2-digit',
-                hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
-            }).formatToParts(now).reduce((values, part) => ({ ...values, [part.type]: part.value }), {});
-            const filename = `${this.t('backupFilename')}_${parts.year}${parts.month}${parts.day}_${parts.hour}${parts.minute}${parts.second}.json`;
-            a.href = url;
-            a.download = filename;
-            a.rel = 'noopener';
-            a.style.display = 'none';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            // Mobile browsers may consume the Blob URL asynchronously after click.
-            setTimeout(() => URL.revokeObjectURL(url), 60_000);
-            try { localStorage.setItem('timerhubLastBackupAt', String(Date.now())); } catch { /* ignore */ }
-            this.updateBackupStatusTexts();
+            await this.exportCurrentDataFile({ setLastBackup: true });
             this.showToast(this.t('backupSuccess'));
         } catch (error) {
+            this.diagnostics?.error('backup', 'download-backup', error, { status: 'failed' });
             this.showToast(this.t('backupFailed'));
         }
     }
@@ -11479,7 +12404,11 @@ class TimerHubApp {
 
     dismissMissingDataWarning() {
         this.missingDataSuspected = false;
-        try { localStorage.removeItem('timerhubLastDataSeenAt'); } catch { /* ignore */ }
+        try {
+            localStorage.removeItem('timerhubLastDataSeenAt');
+            const latest = this.latestExternalBackup;
+            if (latest) localStorage.setItem('timerhubExternalEmptyWarningDismissedAt', String(Number(latest.createdAt) || Date.now()));
+        } catch { /* ignore */ }
         const warning = document.getElementById('missingDataWarning');
         if (warning) warning.style.display = 'none';
     }
@@ -11621,7 +12550,23 @@ class TimerHubApp {
         }
         const buttons = ['backupRestoreMergeBtn', 'backupRestoreReplaceBtn'];
         buttons.forEach(id => { const button = document.getElementById(id); if (button) button.disabled = true; });
+        let safetySnapshot = null;
         try {
+            safetySnapshot = await this.storage.exportAll();
+            if (!merge && this.hasLocalWorkData() && this.backupService?.directoryHandle) {
+                try {
+                    await this.backupService.createBackup({
+                        kind: 'pre-restore',
+                        reason: 'before-replace',
+                        force: true,
+                        revision: this.storage.dataRevision
+                    });
+                } catch (error) {
+                    this.diagnostics?.error('restore', 'pre-restore-backup', error, { status: 'failed' });
+                    this.showToast(this.t('externalBackupSafetyCopyFailed'));
+                    return false;
+                }
+            }
             await this.storage.importAll(this.pendingRestoreData, merge);
             this.cancelPendingRestore();
             await this.loadActivities();
@@ -11633,10 +12578,27 @@ class TimerHubApp {
             this.updateDataPresenceMarker();
             this.renderAll();
             await this.refreshAutomaticBackupStatus();
+            await this.updateExternalBackupStatus().catch(() => {});
             this.showToast(this.t('restoreSuccess'));
+            this.flushExternalBackup({ force: true }).catch(() => {});
             return true;
-        } catch {
-            this.showToast(this.t('restoreFailed'));
+        } catch (error) {
+            this.diagnostics?.error('restore', 'restore-pending-data', error, { status: 'failed' });
+            if (safetySnapshot) {
+                try {
+                    await this.storage.importAll(safetySnapshot, false);
+                    await this.loadActivities();
+                    await this.loadGroups();
+                    await this.loadTimeEntries();
+                    this.renderAll();
+                    this.showToast(this.t('restoreFailed'));
+                    this.diagnostics?.warn('restore', 'restore-rollback', 'previous_data_restored', { status: 'rolled_back' });
+                } catch (rollbackError) {
+                    this.diagnostics?.error('restore', 'restore-rollback', rollbackError, { status: 'failed' });
+                }
+            } else {
+                this.showToast(this.t('restoreFailed'));
+            }
             return false;
         } finally {
             buttons.forEach(id => { const button = document.getElementById(id); if (button) button.disabled = false; });

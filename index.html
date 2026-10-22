@@ -38,13 +38,36 @@
             </div>
         </div>
 
+
+        <div id="backupSetupScreen" class="backup-setup-screen" hidden>
+            <div class="backup-setup-card">
+                <h2 id="backupSetupTitle" data-i18n="backupSetupTitle">Choose a backup folder</h2>
+                <p id="backupSetupIntro" data-i18n="backupSetupIntro">TimerHub needs a folder outside browser storage to protect your data.</p>
+                <p id="backupSetupExplanation" data-i18n="backupSetupExplanation">Automatic backups are written to a folder you control.</p>
+                <p id="backupSetupDirectory" class="backup-status" role="status" aria-live="polite"></p>
+                <p id="backupSetupStatus" class="backup-status" role="status" aria-live="polite"></p>
+                <p id="backupSetupData" class="settings-help"></p>
+                <div class="backup-setup-actions">
+                    <button id="backupSetupChooseBtn" class="settings-btn btn-primary-green" type="button" data-i18n="backupSetupChoose">Choose backup folder</button>
+                    <button id="backupSetupReauthorizeBtn" class="settings-btn btn-primary-green" type="button" data-i18n="backupSetupReauthorize" hidden>Reauthorize folder</button>
+                    <button id="backupSetupRetryBtn" class="settings-btn" type="button" data-i18n="backupSetupRetry" hidden>Retry verification</button>
+                    <button id="backupSetupExportBtn" class="settings-btn" type="button" data-i18n="backupSetupExport">Export current data</button>
+                </div>
+                <p id="backupSetupError" class="settings-help" role="alert"></p>
+                <p id="backupSetupCompatibility" class="settings-help" data-i18n="backupSetupBrowserNote"></p>
+                <p class="settings-help" data-i18n="backupSetupBlocked"></p>
+                <p class="settings-help" data-i18n="backupSetupExportHelp"></p>
+            </div>
+        </div>
+
         <!-- Main screen -->
         <div id="mainScreen" class="screen active">
             <div class="safe-area-top"></div>
             <div id="missingDataWarning" class="review-suspicious-banner" role="alert" style="display: none;">
                 <div class="review-suspicious-title" data-i18n="missingDataWarningTitle">No TimerHub data found on this device</div>
                 <p data-i18n="missingDataWarningBody">Data was stored on this device before, but nothing was found now. Browser storage may have been cleared. Restore a backup file if you have one.</p>
-                <button id="missingDataRestoreBtn" class="settings-btn btn-primary-green" type="button" data-i18n="missingDataRestore">Restore from backup file</button>
+                <button id="missingDataRestoreExternalBtn" class="settings-btn btn-primary-green" type="button" hidden>Restore latest external backup</button>
+                <button id="missingDataRestoreBtn" class="settings-btn" type="button" data-i18n="missingDataRestore">Restore from backup file</button>
                 <button id="missingDataDismissBtn" class="settings-btn" type="button" data-i18n="missingDataDismiss">Dismiss</button>
             </div>
             <div id="timerRunningStatus" class="timer-running-status" role="status" aria-live="polite"></div>
@@ -290,6 +313,28 @@
                         <p id="lastBackupStatus" class="backup-status" role="status" aria-live="polite"></p>
                     </div>
                     <div class="backup-panel">
+                        <h4 data-i18n="externalBackupTitle">External automatic backups</h4>
+                        <p data-i18n="externalBackupDescription">Verified backups are written to the folder you selected. Manual backups are never removed by retention.</p>
+                        <p id="externalBackupStatus" class="backup-status" role="status" aria-live="polite"></p>
+                        <p id="externalBackupFolder" class="settings-help"></p>
+                        <button id="externalBackupNowBtn" class="settings-btn btn-primary-green" type="button" data-i18n="externalBackupNow">Back up now</button>
+                        <button id="externalBackupChooseBtn" class="settings-btn" type="button" data-i18n="externalBackupChooseFolder">Choose or change folder</button>
+                        <button id="externalBackupVerifyBtn" class="settings-btn" type="button" data-i18n="externalBackupVerify">Verify folder</button>
+                        <label for="externalBackupRetentionSelect" data-i18n="backupRetentionLabel">Automatic external backups to keep</label>
+                        <select id="externalBackupRetentionSelect" class="setting-select">
+                            <option value="5">5</option>
+                            <option value="10">10</option>
+                            <option value="20" selected>20</option>
+                            <option value="50">50</option>
+                        </select>
+                        <label for="externalBackupSelect" data-i18n="externalBackupSelect">Choose an external backup</label>
+                        <select id="externalBackupSelect" class="setting-select">
+                            <option value="" data-i18n="externalBackupNone">No verified external backups found.</option>
+                        </select>
+                        <button id="externalBackupRefreshBtn" class="settings-btn" type="button" data-i18n="externalBackupRefresh">Refresh backup list</button>
+                        <button id="externalBackupRestoreBtn" class="settings-btn" type="button" data-i18n="externalBackupRestore" disabled>Restore selected external backup</button>
+                    </div>
+                    <div class="backup-panel">
                         <h4 data-i18n="automaticSnapshotsTitle">Automatic local snapshots</h4>
                         <p data-i18n="automaticSnapshotsDescription">TimerHub keeps the 20 most recent safety snapshots on this device after saved changes.</p>
                         <p class="settings-help" data-i18n="snapshotsSameDatabaseNote">Snapshots are stored in the same browser database as your data. If that database is deleted, snapshots are deleted with it. Export a backup file for protection outside the browser.</p>
@@ -307,7 +352,13 @@
                     </div>
                     <div class="backup-panel">
                         <h4 data-i18n="diagnosticsTitle">Local diagnostics</h4>
+                        <p data-i18n="diagnosticsDescription">Recent errors and warnings. Credentials and sensitive payloads are redacted.</p>
                         <p id="backupDiagnostics" class="settings-help"></p>
+                        <p id="diagnosticsBackupFolder" class="settings-help"></p>
+                        <p id="diagnosticsLastVerified" class="backup-status" role="status" aria-live="polite"></p>
+                        <div id="diagnosticsList" class="diagnostics-list" role="list"></div>
+                        <button id="diagnosticsExportBtn" class="settings-btn" type="button" data-i18n="diagnosticsExport">Export diagnostics</button>
+                        <button id="diagnosticsClearBtn" class="settings-btn" type="button" data-i18n="diagnosticsClear">Clear diagnostics</button>
                     </div>
                 </section>
                 <section class="backup-area" aria-labelledby="assignmentSectionTitle">
@@ -838,6 +889,8 @@
     <script src="clockodo-client.js"></script>
     <script src="exchange.js"></script>
     <script src="assignment.js"></script>
+    <script src="diagnostics.js"></script>
+    <script src="backup-service.js"></script>
     <script src="share-link.js"></script>
     <script src="app.js"></script>
     <script>
