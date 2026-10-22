@@ -2560,6 +2560,7 @@ class TimerHubApp {
                 this.diagnostics?.error('backup', 'startup-backup', error, { status: 'failed' });
                 this.updateExternalBackupStatus().catch(() => {});
                 if (error?.code === 'backup_permission_denied') this.lockForBackupProblem('permission-denied');
+                else this.showToast(this.t('externalBackupFailed'));
             });
 
             if (this.activeActivityId) {
@@ -2851,6 +2852,7 @@ class TimerHubApp {
                 if (error?.code === 'backup_permission_denied') {
                     this.lockForBackupProblem('permission-denied');
                 } else if (this.pendingAutoBackupRevision === null) {
+                    this.showToast(this.t('externalBackupFailed'));
                     this.pendingAutoBackupRevision = this.storage.dataRevision;
                     this.autoBackupTimer = setTimeout(() => {
                         this.autoBackupTimer = null;

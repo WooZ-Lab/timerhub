@@ -344,3 +344,26 @@ test('a failed close or final read leaves the previous verified backup intact', 
     assert.ok(directory.files.has(first.name));
     assert.equal((await service.findLatestVerified()).name, first.name);
 });
+
+test('a newer corrupt file can never cause retention to delete the newest verified backup', async () => {
+    const directory = makeDirectory();
+    const { service } = makeService({ directory, retention: 5 });
+    await service.selectDirectory();
+    const older = await service.createBackup({ kind: 'automatic', revision: 1, force: true });
+    const newestVerified = await service.createBackup({ kind: 'automatic', revision: 2, force: true });
+    directory.files.set('timerhub_auto_backup_20990101_000000_corrupt.json', {
+        text: JSON.stringify({
+            format: 'timerhub-backup',
+            version: 1,
+            activities: [{ id: 'tampered' }],
+            timeEntries: []
+        }),
+        lastModified: Date.now()
+    });
+    service.manifestCache = null;
+    const result = await service.pruneAutomatic(1);
+    assert.ok(directory.files.has(newestVerified.name), 'the newest verified backup is retained');
+    assert.equal(directory.files.has(older.name), false, 'older verified backups may be pruned');
+    assert.ok(directory.files.has('timerhub_auto_backup_20990101_000000_corrupt.json'), 'unverified files are not deleted');
+    assert.ok(result.removed >= 1);
+});

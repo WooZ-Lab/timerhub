@@ -774,40 +774,50 @@
             const entries = await this.listBackups({ verify: false });
             const automatic = entries.filter(entry => entry.kind === 'automatic');
             if (automatic.length <= keep) return { removed: 0, kept: automatic.length };
-            const removeCandidates = automatic.slice(keep);
-            const verifiedNames = new Set();
-            let removed = 0;
-            for (const candidate of removeCandidates) {
+
+            // Find the newest positively verified automatic backup first. If a
+            // newer corrupt or partial file exists, the latest verified file is
+            // still retained no matter which count the retention policy uses.
+            let latestVerified = null;
+            for (const candidate of automatic) {
                 try {
                     const text = await this.readTextFile(directory, candidate.name);
                     const parsed = await this.parseBackupText(text, candidate.name);
-                    if (!parsed.verified || parsed.kind !== 'automatic' ||
-                        parsed.meta?.kind !== 'automatic') {
+                    if (parsed.verified && parsed.kind === 'automatic' && parsed.meta?.kind === 'automatic') {
+                        latestVerified = candidate;
+                        break;
+                    }
+                } catch (error) {
+                    this.report('warn', 'prune-skip-invalid', error, {
+                        status: 'rolled_back',
+                        details: { name: candidate.name }
+                    });
+                }
+            }
+            if (!latestVerified) {
+                return { removed: 0, kept: automatic.length, reason: 'no_verified_backup' };
+            }
+
+            // Only verify files that are actually about to be deleted. Files
+            // that remain in place are not read again during every backup.
+            let removed = 0;
+            for (const candidate of automatic.slice(keep)) {
+                if (candidate.name === latestVerified.name) continue;
+                try {
+                    const text = await this.readTextFile(directory, candidate.name);
+                    const parsed = await this.parseBackupText(text, candidate.name);
+                    if (!parsed.verified || parsed.kind !== 'automatic' || parsed.meta?.kind !== 'automatic') {
                         this.report('warn', 'prune-skip-unverified', 'backup_not_owned', {
                             status: 'rolled_back',
                             details: { name: candidate.name }
                         });
                         continue;
                     }
-                    verifiedNames.add(candidate.name);
-                } catch (error) {
-                    this.report('warn', 'prune-skip-invalid', error, {
-                        status: 'rolled_back',
-                        details: { name: candidate.name }
-                    });
-                    continue;
-                }
-            }
-            if (verifiedNames.size >= automatic.length) {
-                return { removed: 0, kept: automatic.length, reason: 'last_verified_guard' };
-            }
-            for (const name of verifiedNames) {
-                try {
-                    await directory.removeEntry(name);
+                    await directory.removeEntry(candidate.name);
                     removed += 1;
-                    await this.updateManifest(null, { removeName: name });
+                    await this.updateManifest(null, { removeName: candidate.name });
                 } catch (error) {
-                    this.report('warn', 'prune-remove', error, { status: 'failed', details: { name } });
+                    this.report('warn', 'prune-remove', error, { status: 'failed', details: { name: candidate.name } });
                 }
             }
             return { removed, kept: automatic.length - removed };
