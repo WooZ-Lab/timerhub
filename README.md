@@ -186,8 +186,10 @@ Access via **📋** button in top navigation.
 TimerHub requires a persistent backup folder outside browser storage before the
 main application opens. On first start, choose a folder and allow read/write
 access. Automatic backups are written to that folder, verified with a checksum,
-and checked again on every start. If access is revoked, the app stays locked
-until the folder is reauthorized or another folder is selected.
+and checked again on every start. If permission is momentarily unavailable, the
+canvas stays usable and a non-blocking warning offers to restore access to the
+same folder. Only a genuinely missing or invalid handle shows the folder setup
+screen.
 
 Persistent folder access uses the File System Access API. It is available in
 Chromium-based desktop browsers (Chrome and Edge) and in Chrome for Android 132

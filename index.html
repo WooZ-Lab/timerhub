@@ -61,6 +61,14 @@
             </div>
         </div>
 
+        <div id="backupAccessBanner" class="backup-access-banner" role="status" aria-live="polite" hidden>
+            <p id="backupAccessBannerText"></p>
+            <div class="backup-access-actions">
+                <button id="backupAccessRestoreBtn" class="settings-btn btn-primary-green" type="button" data-i18n="backupSetupReauthorize">Restore folder access</button>
+                <button id="backupAccessSettingsBtn" class="settings-btn" type="button" data-i18n="backupAccessSettings">Backup settings</button>
+            </div>
+        </div>
+
         <!-- Main screen -->
         <div id="mainScreen" class="screen active">
             <div class="safe-area-top"></div>
@@ -896,9 +904,23 @@
     <script src="app.js"></script>
     <script>
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js').catch(err => 
-                console.log('SW registration failed:', err)
-            );
+            const hadController = Boolean(navigator.serviceWorker.controller);
+            let reloadingForUpdate = false;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (!hadController || reloadingForUpdate) return;
+                reloadingForUpdate = true;
+                window.location.reload();
+            });
+            navigator.serviceWorker.register('sw.js')
+                .then(registration => {
+                    const checkForUpdate = () => registration.update().catch(() => {});
+                    checkForUpdate();
+                    window.addEventListener('online', checkForUpdate);
+                    document.addEventListener('visibilitychange', () => {
+                        if (!document.hidden) checkForUpdate();
+                    });
+                })
+                .catch(err => console.log('SW registration failed:', err));
         }
     </script>
 </body>

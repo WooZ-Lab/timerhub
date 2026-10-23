@@ -213,7 +213,8 @@ function createTestApp(initialData = {}) {
         'backupSetupScreen', 'backupSetupTitle', 'backupSetupStatus', 'backupSetupDirectory',
         'backupSetupData', 'backupSetupError', 'backupSetupCompatibility',
         'backupSetupChooseBtn', 'backupSetupReauthorizeBtn', 'backupSetupRetryBtn',
-        'backupSetupChangeDirBtn', 'backupSetupExportBtn'
+        'backupSetupChangeDirBtn', 'backupSetupExportBtn',
+        'backupAccessBanner', 'backupAccessBannerText', 'backupAccessRestoreBtn', 'backupAccessSettingsBtn'
     ]) {
         elements.set(id, {
             id,
@@ -12089,21 +12090,27 @@ test('startup backup gate distinguishes restored handles, permission renewal, an
     app.backupService = makeService('handle-invalid');
     assert.equal((await app.evaluateBackupGate()).reason, 'handle-invalid');
     app.backupService = makeService('permission-required');
-    assert.equal((await app.evaluateBackupGate()).reason, 'permission-required');
+    const required = await app.evaluateBackupGate();
+    assert.equal(required.ready, true, 'permission renewal must not hide the canvas');
+    assert.equal(required.warning, 'permission-required');
     app.backupService = makeService('permission-denied');
-    assert.equal((await app.evaluateBackupGate()).reason, 'permission-denied');
+    const denied = await app.evaluateBackupGate();
+    assert.equal(denied.ready, true);
+    assert.equal(denied.warning, 'permission-denied');
     app.backupService = makeService('restore-error');
-    assert.equal((await app.evaluateBackupGate()).reason, 'restore-error');
+    const restoreError = await app.evaluateBackupGate();
+    assert.equal(restoreError.ready, true, 'a transient restore failure must not ask for a new folder');
+    assert.equal(restoreError.warning, 'restore-error');
     app.backupService = makeService('ready');
     assert.equal((await app.evaluateBackupGate()).ready, true);
     app.backupService = makeService('ready', Object.assign(new Error('required'), { code: 'backup_permission_required' }));
     const renewal = await app.evaluateBackupGate();
-    assert.equal(renewal.ready, false);
-    assert.equal(renewal.reason, 'permission-required');
+    assert.equal(renewal.ready, true);
+    assert.equal(renewal.warning, 'permission-required');
     app.backupService = makeService('ready', Object.assign(new Error('denied'), { code: 'backup_permission_denied' }));
     const failed = await app.evaluateBackupGate();
-    assert.equal(failed.ready, false);
-    assert.equal(failed.reason, 'permission-denied');
+    assert.equal(failed.ready, true);
+    assert.equal(failed.warning, 'permission-denied');
 });
 
 test('external backups are skipped while startup is locked and manual backup failures keep the app usable', async () => {
@@ -12270,7 +12277,7 @@ test('the setup reauthorize action renews the saved handle and never opens the d
     assert.equal(app.finished, true);
 });
 
-test('the setup retry action reloads the saved handle before evaluating the gate', async () => {
+test('the setup retry action reloads the saved handle before deciding the canvas is blocked', async () => {
     const { app } = createTestApp();
     const order = [];
     app.backupService = {
@@ -12284,7 +12291,7 @@ test('the setup retry action reloads the saved handle before evaluating the gate
     app.finishStartup = async () => { app.finished = true; return true; };
     app.startupFinalized = false;
     assert.equal(await app.handleBackupSetupChoice('retry'), true);
-    assert.deepEqual(order, ['init', 'verify']);
+    assert.deepEqual(order, ['init']);
     assert.equal(app.finished, true);
 });
 
@@ -12304,4 +12311,181 @@ test('unsupported directory APIs show a compatibility explanation instead of a r
     assert.equal(document.getElementById('backupSetupReauthorizeBtn').hidden, true);
     assert.equal(document.getElementById('backupSetupChangeDirBtn').hidden, true);
     assert.equal(document.getElementById('backupSetupExportBtn').hidden, false, 'data export remains available');
+});
+
+test('startup decision opens the canvas for permission renewal and only blocks genuinely missing folders', () => {
+    const { app } = createTestApp();
+    for (const state of ['permission-required', 'permission-denied', 'permission-unknown', 'restore-error']) {
+        const decision = app.decideBackupStartup({ state, savedHandleAvailable: true, directoryName: 'Backups' });
+        assert.equal(decision.mode, 'degraded', `${state} must not hide the canvas`);
+        assert.equal(decision.warning, state);
+    }
+    for (const state of ['needs-selection', 'handle-invalid', 'unsupported']) {
+        const decision = app.decideBackupStartup({ state, savedHandleAvailable: false, directoryName: '' });
+        assert.equal(decision.mode, 'setup', `${state} may show folder setup`);
+    }
+    assert.equal(app.decideBackupStartup({ state: 'ready' }).mode, 'ready');
+});
+
+test('temporary handle restore errors are retried before any setup decision', async () => {
+    const { app } = createTestApp();
+    let calls = 0;
+    app.backupService = {
+        async init() {
+            calls += 1;
+            return calls < 3
+                ? { state: 'restore-error', savedHandleAvailable: false }
+                : { state: 'ready', savedHandleAvailable: true, directoryName: 'Backups', permissionState: 'granted' };
+        }
+    };
+    const status = await app.restoreBackupAccessBeforeScreen({ retryDelays: [0, 0] });
+    assert.equal(calls, 3);
+    assert.equal(status.state, 'ready');
+    assert.equal(app.decideBackupStartup(status).mode, 'ready');
+});
+
+test('a permission warning is a non-blocking banner that names the saved folder', () => {
+    const { app, document } = createTestApp();
+    app.startupFinalized = true;
+    app.showBackupAccessWarning('permission-required', {
+        state: 'permission-required',
+        savedHandleAvailable: true,
+        directoryName: 'My backups'
+    });
+    const banner = document.getElementById('backupAccessBanner');
+    assert.equal(banner.hidden, false);
+    assert.match(document.getElementById('backupAccessBannerText').textContent, /My backups/);
+    assert.match(document.getElementById('backupAccessRestoreBtn').textContent, /Restore access/);
+    assert.notEqual(document.getElementById('backupAccessSettingsBtn').hidden, true);
+    app.hideBackupAccessWarning();
+    assert.equal(banner.hidden, true);
+});
+
+test('a permission warning does not mark the application as locked', () => {
+    const { app, context } = createTestApp();
+    let locked = false;
+    app.lockMainApplication = () => { locked = true; };
+    app.startupFinalized = true;
+    app.showBackupAccessWarning('permission-required', {
+        state: 'permission-required', savedHandleAvailable: true, directoryName: 'Backups'
+    });
+    assert.equal(locked, false);
+    assert.equal(context.document.title, '');
+});
+
+test('setup retry with a restored folder but prompt permission opens the canvas in degraded mode', async () => {
+    const { app } = createTestApp();
+    let setupShown = 0;
+    let finishArgs = null;
+    app.backupService = {
+        async init() {
+            return {
+                state: 'permission-required', savedHandleAvailable: true,
+                directoryName: 'Backups', permissionState: 'prompt'
+            };
+        },
+        getStatus() {
+            return {
+                state: 'permission-required', savedHandleAvailable: true,
+                directoryName: 'Backups', permissionState: 'prompt'
+            };
+        }
+    };
+    app.showBackupSetup = () => { setupShown += 1; };
+    app.finishStartup = async options => { finishArgs = options; return true; };
+    app.startupFinalized = false;
+    assert.equal(await app.handleBackupSetupChoice('retry'), true);
+    assert.equal(setupShown, 0, 'a saved folder must not send the user back to setup');
+    assert.equal(finishArgs.backupWarning, 'permission-required');
+});
+
+test('setup retry only offers setup when restoration confirms the handle is missing', async () => {
+    const { app, document } = createTestApp();
+    let finishCalled = false;
+    app.backupService = {
+        async init() {
+            return { state: 'needs-selection', savedHandleAvailable: false, directoryName: '' };
+        },
+        getStatus() {
+            return {
+                state: 'needs-selection', savedHandleAvailable: false,
+                directoryName: '', capabilities: { directoryPicker: true }
+            };
+        }
+    };
+    app.finishStartup = async () => { finishCalled = true; return true; };
+    app.startupFinalized = false;
+    assert.equal(await app.handleBackupSetupChoice('retry'), false);
+    assert.equal(finishCalled, false);
+    assert.equal(document.getElementById('backupSetupChooseBtn').hidden, false);
+});
+
+test('startup flow completes the canvas for granted and renewable handles but blocks only on missing folders', async () => {
+    for (const scenario of [
+        { state: 'ready', expectedSetup: 0, expectedWarning: null },
+        { state: 'permission-required', expectedSetup: 0, expectedWarning: 'permission-required' },
+        { state: 'permission-denied', expectedSetup: 0, expectedWarning: 'permission-denied' },
+        { state: 'restore-error', expectedSetup: 0, expectedWarning: 'restore-error' },
+        { state: 'needs-selection', expectedSetup: 1, expectedWarning: null },
+        { state: 'handle-invalid', expectedSetup: 1, expectedWarning: null },
+        { state: 'unsupported', expectedSetup: 1, expectedWarning: null }
+    ]) {
+        const { app } = createTestApp();
+        let setupShown = 0;
+        let finishOptions = null;
+        const status = {
+            state: scenario.state,
+            savedHandleAvailable: !['needs-selection', 'handle-invalid', 'unsupported'].includes(scenario.state),
+            directoryName: ['needs-selection', 'handle-invalid', 'unsupported'].includes(scenario.state) ? '' : 'Backups',
+            permissionState: scenario.state === 'permission-required' ? 'prompt' : 'granted',
+            capabilities: { directoryPicker: scenario.state !== 'unsupported' }
+        };
+        app.storage.init = async () => {};
+        app.loadSettings = async () => {};
+        app.loadBackupRetention = async () => 20;
+        app.applyTranslations = () => {};
+        app.loadActivities = async () => {};
+        app.loadGroups = async () => {};
+        app.loadTimeEntries = async () => {};
+        app.evaluateSuspiciousEmptyState = () => false;
+        app.updateDataPresenceMarker = () => {};
+        app.restoreBackupAccessBeforeScreen = async () => status;
+        app.showBackupSetup = () => { setupShown += 1; };
+        app.finishStartup = async options => { finishOptions = options; return true; };
+        await app.init();
+        assert.equal(setupShown, scenario.expectedSetup, `${scenario.state} setup decision`);
+        if (scenario.expectedWarning) {
+            assert.equal(finishOptions?.backupWarning, scenario.expectedWarning, `${scenario.state} warning`);
+        } else if (scenario.expectedSetup === 0) {
+            assert.equal(finishOptions?.backupWarning || null, null, `${scenario.state} no warning`);
+        }
+    }
+});
+
+test('the non-blocking restore action renews access to the saved folder and clears the warning', async () => {
+    const { app, document } = createTestApp();
+    let requestAccessCalls = 0;
+    const readyStatus = {
+        state: 'ready', savedHandleAvailable: true, directoryName: 'Backups',
+        permissionState: 'granted'
+    };
+    const promptStatus = {
+        state: 'permission-required', savedHandleAvailable: true, directoryName: 'Backups',
+        permissionState: 'prompt'
+    };
+    app.backupService = {
+        async init() { return promptStatus; },
+        async requestAccess() { requestAccessCalls += 1; return readyStatus; },
+        async queryPermission() { return 'granted'; },
+        getStatus() { return readyStatus; }
+    };
+    app.startupFinalized = true;
+    app.ensureStartupExternalBackup = async () => ({ name: 'backup.json' });
+    app.updateExternalBackupStatus = async () => {};
+    app.showToast = () => {};
+    app.showBackupAccessWarning('permission-required', promptStatus);
+    assert.equal(document.getElementById('backupAccessBanner').hidden, false);
+    assert.equal(await app.restoreBackupAccessFromBanner(), true);
+    assert.equal(requestAccessCalls, 1);
+    assert.equal(document.getElementById('backupAccessBanner').hidden, true);
 });
