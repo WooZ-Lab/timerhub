@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'timerhub-v21';
+const CACHE_VERSION = 'timerhub-v22';
 const LOCALE_CACHE_KEY = '/__timerhub_locale__';
 const PUSH_COPY = {
     en: { title: 'TimerHub', body: 'Timer reminder' },

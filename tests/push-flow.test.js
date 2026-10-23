@@ -1623,3 +1623,11 @@ test('activity menu exposes Duplicate and the group editor exposes the default c
     assert.match(source, /sel\('menuDuplicateBtn'\)\?\.addEventListener\('click', \(\) => this\.duplicateActivity\(\)\)/);
     assert.match(source, /sel\('groupEditClockodoRetryBtn'\)\?\.addEventListener\('click', \(\) => this\.reloadClockodoReferenceData\(\)\)/);
 });
+
+test('backup setup buttons marked hidden are actually removed from layout', () => {
+    assert.match(
+        styleSource,
+        /\.backup-setup-screen\s+\.settings-btn\[hidden\]\s*\{[^}]*display\s*:\s*none\s*!important/i,
+        'the settings button display rule must not override the hidden attribute'
+    );
+});

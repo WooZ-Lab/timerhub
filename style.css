@@ -3091,6 +3091,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     color: var(--text-primary);
 }
 .backup-setup-screen[hidden] { display: none !important; }
+/* The .settings-btn rule sets display:inline-flex, which otherwise overrides
+   the browser's [hidden] rule. Keep setup actions genuinely hidden. */
+.backup-setup-screen .settings-btn[hidden] { display: none !important; }
 .backup-setup-card {
     width: min(100%, 560px);
     padding: 24px;
