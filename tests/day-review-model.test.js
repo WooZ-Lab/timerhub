@@ -209,7 +209,11 @@ function createTestApp(initialData = {}) {
         'groupDeleteModalCloseBtn', 'groupDeleteSummary', 'groupDeleteOutcome', 'groupDeleteLockedWarning',
         'groupDeleteActivitiesKeep', 'groupDeleteActivitiesDelete', 'groupDeleteNestedKeep', 'groupDeleteNestedDelete',
         'groupDeleteCancelBtn', 'groupDeleteConfirmBtn', 'groupEditLockedInput', 'undoCanvasBtn', 'redoCanvasBtn', 'iconPicker',
-        'activityAssignmentsToggleBtn'
+        'activityAssignmentsToggleBtn',
+        'backupSetupScreen', 'backupSetupTitle', 'backupSetupStatus', 'backupSetupDirectory',
+        'backupSetupData', 'backupSetupError', 'backupSetupCompatibility',
+        'backupSetupChooseBtn', 'backupSetupReauthorizeBtn', 'backupSetupRetryBtn',
+        'backupSetupChangeDirBtn', 'backupSetupExportBtn'
     ]) {
         elements.set(id, {
             id,
@@ -12057,29 +12061,45 @@ test('a restore failure rolls back to the pre-restore snapshot instead of leavin
     assert.equal(storageData.timeEntries.some(item => item.id === 'existing'), true);
 });
 
-test('startup backup gate refuses unsupported, missing, revoked, and unwritable directories', async () => {
+test('startup backup gate distinguishes restored handles, permission renewal, and genuine setup', async () => {
     const { app } = createTestApp();
     const makeService = (state, verify) => ({
         state,
         directoryHandle: state === 'needs-selection' ? null : { kind: 'directory', name: 'Backups' },
         getStatus() {
+            const hasHandle = state !== 'needs-selection' && state !== 'unsupported';
             return {
-                state, directoryName: state === 'needs-selection' ? '' : 'Backups',
-                lastError: state === 'permission-denied' ? 'permission_prompt' : null,
+                state,
+                permissionState: state === 'permission-required' ? 'prompt' : state === 'permission-denied' ? 'denied' : 'granted',
+                savedHandleAvailable: hasHandle,
+                directoryName: hasHandle ? 'Backups' : '',
+                lastError: state === 'permission-required' ? 'permission_prompt' : state === 'permission-denied' ? 'permission_denied' : null,
                 capabilities: { directoryPicker: state !== 'unsupported' }
             };
         },
         async verifyWritable() { if (verify) throw verify; return true; },
-        async cleanupOwnTemporaryFiles() { return 0; }
+        async cleanupOwnTemporaryFiles() { return 0; },
+        async init() { return this.getStatus(); },
+        async requestAccess() { this.state = 'ready'; return this.getStatus(); }
     });
     app.backupService = makeService('unsupported');
     assert.equal((await app.evaluateBackupGate()).reason, 'unsupported');
     app.backupService = makeService('needs-selection');
     assert.equal((await app.evaluateBackupGate()).reason, 'needs-selection');
+    app.backupService = makeService('handle-invalid');
+    assert.equal((await app.evaluateBackupGate()).reason, 'handle-invalid');
+    app.backupService = makeService('permission-required');
+    assert.equal((await app.evaluateBackupGate()).reason, 'permission-required');
     app.backupService = makeService('permission-denied');
     assert.equal((await app.evaluateBackupGate()).reason, 'permission-denied');
+    app.backupService = makeService('restore-error');
+    assert.equal((await app.evaluateBackupGate()).reason, 'restore-error');
     app.backupService = makeService('ready');
     assert.equal((await app.evaluateBackupGate()).ready, true);
+    app.backupService = makeService('ready', Object.assign(new Error('required'), { code: 'backup_permission_required' }));
+    const renewal = await app.evaluateBackupGate();
+    assert.equal(renewal.ready, false);
+    assert.equal(renewal.reason, 'permission-required');
     app.backupService = makeService('ready', Object.assign(new Error('denied'), { code: 'backup_permission_denied' }));
     const failed = await app.evaluateBackupGate();
     assert.equal(failed.ready, false);
@@ -12166,4 +12186,122 @@ test('duplicate records with the same stable ID do not flag a free interval as o
     app.reviewDate = '2026-10-05';
     assert.deepEqual([...app.getOverlappingEntryIds()], []);
     assert.equal(app.getSuspiciousEntries('2026-10-05').length, 0);
+});
+
+test('the setup screen reuses a saved handle instead of asking for folder selection', async () => {
+    const { app, document } = createTestApp();
+    const status = {
+        state: 'permission-required',
+        permissionState: 'prompt',
+        savedHandleAvailable: true,
+        directoryName: 'My backups',
+        lastError: 'permission_prompt',
+        capabilities: { directoryPicker: true }
+    };
+    app.backupService = { getStatus: () => status };
+    app.showBackupSetup({ ready: false, reason: 'permission-required', status });
+    assert.equal(document.getElementById('backupSetupChooseBtn').hidden, true, 'first-time selection is not offered for a saved handle');
+    assert.equal(document.getElementById('backupSetupReauthorizeBtn').hidden, false, 'the primary action renews access to the saved handle');
+    assert.equal(document.getElementById('backupSetupChangeDirBtn').hidden, false, 'changing folders remains an explicit secondary action');
+    assert.equal(document.getElementById('backupSetupRetryBtn').hidden, true);
+    assert.match(document.getElementById('backupSetupTitle').textContent, /Restore access/);
+    assert.match(document.getElementById('backupSetupCompatibility').textContent, /do not need to select a new folder/i);
+
+    const missing = {
+        state: 'needs-selection',
+        savedHandleAvailable: false,
+        directoryName: '',
+        capabilities: { directoryPicker: true }
+    };
+    app.backupService = { getStatus: () => missing };
+    app.showBackupSetup({ ready: false, reason: 'needs-selection', status: missing });
+    assert.equal(document.getElementById('backupSetupChooseBtn').hidden, false, 'selection is offered when no handle exists');
+    assert.equal(document.getElementById('backupSetupReauthorizeBtn').hidden, true);
+    assert.equal(document.getElementById('backupSetupChangeDirBtn').hidden, true);
+});
+
+test('the setup screen offers retry for a transient handle restore error and not a new folder first', async () => {
+    const { app, document } = createTestApp();
+    const status = {
+        state: 'restore-error',
+        savedHandleAvailable: false,
+        directoryName: '',
+        lastError: 'transient_read_failure',
+        capabilities: { directoryPicker: true }
+    };
+    app.backupService = { getStatus: () => status };
+    app.showBackupSetup({ ready: false, reason: 'restore-error', status });
+    assert.equal(document.getElementById('backupSetupRetryBtn').hidden, false);
+    assert.equal(document.getElementById('backupSetupChooseBtn').hidden, false, 'a different folder remains a recovery option');
+    assert.match(document.getElementById('backupSetupTitle').textContent, /could not be loaded/i);
+});
+
+test('an invalid saved handle leads to a clear recoverable setup flow without deleting the handle', async () => {
+    const { app, document } = createTestApp();
+    const status = {
+        state: 'handle-invalid',
+        savedHandleAvailable: false,
+        directoryName: '',
+        lastError: 'saved_handle_invalid',
+        capabilities: { directoryPicker: true }
+    };
+    app.backupService = { getStatus: () => status };
+    app.showBackupSetup({ ready: false, reason: 'handle-invalid', status });
+    assert.equal(document.getElementById('backupSetupChooseBtn').hidden, false);
+    assert.equal(document.getElementById('backupSetupRetryBtn').hidden, true);
+});
+
+test('the setup reauthorize action renews the saved handle and never opens the directory picker', async () => {
+    const { app } = createTestApp();
+    let requestAccessCalls = 0;
+    let selectCalls = 0;
+    app.backupService = {
+        async requestAccess() { requestAccessCalls += 1; this.state = 'ready'; return { state: 'ready' }; },
+        async selectDirectory() { selectCalls += 1; return { state: 'ready' }; },
+        getStatus() { return { state: 'ready', savedHandleAvailable: true, directoryName: 'Backups' }; }
+    };
+    app.ensureStartupExternalBackup = async () => ({ name: 'backup.json' });
+    app.unlockMainApplication = () => {};
+    app.finishStartup = async () => { app.finished = true; return true; };
+    app.startupFinalized = false;
+    assert.equal(await app.handleBackupSetupChoice('reauthorize'), true);
+    assert.equal(requestAccessCalls, 1);
+    assert.equal(selectCalls, 0);
+    assert.equal(app.finished, true);
+});
+
+test('the setup retry action reloads the saved handle before evaluating the gate', async () => {
+    const { app } = createTestApp();
+    const order = [];
+    app.backupService = {
+        async init() { order.push('init'); return { state: 'ready' }; },
+        async verifyWritable() { order.push('verify'); return true; },
+        async cleanupOwnTemporaryFiles() { return 0; },
+        getStatus() { return { state: 'ready', savedHandleAvailable: true, directoryName: 'Backups' }; }
+    };
+    app.ensureStartupExternalBackup = async () => ({ name: 'backup.json' });
+    app.unlockMainApplication = () => {};
+    app.finishStartup = async () => { app.finished = true; return true; };
+    app.startupFinalized = false;
+    assert.equal(await app.handleBackupSetupChoice('retry'), true);
+    assert.deepEqual(order, ['init', 'verify']);
+    assert.equal(app.finished, true);
+});
+
+test('unsupported directory APIs show a compatibility explanation instead of a repeated setup action', () => {
+    const { app, document } = createTestApp();
+    const status = {
+        state: 'unsupported',
+        savedHandleAvailable: false,
+        directoryName: '',
+        capabilities: { directoryPicker: false }
+    };
+    app.backupService = { getStatus: () => status };
+    app.showBackupSetup({ ready: false, reason: 'unsupported', status });
+    assert.match(document.getElementById('backupSetupTitle').textContent, /not supported/i);
+    assert.match(document.getElementById('backupSetupCompatibility').textContent, /Chrome 132|native wrapper/i);
+    assert.equal(document.getElementById('backupSetupChooseBtn').hidden, true);
+    assert.equal(document.getElementById('backupSetupReauthorizeBtn').hidden, true);
+    assert.equal(document.getElementById('backupSetupChangeDirBtn').hidden, true);
+    assert.equal(document.getElementById('backupSetupExportBtn').hidden, false, 'data export remains available');
 });

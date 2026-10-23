@@ -7,8 +7,9 @@ import vm from 'node:vm';
 const backupSource = await readFile(new URL('../backup-service.js', import.meta.url), 'utf8');
 const diagnosticsSource = await readFile(new URL('../diagnostics.js', import.meta.url), 'utf8');
 
-function makeMetadataIndexedDb() {
+function makeMetadataIndexedDb(options = {}) {
     const values = new Map();
+    const state = { failNextOpen: Boolean(options.failNextOpen), failNextGet: Boolean(options.failNextGet) };
     const db = {
         objectStoreNames: { contains: () => false },
         createObjectStore() {},
@@ -19,6 +20,12 @@ function makeMetadataIndexedDb() {
                 get(key) {
                     const request = {};
                     queueMicrotask(() => {
+                        if (state.failNextGet) {
+                            state.failNextGet = false;
+                            request.error = new Error('transient_read_failure');
+                            request.onerror?.();
+                            return;
+                        }
                         const record = values.get(key);
                         request.result = record;
                         request.onsuccess?.();
@@ -30,6 +37,12 @@ function makeMetadataIndexedDb() {
                         values.set(record.key, record);
                         tx.oncomplete?.();
                     });
+                },
+                delete(key) {
+                    queueMicrotask(() => {
+                        values.delete(key);
+                        tx.oncomplete?.();
+                    });
                 }
             });
             return tx;
@@ -37,9 +50,16 @@ function makeMetadataIndexedDb() {
     };
     return {
         _values: values,
+        state,
         open() {
             const request = {};
             queueMicrotask(() => {
+                if (state.failNextOpen) {
+                    state.failNextOpen = false;
+                    request.error = new Error('transient_open_failure');
+                    request.onerror?.();
+                    return;
+                }
                 try {
                     request.result = db;
                     request.onupgradeneeded?.({ target: { result: db } });
@@ -366,4 +386,156 @@ test('a newer corrupt file can never cause retention to delete the newest verifi
     assert.equal(directory.files.has(older.name), false, 'older verified backups may be pruned');
     assert.ok(directory.files.has('timerhub_auto_backup_20990101_000000_corrupt.json'), 'unverified files are not deleted');
     assert.ok(result.removed >= 1);
+});
+
+test('a saved directory handle is restored after an app restart without opening the picker', async () => {
+    const directory = makeDirectory('Saved backups');
+    const indexedDB = makeMetadataIndexedDb();
+    const first = makeService({ directory, indexedDB });
+    await first.service.selectDirectory();
+    let pickerCalls = 0;
+    const second = makeService({
+        directory,
+        indexedDB,
+        picker: async () => { pickerCalls += 1; return directory.handle; }
+    });
+    const status = await second.service.init();
+    assert.equal(status.state, 'ready');
+    assert.equal(status.savedHandleAvailable, true);
+    assert.equal(status.permissionState, 'granted');
+    assert.equal(status.directoryName, 'Saved backups');
+    assert.equal(pickerCalls, 0, 'restoring a handle must not open the directory picker');
+    const backup = await second.service.createBackup({ kind: 'automatic', revision: 10 });
+    assert.equal(backup.skipped, false);
+    assert.equal((await second.service.readBackup(backup.name)).verified, true);
+});
+
+test('a saved handle requiring permission renewal is reused instead of discarded', async () => {
+    const directory = makeDirectory('Renewed backups');
+    const indexedDB = makeMetadataIndexedDb();
+    const first = makeService({ directory, indexedDB });
+    await first.service.selectDirectory();
+    directory.state.permission = 'prompt';
+    directory.state.requestPermission = 'granted';
+    let pickerCalls = 0;
+    const second = makeService({
+        directory,
+        indexedDB,
+        picker: async () => { pickerCalls += 1; return directory.handle; }
+    });
+    const status = await second.service.init();
+    assert.equal(status.state, 'permission-required');
+    assert.equal(status.savedHandleAvailable, true);
+    assert.equal(status.directoryName, 'Renewed backups');
+    const renewed = await second.service.requestAccess();
+    assert.equal(renewed.state, 'ready');
+    assert.equal(renewed.permissionState, 'granted');
+    assert.equal(pickerCalls, 0, 'permission renewal must reuse the saved handle');
+    assert.equal(second.service.directoryHandle.name, 'Renewed backups');
+});
+
+test('a missing handle requires a legitimate first-time setup flow', async () => {
+    const directory = makeDirectory();
+    const indexedDB = makeMetadataIndexedDb();
+    const { service } = makeService({ directory, indexedDB });
+    const status = await service.init();
+    assert.equal(status.state, 'needs-selection');
+    assert.equal(status.savedHandleAvailable, false);
+    assert.equal(status.directoryName, '');
+});
+
+test('an invalid saved handle is not deleted and leads to a clear recovery flow', async () => {
+    const directory = makeDirectory();
+    const indexedDB = makeMetadataIndexedDb();
+    indexedDB._values.set('directoryHandle', { key: 'directoryHandle', value: { kind: 'file', name: 'wrong' } });
+    const { service } = makeService({ directory, indexedDB });
+    const status = await service.init();
+    assert.equal(status.state, 'handle-invalid');
+    assert.equal(status.savedHandleAvailable, false);
+    assert.equal(indexedDB._values.has('directoryHandle'), true, 'invalid stored handles are preserved for diagnostics/recovery');
+});
+
+test('a transient IndexedDB failure does not erase the saved handle and retry restores it', async () => {
+    const directory = makeDirectory('Transient backups');
+    const indexedDB = makeMetadataIndexedDb();
+    const first = makeService({ directory, indexedDB });
+    await first.service.selectDirectory();
+    assert.equal(indexedDB._values.has('directoryHandle'), true);
+
+    indexedDB.state.failNextOpen = true;
+    const second = makeService({ directory, indexedDB });
+    const failed = await second.service.init();
+    assert.equal(failed.state, 'restore-error');
+    assert.equal(indexedDB._values.has('directoryHandle'), true, 'a transient read failure must not delete the handle');
+
+    const retried = await second.service.init();
+    assert.equal(retried.state, 'ready');
+    assert.equal(retried.directoryName, 'Transient backups');
+});
+
+test('a transient read failure after the database opens is retryable without losing the handle', async () => {
+    const directory = makeDirectory('Retry read backups');
+    const indexedDB = makeMetadataIndexedDb();
+    const first = makeService({ directory, indexedDB });
+    await first.service.selectDirectory();
+
+    indexedDB.state.failNextGet = true;
+    const second = makeService({ directory, indexedDB });
+    const failed = await second.service.init();
+    assert.equal(failed.state, 'restore-error');
+    assert.equal(indexedDB._values.has('directoryHandle'), true);
+    const retried = await second.service.init();
+    assert.equal(retried.state, 'ready');
+});
+
+test('a saved handle is reused even when the current browsing context does not expose the directory picker', async () => {
+    const directory = makeDirectory('PWA backups');
+    const indexedDB = makeMetadataIndexedDb();
+    const first = makeService({ directory, indexedDB });
+    await first.service.selectDirectory();
+
+    const { service } = makeService({ directory, indexedDB, picker: null });
+    service.picker = null;
+    const status = await service.init();
+    assert.equal(status.state, 'ready');
+    assert.equal(status.savedHandleAvailable, true);
+    assert.equal(status.directoryName, 'PWA backups');
+    await assert.rejects(() => service.selectDirectory(), /unsupported/);
+    const backup = await service.createBackup({ kind: 'automatic', revision: 7 });
+    assert.equal(backup.skipped, false);
+});
+
+test('a repeated init keeps an already active handle when the stored value reads back empty', async () => {
+    const directory = makeDirectory('Memory backups');
+    const indexedDB = makeMetadataIndexedDb();
+    const { service } = makeService({ directory, indexedDB });
+    await service.selectDirectory();
+    indexedDB._values.delete('directoryHandle');
+    const status = await service.init();
+    assert.equal(status.state, 'ready');
+    assert.equal(status.savedHandleAvailable, true);
+    assert.equal(service.directoryHandle.name, 'Memory backups');
+});
+
+test('a failed choice of a new folder keeps the previously saved handle and its permission state', async () => {
+    const directoryA = makeDirectory('Original backups');
+    const directoryB = makeDirectory('Broken backups');
+    const indexedDB = makeMetadataIndexedDb();
+    let nextHandle = directoryA.handle;
+    const { service } = makeService({
+        directory: directoryA,
+        indexedDB,
+        picker: async () => nextHandle
+    });
+    await service.selectDirectory();
+    assert.equal(indexedDB._values.get('directoryHandle').value.name, 'Original backups');
+
+    nextHandle = directoryB.handle;
+    directoryB.state.requestPermission = 'denied';
+    directoryB.state.permission = 'denied';
+    await assert.rejects(() => service.selectDirectory(), /permission/i);
+    assert.equal(indexedDB._values.get('directoryHandle').value.name, 'Original backups');
+    assert.equal(service.directoryHandle.name, 'Original backups');
+    assert.equal(service.permissionState, 'granted');
+    assert.equal(service.state, 'ready');
 });

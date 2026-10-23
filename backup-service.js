@@ -75,6 +75,8 @@
             this.directoryHandle = null;
             this.directoryName = '';
             this.state = 'uninitialized';
+            this.permissionState = 'unknown';
+            this.savedHandleAvailable = false;
             this.lastError = null;
             this.lastVerifiedAt = 0;
             this.lastVerifiedName = '';
@@ -102,6 +104,8 @@
         getStatus() {
             return {
                 state: this.state,
+                permissionState: this.permissionState,
+                savedHandleAvailable: this.savedHandleAvailable,
                 directoryName: this.directoryName,
                 lastVerifiedAt: this.lastVerifiedAt,
                 lastVerifiedName: this.lastVerifiedName,
@@ -171,40 +175,123 @@
             });
         }
 
+        async deleteConfig(key) {
+            const db = await this.openMetadataDb();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction([CONFIG_STORE], 'readwrite');
+                tx.objectStore(CONFIG_STORE).delete(key);
+                tx.oncomplete = () => resolve(true);
+                tx.onerror = () => reject(tx.error || new TimerHubBackupError('metadata_delete_failed'));
+                tx.onabort = () => reject(tx.error || new TimerHubBackupError('metadata_delete_aborted'));
+            });
+        }
+
         async init() {
             this.capabilities.directoryPicker = typeof this.picker === 'function';
             this.capabilities.fileSystemAccess = this.capabilities.directoryPicker;
-            if (!this.capabilities.directoryPicker) {
-                this.state = 'unsupported';
-                this.lastError = 'directory_picker_unsupported';
-                return this.getStatus();
-            }
             try {
-                const handle = await this.readConfig('directoryHandle');
-                const lastVerified = await this.readConfig('lastVerified');
+                // A saved handle can be reused even if this particular browsing
+                // context does not expose the picker. Do not discard a valid
+                // handle just because selecting a new folder is unavailable.
+                let handle = await this.readConfig('directoryHandle');
+                if (!handle && this.directoryHandle) {
+                    // Keep a handle that is already active in this session if a
+                    // repeated init sees a transient null read.
+                    handle = this.directoryHandle;
+                    this.report('warn', 'restore-handle', 'saved_handle_read_empty_using_memory', {
+                        status: 'unknown',
+                        details: { savedHandleAvailable: true }
+                    });
+                }
+                if (handle && (handle.kind !== 'directory' || typeof handle.getFileHandle !== 'function') &&
+                    this.directoryHandle && this.directoryHandle !== handle) {
+                    handle = this.directoryHandle;
+                }
+                let storedName = null;
+                let lastVerified = null;
+                try {
+                    storedName = await this.readConfig('directoryName');
+                } catch (error) {
+                    this.report('warn', 'restore-directory-name', error, { status: 'unknown' });
+                }
+                try {
+                    lastVerified = await this.readConfig('lastVerified');
+                } catch (error) {
+                    this.report('warn', 'restore-last-verified', error, { status: 'unknown' });
+                }
                 if (lastVerified && Number.isFinite(Number(lastVerified.at))) {
                     this.lastVerifiedAt = Number(lastVerified.at);
                     this.lastVerifiedName = typeof lastVerified.name === 'string' ? lastVerified.name : '';
                 }
-                if (!handle || handle.kind !== 'directory') {
-                    this.state = 'needs-selection';
+                if (!handle) {
+                    this.savedHandleAvailable = false;
+                    this.directoryHandle = null;
+                    this.directoryName = '';
+                    this.permissionState = 'unknown';
+                    this.state = this.capabilities.directoryPicker ? 'needs-selection' : 'unsupported';
+                    this.lastError = this.capabilities.directoryPicker
+                        ? 'saved_handle_missing'
+                        : 'directory_picker_unsupported';
+                    this.report('info', 'restore-handle', 'saved_handle_missing', {
+                        status: 'unknown',
+                        details: { savedHandleAvailable: false }
+                    });
+                    return this.getStatus();
+                }
+                if (handle.kind !== 'directory' || typeof handle.getFileHandle !== 'function') {
+                    // Keep the stored value untouched. A malformed or
+                    // unsupported handle must not be silently deleted.
+                    this.savedHandleAvailable = false;
+                    this.directoryHandle = null;
+                    this.directoryName = typeof storedName === 'string' ? storedName : '';
+                    this.permissionState = 'unknown';
+                    this.state = this.capabilities.directoryPicker ? 'handle-invalid' : 'unsupported';
+                    this.lastError = this.capabilities.directoryPicker
+                        ? 'saved_handle_invalid'
+                        : 'directory_picker_unsupported';
+                    this.report('warn', 'restore-handle', 'saved_handle_invalid', {
+                        status: 'failed',
+                        details: { savedHandleAvailable: true, handleKind: String(handle.kind || 'unknown') }
+                    });
                     return this.getStatus();
                 }
                 this.directoryHandle = handle;
-                this.directoryName = typeof handle.name === 'string' ? handle.name : '';
-                const permission = await this.queryPermission(handle);
-                if (permission !== 'granted') {
+                this.savedHandleAvailable = true;
+                this.directoryName = typeof handle.name === 'string' && handle.name
+                    ? handle.name
+                    : typeof storedName === 'string' ? storedName : '';
+                this.permissionState = await this.queryPermission(handle);
+                if (this.permissionState === 'granted') {
+                    this.state = 'ready';
+                    this.lastError = null;
+                } else if (this.permissionState === 'prompt') {
+                    this.state = 'permission-required';
+                    this.lastError = 'permission_prompt';
+                } else if (this.permissionState === 'denied') {
                     this.state = 'permission-denied';
-                    this.lastError = `permission_${permission || 'unknown'}`;
-                    return this.getStatus();
+                    this.lastError = 'permission_denied';
+                } else {
+                    this.state = 'permission-unknown';
+                    this.lastError = `permission_${this.permissionState || 'unknown'}`;
                 }
-                this.state = 'ready';
-                this.lastError = null;
+                this.report('info', 'restore-handle', 'saved_handle_restored', {
+                    status: this.state === 'ready' ? 'succeeded' : 'unknown',
+                    details: {
+                        savedHandleAvailable: true,
+                        handleKind: 'directory',
+                        permissionState: this.permissionState
+                    }
+                });
                 return this.getStatus();
             } catch (error) {
-                this.state = 'error';
+                // A transient IndexedDB failure must not discard a saved
+                // handle. The app can retry init() without re-selecting.
+                this.state = 'restore-error';
                 this.lastError = safeErrorCode(error);
-                this.report('error', 'init', error, { status: 'failed' });
+                this.report('error', 'restore-handle', error, {
+                    status: 'failed',
+                    details: { savedHandleAvailable: this.savedHandleAvailable }
+                });
                 return this.getStatus();
             }
         }
@@ -237,7 +324,13 @@
             if (permission !== 'granted' && request) {
                 permission = await this.requestPermission();
             }
+            this.permissionState = permission;
             if (permission !== 'granted') {
+                if (permission === 'prompt') {
+                    this.state = 'permission-required';
+                    this.lastError = 'permission_prompt';
+                    throw new TimerHubBackupError('backup_permission_required');
+                }
                 this.state = 'permission-denied';
                 this.lastError = `permission_${permission || 'unknown'}`;
                 throw new TimerHubBackupError('backup_permission_denied');
@@ -253,6 +346,7 @@
             const previousHandle = this.directoryHandle;
             const previousName = this.directoryName;
             const previousState = this.state;
+            const previousPermission = this.permissionState;
             try {
                 const handle = await this.picker({ id: 'timerhub-backup', mode: 'readwrite' });
                 if (!handle || handle.kind !== 'directory') throw new TimerHubBackupError('invalid_directory');
@@ -261,6 +355,7 @@
             } catch (error) {
                 this.directoryHandle = previousHandle;
                 this.directoryName = previousName;
+                this.permissionState = previousPermission;
                 this.state = previousHandle ? previousState : 'needs-selection';
                 if (error?.name === 'AbortError') {
                     this.lastError = 'directory_selection_cancelled';
@@ -277,46 +372,88 @@
             if (permission !== 'granted') {
                 throw new TimerHubBackupError('backup_permission_denied');
             }
+            const previousHandle = this.directoryHandle;
+            const previousName = this.directoryName;
+            const previousPermission = this.permissionState;
             this.directoryHandle = handle;
             this.directoryName = typeof handle.name === 'string' ? handle.name : '';
+            this.permissionState = permission;
             this.state = 'ready';
             this.lastError = null;
             this.latestVerifiedCache = null;
-            await this.verifyWritable();
             try {
+                await this.verifyWritable();
+                // Stage the handle under a separate key and read it back first.
+                // Only replace the previously saved handle after the staged
+                // value is proven retrievable from IndexedDB.
+                await this.writeConfig('directoryHandleCandidate', handle);
+                const staged = await this.readConfig('directoryHandleCandidate');
+                if (!staged || staged.kind !== 'directory' || typeof staged.getFileHandle !== 'function') {
+                    throw new TimerHubBackupError('directory_handle_not_retrievable');
+                }
                 await this.writeConfig('directoryHandle', handle);
+                const persisted = await this.readConfig('directoryHandle');
+                if (!persisted || persisted.kind !== 'directory' || typeof persisted.getFileHandle !== 'function') {
+                    if (previousHandle) await this.writeConfig('directoryHandle', previousHandle).catch(() => {});
+                    throw new TimerHubBackupError('directory_handle_not_retrievable');
+                }
+                await this.writeConfig('directoryName', this.directoryName).catch(error => {
+                    this.report('warn', 'save-directory-name', error, { status: 'unknown' });
+                });
+                await this.deleteConfig('directoryHandleCandidate').catch(() => {});
             } catch (error) {
-                this.state = 'error';
+                this.directoryHandle = previousHandle;
+                this.directoryName = previousName;
+                this.permissionState = previousPermission;
+                this.state = previousHandle ? 'ready' : 'needs-selection';
                 this.lastError = 'directory_handle_not_saved';
                 this.report('error', 'save-directory-handle', error, { status: 'failed' });
-                throw new TimerHubBackupError('directory_handle_not_saved');
+                throw new TimerHubBackupError(error?.code === 'directory_handle_not_retrievable'
+                    ? 'directory_handle_not_retrievable'
+                    : 'directory_handle_not_saved');
             }
+            this.savedHandleAvailable = true;
             this.report('info', 'select-directory', 'directory_ready', {
                 status: 'succeeded',
-                details: { directoryName: this.directoryName }
+                details: { savedHandleAvailable: true }
             });
             return true;
         }
 
-        async reauthorize() {
+        async requestAccess() {
+            // This must not call the directory picker. It renews permission for
+            // the already persisted handle and is invoked from a user gesture.
             if (!this.directoryHandle) {
                 try {
                     const handle = await this.readConfig('directoryHandle');
-                    if (handle?.kind === 'directory') this.directoryHandle = handle;
+                    if (handle?.kind === 'directory' && typeof handle.getFileHandle === 'function') {
+                        this.directoryHandle = handle;
+                        this.directoryName = typeof handle.name === 'string' ? handle.name : this.directoryName;
+                        this.savedHandleAvailable = true;
+                    }
                 } catch {
-                    // ignore
+                    // Keep the handle state untouched; a failed read is not a
+                    // reason to discard it.
                 }
             }
             if (!this.directoryHandle) throw new TimerHubBackupError('backup_directory_missing');
             const permission = await this.requestPermission();
+            this.permissionState = permission;
             if (permission !== 'granted') {
-                this.state = 'permission-denied';
-                throw new TimerHubBackupError('backup_permission_denied');
+                this.state = permission === 'prompt' ? 'permission-required' : 'permission-denied';
+                this.lastError = permission === 'prompt' ? 'permission_prompt' : `permission_${permission || 'unknown'}`;
+                throw new TimerHubBackupError(permission === 'prompt'
+                    ? 'backup_permission_required'
+                    : 'backup_permission_denied');
             }
             this.state = 'ready';
-            await this.verifyWritable();
             this.lastError = null;
+            await this.verifyWritable();
             return this.getStatus();
+        }
+
+        async reauthorize() {
+            return this.requestAccess();
         }
 
         async verifyWritable() {
@@ -717,7 +854,7 @@
             try {
                 directory = await this.ensureReady();
             } catch (error) {
-                if (error?.code === 'backup_permission_denied' &&
+                if ((error?.code === 'backup_permission_denied' || error?.code === 'backup_permission_required') &&
                     (this.latestVerifiedCache || this.lastVerifiedName)) {
                     return this.latestVerifiedCache || {
                         name: this.lastVerifiedName,

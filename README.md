@@ -189,11 +189,19 @@ access. Automatic backups are written to that folder, verified with a checksum,
 and checked again on every start. If access is revoked, the app stays locked
 until the folder is reauthorized or another folder is selected.
 
-Persistent folder access uses the File System Access API and is currently
-available in Chromium-based desktop browsers (Chrome and Edge). Browsers without
-that API, including Chrome on Android, stay on the backup setup screen and can
-export the current data as a file. They do not pretend that a local IndexedDB
-snapshot is an external automatic backup.
+Persistent folder access uses the File System Access API. It is available in
+Chromium-based desktop browsers (Chrome and Edge) and in Chrome for Android 132
+or newer. The installed Chrome PWA must run on a Chrome version that exposes the
+API. Older browsers stay on the backup setup screen and can export the current
+data as a file; a native Android wrapper (for example one using the Storage
+Access Framework) would be required to provide automatic folder backups there.
+TimerHub never presents a local IndexedDB snapshot as an external automatic
+backup.
+
+The selected folder handle is stored separately from the application database.
+On later launches TimerHub reuses that handle. If Chrome requires confirmation
+again, the setup screen asks only to restore access to the existing folder;
+choosing another folder is a separate, explicit action.
 
 **Create a manual file:**
 1. Settings (⚙️) → "Create backup"

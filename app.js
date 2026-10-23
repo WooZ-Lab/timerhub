@@ -241,7 +241,7 @@ const extendedTranslations = {
         backupSetupIntro: 'TimerHub needs a folder outside browser storage to protect your data.',
         backupSetupExplanation: 'Automatic backups are written to a folder you control, so they survive browser storage clean-up, app restarts, and database problems.',
         backupSetupBrowserNote: 'Your browser may ask you to allow access to this folder again when TimerHub starts. Keep the folder available on this device.',
-        backupSetupChoose: 'Choose backup folder', backupSetupReauthorize: 'Reauthorize folder',
+        backupSetupChoose: 'Choose backup folder', backupSetupReauthorize: 'Restore folder access',
         backupSetupRetry: 'Retry verification', backupSetupExport: 'Export current data',
         backupSetupExportHelp: 'If the folder is unavailable, export your current data now so it can be recovered later.',
         backupSetupDirectoryLabel: 'Backup folder: {name}',
@@ -249,8 +249,13 @@ const extendedTranslations = {
         backupSetupVerified: 'Backup folder verified. Starting TimerHub…',
         backupSetupBlocked: 'The main application stays locked until a usable backup folder is verified.',
         backupSetupUnsupportedTitle: 'Persistent backup folder is not supported',
-        backupSetupUnsupportedBody: 'This browser cannot give TimerHub persistent access to a folder outside browser storage. Automatic external backups cannot be enabled here. Open TimerHub in a Chromium-based desktop browser to select a folder, or export your data now.',
+        backupSetupUnsupportedBody: 'This browser does not expose persistent folder access. On Android, use Chrome 132 or newer (or the installed Chrome PWA) and open TimerHub over HTTPS. In browsers without this API, automatic external backups cannot be enabled; export your data now. A native wrapper would be required for older browsers.',
         backupSetupPermissionTitle: 'Backup folder access is required',
+        backupSetupPermissionRequiredTitle: 'Restore access to your backup folder',
+        backupSetupPermissionRequiredBody: 'TimerHub found your saved backup folder. The browser needs you to confirm access again before automatic backups can continue. You do not need to select a new folder.',
+        backupSetupRestoreErrorTitle: 'Saved backup folder could not be loaded',
+        backupSetupRestoreErrorBody: 'TimerHub could not read the saved folder handle from browser storage. Retry loading it. If the handle is really gone, choose the folder again; existing backups are not deleted.',
+        backupSetupChangeDir: 'Choose a different folder',
         backupSetupPermissionBody: 'Access to the selected folder was revoked or has expired. Reauthorize it, choose another folder, or export your data.',
         backupSetupErrorTitle: 'Backup folder verification failed',
         backupSetupNoData: 'No local data is available to export.',
@@ -273,6 +278,7 @@ const extendedTranslations = {
         externalBackupSucceeded: 'External backup verified: {name}',
         externalBackupFailed: 'External backup failed. Previous backups were kept.',
         externalBackupPermissionLost: 'Backup folder permission was revoked. The main application is locked.',
+        externalBackupPermissionRequired: 'Backup folder access needs confirmation. The main application is locked until access is restored.',
         externalBackupSafetyCopyFailed: 'Could not create a safety backup before restoring. Restore was cancelled.',
         externalBackupNotConfigured: 'No usable backup folder is configured.',
         shareLinkBtn: 'Share link',
@@ -663,7 +669,7 @@ const extendedTranslations = {
         backupSetupIntro: 'TimerHub benötigt einen Ordner außerhalb des Browser-Speichers, um deine Daten zu schützen.',
         backupSetupExplanation: 'Automatische Sicherungen werden in einem Ordner deiner Wahl gespeichert. So überstehen sie das Löschen des Browser-Speichers, App-Neustarts und Datenbankprobleme.',
         backupSetupBrowserNote: 'Der Browser kann beim Start erneut nach dem Zugriff auf diesen Ordner fragen. Halte den Ordner auf diesem Gerät verfügbar.',
-        backupSetupChoose: 'Sicherungsordner auswählen', backupSetupReauthorize: 'Ordner erneut autorisieren',
+        backupSetupChoose: 'Sicherungsordner auswählen', backupSetupReauthorize: 'Ordnerzugriff wiederherstellen',
         backupSetupRetry: 'Prüfung wiederholen', backupSetupExport: 'Aktuelle Daten exportieren',
         backupSetupExportHelp: 'Wenn der Ordner nicht verfügbar ist, exportiere deine aktuellen Daten jetzt, damit du sie später wiederherstellen kannst.',
         backupSetupDirectoryLabel: 'Sicherungsordner: {name}',
@@ -671,8 +677,13 @@ const extendedTranslations = {
         backupSetupVerified: 'Sicherungsordner geprüft. TimerHub wird gestartet…',
         backupSetupBlocked: 'Die Hauptanwendung bleibt gesperrt, bis ein nutzbarer Sicherungsordner geprüft wurde.',
         backupSetupUnsupportedTitle: 'Dauerhafter Sicherungsordner wird nicht unterstützt',
-        backupSetupUnsupportedBody: 'Dieser Browser kann TimerHub keinen dauerhaften Zugriff auf einen Ordner außerhalb des Browser-Speichers geben. Automatische externe Sicherungen sind hier nicht möglich. Öffne TimerHub in einem Chromium-basierten Desktop-Browser, um einen Ordner auszuwählen, oder exportiere jetzt deine Daten.',
+        backupSetupUnsupportedBody: 'Dieser Browser bietet keinen dauerhaften Ordnerzugriff. Unter Android benötigst du Chrome 132 oder neuer (oder die installierte Chrome-PWA) und TimerHub über HTTPS. In Browsern ohne diese API sind automatische externe Sicherungen nicht möglich; exportiere jetzt deine Daten. Für ältere Browser wäre eine native Hülle erforderlich.',
         backupSetupPermissionTitle: 'Zugriff auf den Sicherungsordner erforderlich',
+        backupSetupPermissionRequiredTitle: 'Zugriff auf den Sicherungsordner wiederherstellen',
+        backupSetupPermissionRequiredBody: 'TimerHub hat den gespeicherten Sicherungsordner gefunden. Der Browser benötigt eine erneute Bestätigung, bevor automatische Sicherungen fortgesetzt werden können. Du musst keinen neuen Ordner auswählen.',
+        backupSetupRestoreErrorTitle: 'Gespeicherter Sicherungsordner konnte nicht geladen werden',
+        backupSetupRestoreErrorBody: 'TimerHub konnte den gespeicherten Ordnerzugriff nicht aus dem Browserspeicher lesen. Versuche es erneut. Wenn der Zugriff wirklich verloren ist, wähle den Ordner erneut; vorhandene Sicherungen werden nicht gelöscht.',
+        backupSetupChangeDir: 'Anderen Ordner auswählen',
         backupSetupPermissionBody: 'Der Zugriff auf den ausgewählten Ordner wurde entzogen oder ist abgelaufen. Autorisiere ihn erneut, wähle einen anderen Ordner oder exportiere deine Daten.',
         backupSetupErrorTitle: 'Prüfung des Sicherungsordners fehlgeschlagen',
         backupSetupNoData: 'Keine lokalen Daten zum Exportieren vorhanden.',
@@ -695,6 +706,7 @@ const extendedTranslations = {
         externalBackupSucceeded: 'Externe Sicherung geprüft: {name}',
         externalBackupFailed: 'Externe Sicherung fehlgeschlagen. Vorhandene Sicherungen blieben erhalten.',
         externalBackupPermissionLost: 'Der Zugriff auf den Sicherungsordner wurde entzogen. Die Hauptanwendung ist gesperrt.',
+        externalBackupPermissionRequired: 'Der Zugriff auf den Sicherungsordner muss bestätigt werden. Die Hauptanwendung bleibt gesperrt, bis der Zugriff wiederhergestellt ist.',
         externalBackupSafetyCopyFailed: 'Vor der Wiederherstellung konnte keine Schutzsicherung erstellt werden. Die Wiederherstellung wurde abgebrochen.',
         externalBackupNotConfigured: 'Kein nutzbarer Sicherungsordner konfiguriert.',
         shareLinkBtn: 'Link teilen',
@@ -1085,7 +1097,7 @@ const extendedTranslations = {
         backupSetupIntro: 'TimerHub нужна папка вне хранилища браузера для защиты ваших данных.',
         backupSetupExplanation: 'Автоматические копии сохраняются в выбранной вами папке, поэтому они переживают очистку хранилища браузера, перезапуск приложения и проблемы с базой данных.',
         backupSetupBrowserNote: 'Браузер может снова запросить доступ к этой папке при запуске TimerHub. Папка должна оставаться доступной на этом устройстве.',
-        backupSetupChoose: 'Выбрать папку', backupSetupReauthorize: 'Разрешить доступ снова',
+        backupSetupChoose: 'Выбрать папку', backupSetupReauthorize: 'Восстановить доступ к папке',
         backupSetupRetry: 'Проверить ещё раз', backupSetupExport: 'Экспортировать текущие данные',
         backupSetupExportHelp: 'Если папка недоступна, экспортируйте текущие данные сейчас, чтобы восстановить их позже.',
         backupSetupDirectoryLabel: 'Папка резервных копий: {name}',
@@ -1093,8 +1105,13 @@ const extendedTranslations = {
         backupSetupVerified: 'Папка проверена. Запуск TimerHub…',
         backupSetupBlocked: 'Основное приложение останется заблокированным, пока не будет проверена доступная папка для копий.',
         backupSetupUnsupportedTitle: 'Постоянная папка для копий не поддерживается',
-        backupSetupUnsupportedBody: 'Этот браузер не может предоставить TimerHub постоянный доступ к папке вне хранилища браузера. Автоматические внешние копии здесь недоступны. Откройте TimerHub в браузере Chromium на компьютере, чтобы выбрать папку, или экспортируйте данные сейчас.',
+        backupSetupUnsupportedBody: 'Этот браузер не предоставляет постоянный доступ к папке. На Android нужен Chrome 132 или новее (либо установленное приложение Chrome PWA) и TimerHub по HTTPS. В браузерах без этого API автоматические внешние копии недоступны; экспортируйте данные сейчас. Для старых браузеров потребуется нативная оболочка.',
         backupSetupPermissionTitle: 'Требуется доступ к папке резервных копий',
+        backupSetupPermissionRequiredTitle: 'Восстановите доступ к папке резервных копий',
+        backupSetupPermissionRequiredBody: 'TimerHub нашёл сохранённую папку резервных копий. Браузеру нужно повторное подтверждение, прежде чем автоматические копии смогут продолжиться. Выбирать новую папку не требуется.',
+        backupSetupRestoreErrorTitle: 'Не удалось загрузить сохранённую папку резервных копий',
+        backupSetupRestoreErrorBody: 'TimerHub не смог прочитать сохранённый доступ к папке из хранилища браузера. Повторите загрузку. Если доступ действительно потерян, выберите папку снова; существующие копии не удаляются.',
+        backupSetupChangeDir: 'Выбрать другую папку',
         backupSetupPermissionBody: 'Доступ к выбранной папке отозван или истёк. Разрешите его снова, выберите другую папку или экспортируйте данные.',
         backupSetupErrorTitle: 'Не удалось проверить папку резервных копий',
         backupSetupNoData: 'Нет локальных данных для экспорта.',
@@ -1117,6 +1134,7 @@ const extendedTranslations = {
         externalBackupSucceeded: 'Внешняя копия проверена: {name}',
         externalBackupFailed: 'Не удалось создать внешнюю копию. Предыдущие копии сохранены.',
         externalBackupPermissionLost: 'Доступ к папке резервных копий отозван. Основное приложение заблокировано.',
+        externalBackupPermissionRequired: 'Нужно подтвердить доступ к папке резервных копий. Основное приложение заблокировано до восстановления доступа.',
         externalBackupSafetyCopyFailed: 'Не удалось создать защитную копию перед восстановлением. Восстановление отменено.',
         externalBackupNotConfigured: 'Нет доступной папки для резервных копий.',
         shareLinkBtn: 'Поделиться ссылкой',
@@ -2502,6 +2520,16 @@ class TimerHubApp {
         try {
             if (this.backupService) {
                 await this.backupService.init();
+                try {
+                    this.diagnostics?.info('backup', 'environment', 'environment_detected', {
+                        status: 'succeeded',
+                        details: {
+                            standalone: window.matchMedia?.('(display-mode: standalone)')?.matches === true,
+                            directoryPickerAvailable: typeof window.showDirectoryPicker === 'function',
+                            secureContext: window.isSecureContext === true
+                        }
+                    });
+                } catch { /* diagnostics must not block startup */ }
             }
             await this.storage.init();
             this.storage.onSnapshotStatus = () => this.refreshAutomaticBackupStatus();
@@ -2559,7 +2587,8 @@ class TimerHubApp {
             this.ensureStartupExternalBackup().then(() => this.refreshMissingDataWarning()).catch(error => {
                 this.diagnostics?.error('backup', 'startup-backup', error, { status: 'failed' });
                 this.updateExternalBackupStatus().catch(() => {});
-                if (error?.code === 'backup_permission_denied') this.lockForBackupProblem('permission-denied');
+                if (error?.code === 'backup_permission_required') this.lockForBackupProblem('permission-required');
+                else if (error?.code === 'backup_permission_denied') this.lockForBackupProblem('permission-denied');
                 else this.showToast(this.t('externalBackupFailed'));
             });
 
@@ -2610,14 +2639,26 @@ class TimerHubApp {
         if (status.state === 'needs-selection') {
             return { ready: false, reason: 'needs-selection', status };
         }
+        if (status.state === 'handle-invalid') {
+            return { ready: false, reason: 'handle-invalid', status };
+        }
+        if (status.state === 'restore-error') {
+            return { ready: false, reason: 'restore-error', status };
+        }
+        if (status.state === 'permission-required') {
+            return { ready: false, reason: 'permission-required', status };
+        }
         if (status.state === 'permission-denied') {
             return { ready: false, reason: 'permission-denied', status };
         }
+        if (status.state === 'permission-unknown') {
+            return { ready: false, reason: 'permission-unknown', status };
+        }
         if (status.state === 'error' && !status.directoryName) {
-            return { ready: false, reason: 'error', status };
+            return { ready: false, reason: 'restore-error', status };
         }
         if (status.state !== 'ready') {
-            return { ready: false, reason: status.state === 'error' ? 'error' : 'needs-selection', status };
+            return { ready: false, reason: 'restore-error', status };
         }
         try {
             await this.backupService.verifyWritable();
@@ -2627,7 +2668,9 @@ class TimerHubApp {
         } catch (error) {
             const code = error?.code || error?.name || 'backup_verification_failed';
             this.diagnostics?.error('backup', 'verify-directory', error, { status: 'failed' });
-            const reason = code === 'backup_permission_denied' ? 'permission-denied' : 'error';
+            const reason = code === 'backup_permission_required' ? 'permission-required'
+                : code === 'backup_permission_denied' ? 'permission-denied'
+                : 'restore-error';
             return { ready: false, reason, status: this.backupService.getStatus(), error: code };
         }
     }
@@ -2660,6 +2703,7 @@ class TimerHubApp {
             choose: document.getElementById('backupSetupChooseBtn'),
             reauthorize: document.getElementById('backupSetupReauthorizeBtn'),
             retry: document.getElementById('backupSetupRetryBtn'),
+            change: document.getElementById('backupSetupChangeDirBtn'),
             export: document.getElementById('backupSetupExportBtn')
         };
     }
@@ -2669,6 +2713,7 @@ class TimerHubApp {
         this.backupSetupUIReady = true;
         const elements = this.backupSetupElements();
         elements.choose?.addEventListener('click', () => this.handleBackupSetupChoice('choose'));
+        elements.change?.addEventListener('click', () => this.handleBackupSetupChoice('change'));
         elements.reauthorize?.addEventListener('click', () => this.handleBackupSetupChoice('reauthorize'));
         elements.retry?.addEventListener('click', () => this.handleBackupSetupChoice('retry'));
         elements.export?.addEventListener('click', () => this.handleBackupSetupExport());
@@ -2678,25 +2723,35 @@ class TimerHubApp {
         this.lockMainApplication();
         this.setupBackupSetupUI();
         const elements = this.backupSetupElements();
-        const unsupported = gate.reason === 'unsupported';
-        const permissionDenied = gate.reason === 'permission-denied';
         const status = gate.status || this.backupService?.getStatus?.() || {};
+        const reason = gate.reason || status.state || 'needs-selection';
+        const unsupported = reason === 'unsupported';
+        const permissionUnknown = reason === 'permission-unknown';
+        const permissionRequired = reason === 'permission-required' || permissionUnknown;
+        const permissionDenied = reason === 'permission-denied';
+        const restoreError = reason === 'restore-error';
+        const handleInvalid = reason === 'handle-invalid';
+        const hasSavedHandle = Boolean(status.savedHandleAvailable);
+        const canPick = status.capabilities?.directoryPicker !== false;
         if (elements.title) {
             elements.title.textContent = unsupported ? this.t('backupSetupUnsupportedTitle')
+                : permissionRequired ? this.t('backupSetupPermissionRequiredTitle')
                 : permissionDenied ? this.t('backupSetupPermissionTitle')
-                : gate.reason === 'error' ? this.t('backupSetupErrorTitle')
+                : restoreError ? this.t('backupSetupRestoreErrorTitle')
+                : handleInvalid ? this.t('backupSetupErrorTitle')
                 : this.t('backupSetupTitle');
         }
         if (elements.compatibility) {
             elements.compatibility.textContent = unsupported
                 ? this.t('backupSetupUnsupportedBody')
+                : permissionRequired ? this.t('backupSetupPermissionRequiredBody')
                 : permissionDenied ? this.t('backupSetupPermissionBody')
+                : restoreError ? this.t('backupSetupRestoreErrorBody')
+                : handleInvalid ? this.t('backupSetupRestoreErrorBody')
                 : this.t('backupSetupBrowserNote');
         }
         if (elements.status) {
-            elements.status.textContent = unsupported
-                ? this.t('backupSetupBlocked')
-                : this.t('backupSetupBlocked');
+            elements.status.textContent = this.t('backupSetupBlocked');
         }
         if (elements.directory) {
             elements.directory.hidden = !status.directoryName;
@@ -2711,13 +2766,18 @@ class TimerHubApp {
                 : this.t('backupSetupNoData');
         }
         if (elements.error) {
-            elements.error.textContent = gate.error || status.lastError
-                ? this.t('backupSetupSelectFailed')
-                : '';
+            elements.error.textContent = gate.error ? this.t('backupSetupSelectFailed') : '';
         }
-        if (elements.choose) elements.choose.hidden = unsupported;
-        if (elements.reauthorize) elements.reauthorize.hidden = unsupported || (!permissionDenied && gate.reason !== 'error');
-        if (elements.retry) elements.retry.hidden = unsupported || (!status.directoryName && !permissionDenied);
+        // Reusing a saved handle must never look like first-time setup. The
+        // primary action renews access to the stored handle; choosing another
+        // folder is an explicit secondary action.
+        if (elements.choose) {
+            elements.choose.hidden = unsupported || !canPick || permissionRequired || hasSavedHandle;
+            elements.choose.classList.toggle('btn-primary-green', !restoreError);
+        }
+        if (elements.change) elements.change.hidden = unsupported || !hasSavedHandle || !canPick;
+        if (elements.reauthorize) elements.reauthorize.hidden = unsupported || (!permissionRequired && !permissionDenied) || !status.savedHandleAvailable;
+        if (elements.retry) elements.retry.hidden = unsupported || (!restoreError && !permissionUnknown);
         if (elements.export) elements.export.hidden = false;
     }
 
@@ -2736,21 +2796,22 @@ class TimerHubApp {
 
     async handleBackupSetupChoice(action) {
         const elements = this.backupSetupElements();
+        const buttons = [elements.choose, elements.change, elements.reauthorize, elements.retry, elements.export];
         const setBusy = busy => {
-            [elements.choose, elements.reauthorize, elements.retry, elements.export].forEach(button => {
-                if (button) button.disabled = busy;
-            });
+            buttons.forEach(button => { if (button) button.disabled = busy; });
             if (elements.status && busy) elements.status.textContent = this.t('backupSetupVerifying');
             if (elements.error) elements.error.textContent = '';
         };
         if (!this.backupService) return false;
         setBusy(true);
         try {
-            if (action === 'choose') {
+            if (action === 'choose' || action === 'change') {
                 await this.backupService.selectDirectory();
             } else if (action === 'reauthorize') {
-                await this.backupService.reauthorize();
+                await this.backupService.requestAccess();
             } else {
+                // Retry must re-read the saved handle, not open the picker.
+                await this.backupService.init();
                 const gate = await this.evaluateBackupGate();
                 if (!gate.ready) {
                     this.showBackupSetup(gate);
@@ -2773,16 +2834,14 @@ class TimerHubApp {
             const gate = await this.evaluateBackupGate();
             this.showBackupSetup({
                 ...gate,
-                reason: gate.ready ? 'error' : gate.reason,
+                reason: gate.ready ? 'restore-error' : gate.reason,
                 error: error?.code || error?.name || 'backup_setup_failed'
             });
             if (elements.error) elements.error.textContent = this.t('backupSetupSelectFailed');
             return false;
         } finally {
             setBusy(false);
-            [elements.choose, elements.reauthorize, elements.retry, elements.export].forEach(button => {
-                if (button) button.disabled = false;
-            });
+            buttons.forEach(button => { if (button) button.disabled = false; });
         }
     }
 
@@ -2849,7 +2908,9 @@ class TimerHubApp {
             } catch (error) {
                 this.diagnostics?.error('backup', 'external-backup', error, { status: 'failed' });
                 await this.updateExternalBackupStatus();
-                if (error?.code === 'backup_permission_denied') {
+                if (error?.code === 'backup_permission_required') {
+                    this.lockForBackupProblem('permission-required');
+                } else if (error?.code === 'backup_permission_denied') {
                     this.lockForBackupProblem('permission-denied');
                 } else if (this.pendingAutoBackupRevision === null) {
                     this.showToast(this.t('externalBackupFailed'));
@@ -2869,7 +2930,9 @@ class TimerHubApp {
 
     lockForBackupProblem(reason) {
         this.diagnostics?.warn('backup', 'lock-application', reason, { status: 'failed' });
-        if (reason === 'permission-denied') {
+        if (reason === 'permission-required') {
+            this.showToast(this.t('externalBackupPermissionRequired'));
+        } else if (reason === 'permission-denied') {
             this.showToast(this.t('externalBackupPermissionLost'));
         }
         const status = this.backupService?.getStatus?.() || {};
@@ -2892,7 +2955,8 @@ class TimerHubApp {
         } catch (error) {
             this.diagnostics?.error('backup', 'manual-external-backup', error, { status: 'failed' });
             this.showToast(this.t('externalBackupFailed'));
-            if (error?.code === 'backup_permission_denied') this.lockForBackupProblem('permission-denied');
+            if (error?.code === 'backup_permission_required') this.lockForBackupProblem('permission-required');
+            else if (error?.code === 'backup_permission_denied') this.lockForBackupProblem('permission-denied');
             return false;
         }
     }
@@ -2985,7 +3049,8 @@ class TimerHubApp {
         } catch (error) {
             this.diagnostics?.error('backup', 'verify-folder', error, { status: 'failed' });
             this.showToast(this.t('externalBackupFailed'));
-            if (error?.code === 'backup_permission_denied') this.lockForBackupProblem('permission-denied');
+            if (error?.code === 'backup_permission_required') this.lockForBackupProblem('permission-required');
+            else if (error?.code === 'backup_permission_denied') this.lockForBackupProblem('permission-denied');
             return false;
         }
     }
