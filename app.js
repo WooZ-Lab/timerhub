@@ -3030,9 +3030,21 @@ class TimerHubApp {
                 return true;
             }
             const gate = await this.evaluateBackupGate();
+            if (gate.ready) {
+                // A transient folder failure must not put a saved handle back
+                // behind the first-run setup screen.
+                const warning = gate.warning || 'restore-error';
+                if (!this.startupFinalized) {
+                    await this.finishStartup({ backupWarning: warning, backupStatus: gate.status });
+                } else {
+                    this.unlockMainApplication();
+                    this.showBackupAccessWarning(warning, gate.status);
+                }
+                return true;
+            }
             this.showBackupSetup({
                 ...gate,
-                reason: gate.ready ? 'restore-error' : gate.reason,
+                reason: gate.reason,
                 error: error?.code || error?.name || 'backup_setup_failed'
             });
             if (elements.error) elements.error.textContent = this.t('backupSetupSelectFailed');
