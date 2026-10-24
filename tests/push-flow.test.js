@@ -1631,3 +1631,8 @@ test('backup setup buttons marked hidden are actually removed from layout', () =
         'the settings button display rule must not override the hidden attribute'
     );
 });
+
+test('the startup backup permission banner is removed from the interface', () => {
+    assert.equal(htmlSource.includes('backupAccessBanner'), false);
+    assert.equal(styleSource.includes('backup-access-banner'), false);
+});

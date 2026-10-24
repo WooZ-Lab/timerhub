@@ -214,7 +214,9 @@ function createTestApp(initialData = {}) {
         'backupSetupData', 'backupSetupError', 'backupSetupCompatibility',
         'backupSetupChooseBtn', 'backupSetupReauthorizeBtn', 'backupSetupRetryBtn',
         'backupSetupChangeDirBtn', 'backupSetupExportBtn',
-        'backupAccessBanner', 'backupAccessBannerText', 'backupAccessRestoreBtn', 'backupAccessSettingsBtn'
+        'externalBackupStatus', 'externalBackupFolder', 'externalBackupSelect',
+        'externalBackupRestoreBtn', 'externalBackupVerifyBtn',
+        'diagnosticsLastVerified', 'diagnosticsBackupFolder'
     ]) {
         elements.set(id, {
             id,
@@ -12344,35 +12346,6 @@ test('temporary handle restore errors are retried before any setup decision', as
     assert.equal(app.decideBackupStartup(status).mode, 'ready');
 });
 
-test('a permission warning is a non-blocking banner that names the saved folder', () => {
-    const { app, document } = createTestApp();
-    app.startupFinalized = true;
-    app.showBackupAccessWarning('permission-required', {
-        state: 'permission-required',
-        savedHandleAvailable: true,
-        directoryName: 'My backups'
-    });
-    const banner = document.getElementById('backupAccessBanner');
-    assert.equal(banner.hidden, false);
-    assert.match(document.getElementById('backupAccessBannerText').textContent, /My backups/);
-    assert.match(document.getElementById('backupAccessRestoreBtn').textContent, /Restore access/);
-    assert.notEqual(document.getElementById('backupAccessSettingsBtn').hidden, true);
-    app.hideBackupAccessWarning();
-    assert.equal(banner.hidden, true);
-});
-
-test('a permission warning does not mark the application as locked', () => {
-    const { app, context } = createTestApp();
-    let locked = false;
-    app.lockMainApplication = () => { locked = true; };
-    app.startupFinalized = true;
-    app.showBackupAccessWarning('permission-required', {
-        state: 'permission-required', savedHandleAvailable: true, directoryName: 'Backups'
-    });
-    assert.equal(locked, false);
-    assert.equal(context.document.title, '');
-});
-
 test('setup retry with a restored folder but prompt permission opens the canvas in degraded mode', async () => {
     const { app } = createTestApp();
     let setupShown = 0;
@@ -12462,30 +12435,30 @@ test('startup flow completes the canvas for granted and renewable handles but bl
     }
 });
 
-test('the non-blocking restore action renews access to the saved folder and clears the warning', async () => {
+test('only a genuinely missing backup folder is reported as an error in Backup settings', async () => {
     const { app, document } = createTestApp();
-    let requestAccessCalls = 0;
-    const readyStatus = {
-        state: 'ready', savedHandleAvailable: true, directoryName: 'Backups',
-        permissionState: 'granted'
-    };
-    const promptStatus = {
-        state: 'permission-required', savedHandleAvailable: true, directoryName: 'Backups',
-        permissionState: 'prompt'
-    };
+    let state = 'permission-required';
     app.backupService = {
-        async init() { return promptStatus; },
-        async requestAccess() { requestAccessCalls += 1; return readyStatus; },
-        async queryPermission() { return 'granted'; },
-        getStatus() { return readyStatus; }
+        getStatus() {
+            return {
+                state,
+                savedHandleAvailable: state !== 'needs-selection',
+                directoryName: state === 'needs-selection' ? '' : 'Thunder',
+                permissionState: state === 'permission-required' ? 'prompt' : 'granted'
+            };
+        },
+        async findLatestVerified() { return null; },
+        async listBackups() { return []; }
     };
-    app.startupFinalized = true;
-    app.ensureStartupExternalBackup = async () => ({ name: 'backup.json' });
-    app.updateExternalBackupStatus = async () => {};
-    app.showToast = () => {};
-    app.showBackupAccessWarning('permission-required', promptStatus);
-    assert.equal(document.getElementById('backupAccessBanner').hidden, false);
-    assert.equal(await app.restoreBackupAccessFromBanner(), true);
-    assert.equal(requestAccessCalls, 1);
-    assert.equal(document.getElementById('backupAccessBanner').hidden, true);
+    app.startupFinalized = false;
+
+    await app.updateExternalBackupStatus();
+    assert.doesNotMatch(document.getElementById('externalBackupStatus').textContent, /not found/i);
+    assert.match(document.getElementById('externalBackupVerifyBtn').textContent, /Restore access/i);
+    assert.match(document.getElementById('externalBackupFolder').textContent, /Thunder/);
+
+    state = 'needs-selection';
+    await app.updateExternalBackupStatus();
+    assert.match(document.getElementById('externalBackupStatus').textContent, /not found/i);
+    assert.match(document.getElementById('externalBackupVerifyBtn').textContent, /Verify folder/i);
 });

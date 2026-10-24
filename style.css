@@ -3133,27 +3133,3 @@ body.backup-locked #reviewScreen,
 body.backup-locked #logScreen,
 body.backup-locked #settingsScreen,
 body.backup-locked .modal { display: none !important; }
-
-/* Non-blocking backup access warning */
-.backup-access-banner {
-    position: fixed;
-    left: max(12px, var(--safe-left));
-    right: max(12px, var(--safe-right));
-    bottom: calc(12px + var(--safe-bottom));
-    z-index: calc(var(--z-dialog) - 1);
-    display: grid;
-    gap: 8px;
-    max-width: 560px;
-    margin: 0 auto;
-    padding: 12px 14px;
-    border: 1px solid var(--border-color);
-    border-left: 4px solid var(--warning-color, #b7791f);
-    border-radius: var(--radius-md);
-    background: var(--bg-secondary);
-    box-shadow: var(--shadow-card);
-    color: var(--text-primary);
-}
-.backup-access-banner[hidden] { display: none !important; }
-.backup-access-banner p { margin: 0; font-size: 13px; line-height: 1.4; color: var(--text-secondary); }
-.backup-access-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.backup-access-actions .settings-btn { width: auto; margin: 0; flex: 1 1 150px; }

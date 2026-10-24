@@ -274,17 +274,14 @@ const extendedTranslations = {
         externalBackupSelect: 'Choose an external backup',
         externalBackupRestore: 'Restore selected external backup',
         externalBackupNone: 'No verified external backups found.',
-        externalBackupListFailed: 'Could not read the backup folder. Previous backups were not changed.',
         externalBackupSucceeded: 'External backup verified: {name}',
         externalBackupFailed: 'External backup failed. Previous backups were kept.',
-        externalBackupPermissionLost: 'Backup folder permission was revoked. Automatic backups are paused.',
-        externalBackupPermissionRequired: 'Backup folder access needs confirmation. Automatic backups are paused.',
-        backupAccessSettings: 'Backup settings',
-        backupAccessRetrying: 'Backup storage is temporarily unavailable. TimerHub will keep retrying in the background.',
         backupAccessRestore: 'Restore access',
         backupAccessRetry: 'Retry backup storage',
         externalBackupSafetyCopyFailed: 'Could not create a safety backup before restoring. Restore was cancelled.',
         externalBackupNotConfigured: 'No usable backup folder is configured.',
+        externalBackupFolderMissing: 'Backup folder was not found. Choose the folder again in Backup settings.',
+        externalBackupUnsupported: 'External folder backups are not supported in this browser.',
         shareLinkBtn: 'Share link',
         shareLinkTitle: 'Share day as a link',
         shareLinkDesc: 'Selected entries are encrypted on this device before upload. Only encrypted data is stored temporarily, and the link expires automatically.',
@@ -706,17 +703,14 @@ const extendedTranslations = {
         externalBackupSelect: 'Externe Sicherung auswählen',
         externalBackupRestore: 'Ausgewählte externe Sicherung wiederherstellen',
         externalBackupNone: 'Keine geprüften externen Sicherungen gefunden.',
-        externalBackupListFailed: 'Der Sicherungsordner konnte nicht gelesen werden. Vorhandene Sicherungen wurden nicht verändert.',
         externalBackupSucceeded: 'Externe Sicherung geprüft: {name}',
         externalBackupFailed: 'Externe Sicherung fehlgeschlagen. Vorhandene Sicherungen blieben erhalten.',
-        externalBackupPermissionLost: 'Der Zugriff auf den Sicherungsordner wurde entzogen. Automatische Sicherungen sind pausiert.',
-        externalBackupPermissionRequired: 'Der Zugriff auf den Sicherungsordner muss bestätigt werden. Automatische Sicherungen sind pausiert.',
-        backupAccessSettings: 'Sicherungseinstellungen',
-        backupAccessRetrying: 'Der Sicherungsspeicher ist vorübergehend nicht verfügbar. TimerHub versucht es im Hintergrund weiter.',
         backupAccessRestore: 'Zugriff wiederherstellen',
         backupAccessRetry: 'Sicherungsspeicher erneut prüfen',
         externalBackupSafetyCopyFailed: 'Vor der Wiederherstellung konnte keine Schutzsicherung erstellt werden. Die Wiederherstellung wurde abgebrochen.',
         externalBackupNotConfigured: 'Kein nutzbarer Sicherungsordner konfiguriert.',
+        externalBackupFolderMissing: 'Sicherungsordner nicht gefunden. Wähle den Ordner in den Sicherungseinstellungen erneut aus.',
+        externalBackupUnsupported: 'Externe Ordnersicherungen werden von diesem Browser nicht unterstützt.',
         shareLinkBtn: 'Link teilen',
         shareLinkTitle: 'Tag als Link teilen',
         shareLinkDesc: 'Ausgewählte Einträge werden vor dem Hochladen auf diesem Gerät verschlüsselt. Es werden nur verschlüsselte Daten vorübergehend gespeichert, und der Link läuft automatisch ab.',
@@ -1138,17 +1132,14 @@ const extendedTranslations = {
         externalBackupSelect: 'Выберите внешнюю копию',
         externalBackupRestore: 'Восстановить выбранную внешнюю копию',
         externalBackupNone: 'Проверенные внешние копии не найдены.',
-        externalBackupListFailed: 'Не удалось прочитать папку резервных копий. Существующие копии не изменены.',
         externalBackupSucceeded: 'Внешняя копия проверена: {name}',
         externalBackupFailed: 'Не удалось создать внешнюю копию. Предыдущие копии сохранены.',
-        externalBackupPermissionLost: 'Доступ к папке резервных копий отозван. Автоматические копии приостановлены.',
-        externalBackupPermissionRequired: 'Нужно подтвердить доступ к папке резервных копий. Автоматические копии приостановлены.',
-        backupAccessSettings: 'Настройки резервных копий',
-        backupAccessRetrying: 'Хранилище резервных копий временно недоступно. TimerHub продолжит повторять попытки в фоне.',
         backupAccessRestore: 'Восстановить доступ',
         backupAccessRetry: 'Повторить проверку хранилища',
         externalBackupSafetyCopyFailed: 'Не удалось создать защитную копию перед восстановлением. Восстановление отменено.',
         externalBackupNotConfigured: 'Нет доступной папки для резервных копий.',
+        externalBackupFolderMissing: 'Папка резервных копий не найдена. Выберите её снова в настройках резервных копий.',
+        externalBackupUnsupported: 'Внешние резервные копии в папку не поддерживаются этим браузером.',
         shareLinkBtn: 'Поделиться ссылкой',
         shareLinkTitle: 'Поделиться днём по ссылке',
         shareLinkDesc: 'Выбранные записи шифруются на этом устройстве перед загрузкой. На сервере временно хранятся только зашифрованные данные, а ссылка автоматически истекает.',
@@ -2268,10 +2259,8 @@ class TimerHubApp {
         this.pendingAutoBackupRevision = null;
         this.startupFinalized = false;
         this.lastExternalBackupAttempt = 0;
-        this.backupAccessWarning = null;
         this.backupRestoreRetryTimer = null;
         this.backupRestoreRetryDelay = 5000;
-        this.backupAccessUIReady = false;
         this.pendingRestoreData = null;
         this.pendingRestoreIsEmpty = false;
         this.pendingRestoreEmptyConfirmed = false;
@@ -2593,16 +2582,14 @@ class TimerHubApp {
             this.startupFinalized = true;
             this.unlockMainApplication();
             if (backupWarning) {
-                this.showBackupAccessWarning(backupWarning, backupStatus);
+                // Backups are paused but the canvas stays available. Report the
+                // state in Backup settings, not with a startup banner.
+                this.updateExternalBackupStatus().catch(() => {});
+                if (backupWarning === 'restore-error') this.scheduleBackupRestoreRetry();
             } else {
                 this.ensureStartupExternalBackup().then(() => this.refreshMissingDataWarning()).catch(error => {
                     this.diagnostics?.error('backup', 'startup-backup', error, { status: 'failed' });
                     this.updateExternalBackupStatus().catch(() => {});
-                    this.showBackupAccessWarning(
-                        error?.code === 'backup_permission_required' ? 'permission-required'
-                            : error?.code === 'backup_permission_denied' ? 'permission-denied'
-                            : 'restore-error'
-                    );
                 });
             }
             this.storage.flushAutomaticSnapshot().catch(error => {
@@ -2633,50 +2620,6 @@ class TimerHubApp {
     }
 
 
-    setupBackupAccessBanner() {
-        if (this.backupAccessUIReady) return;
-        this.backupAccessUIReady = true;
-        document.getElementById('backupAccessRestoreBtn')?.addEventListener('click', () => this.restoreBackupAccessFromBanner());
-        document.getElementById('backupAccessSettingsBtn')?.addEventListener('click', () => this.switchScreen('settings'));
-    }
-
-    showBackupAccessWarning(reason, status = null) {
-        const banner = document.getElementById('backupAccessBanner');
-        if (!banner) return;
-        const current = status || this.backupService?.getStatus?.() || {};
-        this.backupAccessWarning = reason;
-        const folder = current.directoryName || '';
-        const folderText = folder ? this.t('backupSetupDirectoryLabel', { name: folder }) : '';
-        let message = this.t('backupAccessRetrying');
-        if (reason === 'permission-required' || reason === 'permission-unknown') {
-            message = this.t('externalBackupPermissionRequired');
-            if (folderText) message = `${message} ${folderText}`;
-        } else if (reason === 'permission-denied') {
-            message = this.t('externalBackupPermissionLost');
-            if (folderText) message = `${message} ${folderText}`;
-        } else if (reason === 'restore-error') {
-            message = this.t('backupAccessRetrying');
-        }
-        const text = document.getElementById('backupAccessBannerText');
-        if (text) text.textContent = message;
-        const restore = document.getElementById('backupAccessRestoreBtn');
-        if (restore) {
-            restore.textContent = reason === 'restore-error'
-                ? this.t('backupAccessRetry')
-                : this.t('backupAccessRestore');
-            restore.hidden = false;
-        }
-        banner.hidden = false;
-        if (reason === 'restore-error') this.scheduleBackupRestoreRetry();
-    }
-
-    hideBackupAccessWarning() {
-        this.backupAccessWarning = null;
-        const banner = document.getElementById('backupAccessBanner');
-        if (banner) banner.hidden = true;
-        this.clearBackupRestoreRetry();
-    }
-
     clearBackupRestoreRetry() {
         if (this.backupRestoreRetryTimer) {
             clearTimeout(this.backupRestoreRetryTimer);
@@ -2695,80 +2638,24 @@ class TimerHubApp {
                 const status = await this.backupService.init();
                 const decision = this.decideBackupStartup(status);
                 if (decision.mode === 'ready') {
-                    this.hideBackupAccessWarning();
+                    this.clearBackupRestoreRetry();
                     await this.ensureStartupExternalBackup({ force: true });
                     await this.updateExternalBackupStatus().catch(() => {});
                     return;
                 }
-                if (decision.mode === 'degraded') {
+                if (decision.mode === 'degraded' && decision.warning === 'restore-error') {
                     this.backupRestoreRetryDelay = Math.min(60_000, wait * 2);
-                    this.showBackupAccessWarning(decision.warning, status);
-                    return;
+                    this.scheduleBackupRestoreRetry();
                 }
-                // A completed read now says the folder is genuinely missing or
-                // invalid. Only now is folder selection appropriate.
-                this.hideBackupAccessWarning();
-                this.showBackupSetup({ ready: false, reason: decision.reason, status });
+                // Permission and genuinely missing folders are reported in
+                // Backup settings. Startup does not interrupt the canvas.
+                await this.updateExternalBackupStatus().catch(() => {});
             } catch (error) {
                 this.diagnostics?.warn('backup', 'restore-retry', error, { status: 'failed' });
                 this.backupRestoreRetryDelay = Math.min(60_000, wait * 2);
-                this.showBackupAccessWarning('restore-error', this.backupService.getStatus());
+                this.scheduleBackupRestoreRetry();
             }
         }, wait);
-    }
-
-    async restoreBackupAccessFromBanner() {
-        if (!this.backupService) return false;
-        const button = document.getElementById('backupAccessRestoreBtn');
-        if (button) button.disabled = true;
-        try {
-            const status = await this.backupService.init();
-            if (status.state === 'needs-selection' || status.state === 'handle-invalid') {
-                this.hideBackupAccessWarning();
-                this.showBackupSetup({ ready: false, reason: status.state, status });
-                return false;
-            }
-            if (status.state === 'unsupported') {
-                this.hideBackupAccessWarning();
-                this.showBackupSetup({ ready: false, reason: 'unsupported', status });
-                return false;
-            }
-            if (status.state === 'restore-error') {
-                this.showBackupAccessWarning('restore-error', status);
-                return false;
-            }
-            if (status.state === 'permission-required' || status.state === 'permission-denied' || status.state === 'permission-unknown') {
-                await this.backupService.requestAccess();
-            }
-            await this.ensureStartupExternalBackup({ force: true });
-            const finalStatus = this.backupService.getStatus();
-            if (finalStatus.state !== 'ready') {
-                this.showBackupAccessWarning(
-                    finalStatus.state === 'permission-denied' ? 'permission-denied'
-                        : finalStatus.state === 'restore-error' ? 'restore-error'
-                        : 'permission-required',
-                    finalStatus
-                );
-                return false;
-            }
-            this.hideBackupAccessWarning();
-            await this.updateExternalBackupStatus().catch(() => {});
-            this.showToast(this.t('backupSetupVerified'));
-            return true;
-        } catch (error) {
-            this.diagnostics?.warn('backup', 'restore-access', error, { status: 'failed' });
-            const status = this.backupService.getStatus();
-            this.showBackupAccessWarning(
-                error?.code === 'backup_permission_required' ? 'permission-required'
-                    : error?.code === 'backup_permission_denied' ? 'permission-denied'
-                    : status.state === 'restore-error' ? 'restore-error'
-                    : 'permission-required',
-                status
-            );
-            return false;
-        } finally {
-            if (button) button.disabled = false;
-        }
     }
 
     decideBackupStartup(status = null) {
@@ -2999,7 +2886,7 @@ class TimerHubApp {
                         await this.finishStartup({ backupWarning: decision.warning, backupStatus: status });
                     } else {
                         this.unlockMainApplication();
-                        this.showBackupAccessWarning(decision.warning, status);
+                        await this.updateExternalBackupStatus().catch(() => {});
                     }
                     return true;
                 }
@@ -3023,10 +2910,7 @@ class TimerHubApp {
                 // Never trap the user on the setup screen when the saved
                 // folder still exists and only permission renewal failed.
                 this.unlockMainApplication();
-                this.showBackupAccessWarning(
-                    error.code === 'backup_permission_required' ? 'permission-required' : 'permission-denied',
-                    status
-                );
+                await this.updateExternalBackupStatus().catch(() => {});
                 return true;
             }
             const gate = await this.evaluateBackupGate();
@@ -3038,7 +2922,7 @@ class TimerHubApp {
                     await this.finishStartup({ backupWarning: warning, backupStatus: gate.status });
                 } else {
                     this.unlockMainApplication();
-                    this.showBackupAccessWarning(warning, gate.status);
+                    await this.updateExternalBackupStatus().catch(() => {});
                 }
                 return true;
             }
@@ -3063,22 +2947,14 @@ class TimerHubApp {
         const status = this.backupService.getStatus();
         if (status.state === 'permission-required' || status.state === 'permission-denied' ||
             status.state === 'permission-unknown' || status.state === 'restore-error') {
-            this.showBackupAccessWarning(
-                status.state === 'permission-unknown' ? 'permission-required' : status.state,
-                status
-            );
+            this.updateExternalBackupStatus().catch(() => {});
             return null;
         }
         const permission = typeof this.backupService.queryPermission === 'function'
             ? await this.backupService.queryPermission()
             : 'granted';
         if (permission !== 'granted') {
-            this.showBackupAccessWarning(
-                permission === 'prompt' ? 'permission-required'
-                    : permission === 'denied' ? 'permission-denied'
-                    : 'permission-required',
-                status
-            );
+            this.updateExternalBackupStatus().catch(() => {});
             return null;
         }
         let latest = null;
@@ -3141,10 +3017,6 @@ class TimerHubApp {
                 await this.updateExternalBackupStatus();
                 if (error?.code === 'backup_permission_required' || error?.code === 'backup_permission_denied') {
                     this.pendingAutoBackupRevision = null;
-                    this.showBackupAccessWarning(
-                        error.code === 'backup_permission_required' ? 'permission-required' : 'permission-denied',
-                        this.backupService.getStatus()
-                    );
                 } else if (this.pendingAutoBackupRevision === null) {
                     this.showToast(this.t('externalBackupFailed'));
                     this.pendingAutoBackupRevision = this.storage.dataRevision;
@@ -3168,7 +3040,7 @@ class TimerHubApp {
             this.showBackupSetup({ ready: false, reason, status });
             return;
         }
-        this.showBackupAccessWarning(reason, status);
+        this.updateExternalBackupStatus().catch(() => {});
     }
 
     async manualExternalBackup() {
@@ -3181,18 +3053,14 @@ class TimerHubApp {
                 kind: 'manual', reason: 'manual', force: true, revision: this.storage.dataRevision
             });
             if (result?.skipped) return false;
+            this.clearBackupRestoreRetry();
             await this.updateExternalBackupStatus();
             this.showToast(this.t('externalBackupSucceeded', { name: result?.name || '' }));
             return true;
         } catch (error) {
             this.diagnostics?.error('backup', 'manual-external-backup', error, { status: 'failed' });
             this.showToast(this.t('externalBackupFailed'));
-            if (error?.code === 'backup_permission_required' || error?.code === 'backup_permission_denied') {
-                this.showBackupAccessWarning(
-                    error.code === 'backup_permission_required' ? 'permission-required' : 'permission-denied',
-                    this.backupService.getStatus()
-                );
-            }
+            await this.updateExternalBackupStatus().catch(() => {});
             return false;
         }
     }
@@ -3216,27 +3084,37 @@ class TimerHubApp {
         if (diagnosticsFolder) diagnosticsFolder.textContent = folderText;
         let latest = null;
         let backups = [];
-        let listFailed = false;
         try {
             latest = await this.backupService.findLatestVerified();
             backups = await this.backupService.listBackups({ verify: false });
         } catch (error) {
-            listFailed = true;
             this.diagnostics?.warn('backup', 'list-backups', error, { status: 'failed' });
         }
         this.externalBackups = backups;
         this.latestExternalBackup = latest || null;
+        const missing = status.state === 'needs-selection' || status.state === 'handle-invalid';
+        const unsupported = status.state === 'unsupported';
+        const permissionPaused = status.state === 'permission-required' ||
+            status.state === 'permission-denied' || status.state === 'permission-unknown';
+        const restorePaused = status.state === 'restore-error';
+        const latestText = latest
+            ? this.t('externalBackupStatusOk', { date: this.formatSnapshotDate(latest.createdAt) })
+            : this.t('externalBackupStatusNone');
         if (statusElement) {
-            statusElement.textContent = listFailed
-                ? this.t('externalBackupListFailed')
-                : latest
-                    ? this.t('externalBackupStatusOk', { date: this.formatSnapshotDate(latest.createdAt) })
-                    : this.t('externalBackupStatusNone');
+            statusElement.textContent = missing
+                ? this.t('externalBackupFolderMissing')
+                : unsupported
+                    ? this.t('externalBackupUnsupported')
+                    : latestText;
         }
         if (diagnosticsLast) {
-            diagnosticsLast.textContent = latest
-                ? this.t('externalBackupStatusOk', { date: this.formatSnapshotDate(latest.createdAt) })
-                : this.t('externalBackupStatusNone');
+            diagnosticsLast.textContent = missing ? this.t('externalBackupFolderMissing') : latestText;
+        }
+        const verifyButton = document.getElementById('externalBackupVerifyBtn');
+        if (verifyButton) {
+            verifyButton.textContent = permissionPaused
+                ? this.t('backupAccessRestore')
+                : restorePaused ? this.t('backupAccessRetry') : this.t('externalBackupVerify');
         }
         if (select) {
             const selected = select.value;
@@ -3278,19 +3156,27 @@ class TimerHubApp {
     async verifyExternalBackupDirectory() {
         if (!this.backupService) return false;
         try {
+            const before = this.backupService.getStatus();
+            if (before.state === 'permission-required' || before.state === 'permission-denied' || before.state === 'permission-unknown') {
+                await this.backupService.requestAccess();
+            } else if (before.state === 'restore-error') {
+                const status = await this.backupService.init();
+                if (status.state === 'permission-required' || status.state === 'permission-denied' || status.state === 'permission-unknown') {
+                    await this.backupService.requestAccess();
+                } else if (status.state !== 'ready') {
+                    await this.updateExternalBackupStatus();
+                    return false;
+                }
+            }
             await this.backupService.verifyWritable();
+            await this.ensureStartupExternalBackup({ force: true });
+            this.clearBackupRestoreRetry();
             await this.updateExternalBackupStatus();
             this.showToast(this.t('backupSetupVerified'));
             return true;
         } catch (error) {
             this.diagnostics?.error('backup', 'verify-folder', error, { status: 'failed' });
-            this.showToast(this.t('externalBackupFailed'));
-            if (error?.code === 'backup_permission_required' || error?.code === 'backup_permission_denied') {
-                this.showBackupAccessWarning(
-                    error.code === 'backup_permission_required' ? 'permission-required' : 'permission-denied',
-                    this.backupService.getStatus()
-                );
-            }
+            await this.updateExternalBackupStatus().catch(() => {});
             return false;
         }
     }
@@ -4134,7 +4020,6 @@ class TimerHubApp {
             return el;
         };
         this.setupDialogAccessibility();
-        this.setupBackupAccessBanner();
         this.setupActivityCanvasInteractions();
         this.syncCanvasToolbarLayout();
         window.addEventListener?.('resize', () => this.syncCanvasToolbarLayout());
