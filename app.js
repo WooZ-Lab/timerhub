@@ -2985,8 +2985,18 @@ class TimerHubApp {
         this.scheduleExternalBackup(revision);
     }
 
+    backupAccessPaused(status = null) {
+        const current = status || this.backupService?.getStatus?.() || {};
+        return current.state === 'permission-required' || current.state === 'permission-denied' ||
+            current.state === 'permission-unknown' || current.state === 'restore-error';
+    }
+
     scheduleExternalBackup(revision = null) {
         if (!this.startupFinalized || !this.backupService) return;
+        // Automatic backups cannot request permission. Wait for the user to
+        // restore access from Backup settings instead of retrying a prompt
+        // that cannot be answered in the background.
+        if (this.backupAccessPaused()) return;
         this.pendingAutoBackupRevision = revision ?? this.storage.dataRevision;
         if (this.autoBackupTimer !== null || this.autoBackupInFlight) return;
         this.autoBackupTimer = setTimeout(() => {
@@ -2999,6 +3009,7 @@ class TimerHubApp {
 
     async flushExternalBackup({ force = false } = {}) {
         if (!this.startupFinalized || !this.backupService) return null;
+        if (this.backupAccessPaused()) return null;
         if (this.autoBackupInFlight) return this.autoBackupInFlight;
         const revision = this.pendingAutoBackupRevision ?? this.storage.dataRevision;
         this.pendingAutoBackupRevision = null;
@@ -3049,6 +3060,18 @@ class TimerHubApp {
             return false;
         }
         try {
+            let status = this.backupService.getStatus();
+            if (status.state === 'restore-error') {
+                status = await this.backupService.init();
+            }
+            if (status.state === 'permission-required' || status.state === 'permission-denied' || status.state === 'permission-unknown') {
+                // This click is the required user gesture; renew access to the
+                // saved folder instead of failing the manual backup.
+                await this.backupService.requestAccess();
+            } else if (status.state === 'needs-selection' || status.state === 'handle-invalid' || status.state === 'restore-error') {
+                await this.updateExternalBackupStatus().catch(() => {});
+                return false;
+            }
             const result = await this.backupService?.createBackup({
                 kind: 'manual', reason: 'manual', force: true, revision: this.storage.dataRevision
             });
@@ -3082,21 +3105,30 @@ class TimerHubApp {
             : this.t('externalBackupNotConfigured');
         if (folderElement) folderElement.textContent = folderText;
         if (diagnosticsFolder) diagnosticsFolder.textContent = folderText;
-        let latest = null;
-        let backups = [];
-        try {
-            latest = await this.backupService.findLatestVerified();
-            backups = await this.backupService.listBackups({ verify: false });
-        } catch (error) {
-            this.diagnostics?.warn('backup', 'list-backups', error, { status: 'failed' });
-        }
-        this.externalBackups = backups;
-        this.latestExternalBackup = latest || null;
         const missing = status.state === 'needs-selection' || status.state === 'handle-invalid';
         const unsupported = status.state === 'unsupported';
         const permissionPaused = status.state === 'permission-required' ||
             status.state === 'permission-denied' || status.state === 'permission-unknown';
         const restorePaused = status.state === 'restore-error';
+        let latest = null;
+        let backups = [];
+        if (!permissionPaused && !restorePaused) {
+            try {
+                latest = await this.backupService.findLatestVerified();
+                backups = await this.backupService.listBackups({ verify: false });
+            } catch (error) {
+                this.diagnostics?.warn('backup', 'list-backups', error, { status: 'failed' });
+            }
+        } else {
+            // Do not touch the directory while the browser is waiting for a
+            // permission gesture. Use the last known verified metadata.
+            latest = this.latestExternalBackup || (status.lastVerifiedAt
+                ? { createdAt: status.lastVerifiedAt, name: status.lastVerifiedName, verified: true }
+                : null);
+            backups = this.externalBackups || [];
+        }
+        this.externalBackups = backups;
+        if (latest) this.latestExternalBackup = latest;
         const latestText = latest
             ? this.t('externalBackupStatusOk', { date: this.formatSnapshotDate(latest.createdAt) })
             : this.t('externalBackupStatusNone');
@@ -3131,7 +3163,7 @@ class TimerHubApp {
             });
             if (backups.some(backup => backup.name === selected)) select.value = selected;
         }
-        if (restoreButton) restoreButton.disabled = !select?.value;
+        if (restoreButton) restoreButton.disabled = permissionPaused || restorePaused || !select?.value;
         this.renderDiagnostics();
         if (this.startupFinalized) this.refreshMissingDataWarning();
         return { latest, backups, status };

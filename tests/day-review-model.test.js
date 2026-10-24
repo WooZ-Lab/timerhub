@@ -12462,3 +12462,66 @@ test('only a genuinely missing backup folder is reported as an error in Backup s
     assert.match(document.getElementById('externalBackupStatus').textContent, /not found/i);
     assert.match(document.getElementById('externalBackupVerifyBtn').textContent, /Verify folder/i);
 });
+
+test('automatic backup scheduling does not retry while folder permission needs a user gesture', async () => {
+    const { app } = createTestApp();
+    let createCalls = 0;
+    app.startupFinalized = true;
+    app.backupService = {
+        getStatus() {
+            return {
+                state: 'permission-required', savedHandleAvailable: true,
+                directoryName: 'Thunder', permissionState: 'prompt'
+            };
+        },
+        async createBackup() { createCalls += 1; return { name: 'unexpected.json' }; }
+    };
+    app.scheduleExternalBackup(10);
+    assert.equal(app.autoBackupTimer, null);
+    assert.equal(await app.flushExternalBackup({ force: true }), null);
+    assert.equal(createCalls, 0);
+});
+
+test('backup settings avoid directory reads and folder errors while permission is pending', async () => {
+    const { app, document } = createTestApp();
+    let directoryReads = 0;
+    app.startupFinalized = false;
+    app.backupService = {
+        getStatus() {
+            return {
+                state: 'permission-required', savedHandleAvailable: true,
+                directoryName: 'Thunder', permissionState: 'prompt',
+                lastVerifiedAt: Date.now() - 60_000, lastVerifiedName: 'last.json'
+            };
+        },
+        async findLatestVerified() { directoryReads += 1; throw new Error('should not read'); },
+        async listBackups() { directoryReads += 1; throw new Error('should not read'); }
+    };
+    await app.updateExternalBackupStatus();
+    assert.equal(directoryReads, 0, 'permission prompts must not trigger failing directory reads');
+    assert.doesNotMatch(document.getElementById('externalBackupStatus').textContent, /not found/i);
+    assert.match(document.getElementById('externalBackupVerifyBtn').textContent, /Restore access/i);
+    assert.match(document.getElementById('externalBackupStatus').textContent, /Last verified external backup/i);
+});
+
+test('manual backup uses its user gesture to renew access to the saved folder', async () => {
+    const { app } = createTestApp();
+    let requestAccessCalls = 0;
+    let createCalls = 0;
+    app.startupFinalized = true;
+    app.backupService = {
+        getStatus() {
+            return {
+                state: requestAccessCalls ? 'ready' : 'permission-required',
+                savedHandleAvailable: true, directoryName: 'Thunder', permissionState: requestAccessCalls ? 'granted' : 'prompt'
+            };
+        },
+        async requestAccess() { requestAccessCalls += 1; return this.getStatus(); },
+        async createBackup() { createCalls += 1; return { name: 'manual.json' }; }
+    };
+    app.updateExternalBackupStatus = async () => {};
+    app.showToast = () => {};
+    assert.equal(await app.manualExternalBackup(), true);
+    assert.equal(requestAccessCalls, 1);
+    assert.equal(createCalls, 1);
+});
