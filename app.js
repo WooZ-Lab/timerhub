@@ -1581,9 +1581,10 @@ const DAY_REVIEW_PROJECT_MIGRATION_VERSION = 1;
 class StorageRepository {
     constructor() {
         this.dbName = 'TimerHubDB';
-        this.version = 4;
+        this.version = 5;
         this.db = null;
         this.mutationQueue = Promise.resolve();
+        this.canvasHistoryQueue = Promise.resolve();
         this.snapshotSequence = 0;
         this.snapshotStatus = 'idle';
         this.lastSnapshotAt = null;
@@ -1662,6 +1663,12 @@ class StorageRepository {
                 // Groups store (canvas activity groups)
                 if (!db.objectStoreNames.contains('groups')) {
                     db.createObjectStore('groups', { keyPath: 'id' });
+                }
+
+                // Persistent canvas undo/redo history. Kept separate from user
+                // data and excluded from backups.
+                if (!db.objectStoreNames.contains('canvasHistory')) {
+                    db.createObjectStore('canvasHistory', { keyPath: 'id' });
                 }
             };
         });
@@ -1786,6 +1793,72 @@ class StorageRepository {
             Promise.resolve().then(() => this.onSnapshotStatus?.()).catch(() => {});
             return false;
         }
+    }
+
+    canvasHistoryTransaction(storeMode, operation) {
+        const run = this.canvasHistoryQueue.then(() => new Promise((resolve, reject) => {
+            const tx = this.db.transaction(['canvasHistory'], storeMode);
+            const store = tx.objectStore('canvasHistory');
+            let result;
+            try {
+                result = operation(store, tx);
+            } catch (error) {
+                reject(error);
+                return;
+            }
+            tx.oncomplete = () => resolve(result);
+            tx.onerror = () => reject(tx.error || new Error('canvas_history_write_failed'));
+            tx.onabort = () => reject(tx.error || new Error('canvas_history_write_aborted'));
+        }));
+        this.canvasHistoryQueue = run.catch(() => undefined);
+        return run;
+    }
+
+    async getCanvasHistory() {
+        return new Promise((resolve, reject) => {
+            const tx = this.db.transaction(['canvasHistory'], 'readonly');
+            const request = tx.objectStore('canvasHistory').getAll();
+            request.onsuccess = () => resolve(request.result
+                .sort((a, b) => (Number(a.sequence) || 0) - (Number(b.sequence) || 0)));
+            request.onerror = () => reject(request.error || new Error('canvas_history_read_failed'));
+        });
+    }
+
+    async saveCanvasHistoryEntry(entry, limit = 50) {
+        return this.canvasHistoryTransaction('readwrite', store => {
+            store.put(entry);
+            const all = store.getAll();
+            all.onsuccess = () => {
+                const ordered = all.result
+                    .sort((a, b) => (Number(a.sequence) || 0) - (Number(b.sequence) || 0));
+                const excess = Math.max(0, ordered.length - limit);
+                ordered.slice(0, excess).forEach(item => store.delete(item.id));
+            };
+            return true;
+        });
+    }
+
+    async updateCanvasHistoryEntry(entry) {
+        return this.canvasHistoryTransaction('readwrite', store => {
+            store.put(entry);
+            return true;
+        });
+    }
+
+    async deleteCanvasHistoryEntries(ids) {
+        const list = Array.isArray(ids) ? ids : [ids];
+        if (!list.length) return true;
+        return this.canvasHistoryTransaction('readwrite', store => {
+            list.forEach(id => store.delete(id));
+            return true;
+        });
+    }
+
+    async clearCanvasHistory() {
+        return this.canvasHistoryTransaction('readwrite', store => {
+            store.clear();
+            return true;
+        });
     }
 
     async getAutomaticSnapshots() {
@@ -2303,7 +2376,8 @@ class TimerHubApp {
         this.pendingGroupDeletion = null;
         this.canvasUndoStack = [];
         this.canvasRedoStack = [];
-        this.maxCanvasHistory = 30;
+        this.canvasHistorySequence = 0;
+        this.maxCanvasHistory = 50;
         this.groupDisplayOffsets = new Map();
         // Final world-space bounds of every rendered group, refreshed whenever
         // the display offsets are recomputed. Used by hit testing so pointer
@@ -2577,6 +2651,7 @@ class TimerHubApp {
             await this.migrateMissingGroupLayouts();
             await this.migrateActivityCanvasGeometry();
             await this.migrateDayReviewProjectAssignments(this._rawTimeEntries || []);
+            await this.loadCanvasHistory();
             this.applyTranslations();
             this.setupUI();
             this.applyTheme();
@@ -6612,6 +6687,7 @@ class TimerHubApp {
     async duplicateGroup(groupId) {
         const group = this.groups.find(item => item.id === groupId);
         if (!group) return null;
+        const historyBefore = this.snapshotCanvasState();
         const members = this.activities.filter(activity => activity.groupId === group.id);
         const duplicate = {
             id: this.generateId(),
@@ -6702,6 +6778,7 @@ class TimerHubApp {
             return null;
         }
         this.renderMain();
+        await this.recordCanvasHistoryFromSnapshot('duplicate-group', historyBefore);
         this.showToast(this.t('groupDuplicated', { name: duplicate.name }));
         return duplicate;
     }
@@ -7292,6 +7369,7 @@ class TimerHubApp {
     async createGroupFromSelectedGroups() {
         const selected = this.selectedTopLevelGroups();
         if (!selected.length) return null;
+        const historyBefore = this.snapshotCanvasState();
         const boundsList = selected
             .map(group => group.collapsed ? this.groupCollapsedBounds(group) : this.groupBaseBounds(group))
             .filter(Boolean);
@@ -7326,6 +7404,7 @@ class TimerHubApp {
         }
         this.setGroupSelection([group.id]);
         this.renderMain();
+        await this.recordCanvasHistoryFromSnapshot('group-groups', historyBefore);
         this.showToast(this.t('groupCreated', { name: group.name }));
         return group;
     }
@@ -7478,21 +7557,140 @@ class TimerHubApp {
         };
     }
 
-    recordCanvasHistory(entry) {
-        if (!entry) return;
-        this.canvasUndoStack.push(entry);
-        if (this.canvasUndoStack.length > this.maxCanvasHistory) this.canvasUndoStack.shift();
+    snapshotCanvasState() {
+        const activities = [...(this.activities || []), ...(this.archivedActivities || [])];
+        return {
+            groups: (this.groups || []).map(record => this.cloneCanvasRecord(record)),
+            activities: activities.map(record => this.cloneCanvasRecord(record)),
+            layouts: [...(this.activityLayouts?.values?.() || [])].map(record => this.cloneCanvasRecord(record))
+        };
+    }
+
+    buildCanvasHistoryEntry(label, before, after) {
+        if (!before || !after) return null;
+        const diff = (beforeRecords, afterRecords, key) => {
+            const beforeMap = new Map(beforeRecords.map(record => [String(record[key]), record]));
+            const afterMap = new Map(afterRecords.map(record => [String(record[key]), record]));
+            const ids = [...new Set([...beforeMap.keys(), ...afterMap.keys()])].sort();
+            const changedIds = [];
+            const beforeChanged = [];
+            const afterChanged = [];
+            for (const id of ids) {
+                const beforeRecord = beforeMap.get(id);
+                const afterRecord = afterMap.get(id);
+                if (JSON.stringify(beforeRecord) === JSON.stringify(afterRecord)) continue;
+                changedIds.push(id);
+                if (beforeRecord) beforeChanged.push(beforeRecord);
+                if (afterRecord) afterChanged.push(afterRecord);
+            }
+            return { ids: changedIds, before: beforeChanged, after: afterChanged };
+        };
+        const groups = diff(before.groups, after.groups, 'id');
+        const activities = diff(before.activities, after.activities, 'id');
+        const layouts = diff(before.layouts, after.layouts, 'activityId');
+        if (!groups.ids.length && !activities.ids.length && !layouts.ids.length) return null;
+        return {
+            id: `canvas_${Date.now().toString(36)}_${this.generateId()}`,
+            label: String(label || 'canvas-change').slice(0, 120),
+            createdAt: Date.now(),
+            sequence: ++this.canvasHistorySequence,
+            undone: false,
+            ids: {
+                groups: groups.ids,
+                activities: activities.ids,
+                layouts: layouts.ids
+            },
+            before: {
+                groups: groups.before,
+                activities: activities.before,
+                layouts: layouts.before
+            },
+            after: {
+                groups: groups.after,
+                activities: activities.after,
+                layouts: layouts.after
+            }
+        };
+    }
+
+    async recordCanvasHistoryFromSnapshot(label, before) {
+        const entry = this.buildCanvasHistoryEntry(label, before, this.snapshotCanvasState());
+        if (!entry) return false;
+        return this.recordCanvasHistory(entry);
+    }
+
+    async recordCanvasHistory(entry) {
+        if (!entry) return false;
+        if (!Array.isArray(this.canvasUndoStack)) this.canvasUndoStack = [];
+        if (!Array.isArray(this.canvasRedoStack)) this.canvasRedoStack = [];
+        if (!Number.isFinite(Number(this.maxCanvasHistory))) this.maxCanvasHistory = 50;
+        if (!Number.isFinite(Number(this.canvasHistorySequence))) this.canvasHistorySequence = 0;
+        entry.id = entry.id || `canvas_${Date.now().toString(36)}_${this.generateId()}`;
+        entry.createdAt = Number(entry.createdAt) || Date.now();
+        entry.sequence = Number(entry.sequence) || ++this.canvasHistorySequence;
+        this.canvasHistorySequence = Math.max(this.canvasHistorySequence, entry.sequence);
+        entry.undone = false;
+        const redoEntries = this.canvasRedoStack;
         this.canvasRedoStack = [];
+        this.canvasUndoStack.push(entry);
+        const dropped = [];
+        while (this.canvasUndoStack.length > this.maxCanvasHistory) {
+            dropped.push(this.canvasUndoStack.shift());
+        }
         this.updateCanvasHistoryActions();
+        try {
+            await this.storage.saveCanvasHistoryEntry?.(entry, this.maxCanvasHistory);
+            if (redoEntries.length) {
+                await this.storage.deleteCanvasHistoryEntries?.(redoEntries.map(item => item.id));
+            }
+            if (dropped.length) {
+                await this.storage.deleteCanvasHistoryEntries?.(dropped.map(item => item.id));
+            }
+        } catch (error) {
+            this.diagnostics?.warn('canvas', 'persist-history', error, { status: 'failed' });
+        }
+        return true;
+    }
+
+    async clearCanvasHistory() {
+        this.canvasUndoStack = [];
+        this.canvasRedoStack = [];
+        this.canvasHistorySequence = 0;
+        this.updateCanvasHistoryActions();
+        try { await this.storage.clearCanvasHistory?.(); } catch (error) {
+            this.diagnostics?.warn('canvas', 'clear-history', error, { status: 'failed' });
+        }
+    }
+
+    async loadCanvasHistory() {
+        try {
+            const entries = await this.storage.getCanvasHistory?.() || [];
+            const valid = entries.filter(entry => entry && entry.ids &&
+                Array.isArray(entry.ids.groups) && Array.isArray(entry.ids.activities) &&
+                Array.isArray(entry.ids.layouts) && entry.before && entry.after);
+            this.canvasUndoStack = valid.filter(entry => entry.undone !== true)
+                .sort((a, b) => (Number(a.sequence) || 0) - (Number(b.sequence) || 0));
+            this.canvasRedoStack = valid.filter(entry => entry.undone === true)
+                .sort((a, b) => (Number(b.sequence) || 0) - (Number(a.sequence) || 0));
+            if (this.canvasUndoStack.length > this.maxCanvasHistory) {
+                this.canvasUndoStack = this.canvasUndoStack.slice(-this.maxCanvasHistory);
+            }
+            this.canvasHistorySequence = Math.max(0, ...valid.map(entry => Number(entry.sequence) || 0));
+            this.updateCanvasHistoryActions();
+        } catch (error) {
+            this.diagnostics?.warn('canvas', 'load-history', error, { status: 'failed' });
+            this.canvasUndoStack = [];
+            this.canvasRedoStack = [];
+            this.updateCanvasHistoryActions();
+        }
     }
 
     updateCanvasHistoryActions() {
         const undo = document.getElementById('undoCanvasBtn');
-        if (undo) undo.hidden = this.canvasUndoStack.length === 0;
+        if (undo) undo.hidden = (this.canvasUndoStack || []).length === 0;
         const redo = document.getElementById('redoCanvasBtn');
-        if (redo) redo.hidden = this.canvasRedoStack.length === 0;
+        if (redo) redo.hidden = (this.canvasRedoStack || []).length === 0;
     }
-
 
     async applyCanvasHistoryState(entry, side) {
         const state = entry[side];
@@ -7519,7 +7717,12 @@ class TimerHubApp {
         for (const record of state.groups) this.groups.push(this.cloneCanvasRecord(record));
         const activityIds = new Set(entry.ids.activities);
         this.activities = this.activities.filter(activity => !activityIds.has(activity.id));
-        for (const record of state.activities) this.activities.push(this.cloneCanvasRecord(record));
+        this.archivedActivities = (this.archivedActivities || []).filter(activity => !activityIds.has(activity.id));
+        for (const record of state.activities) {
+            const copy = this.cloneCanvasRecord(record);
+            if (copy.archived) this.archivedActivities.push(copy);
+            else this.activities.push(copy);
+        }
         this.activities.sort((a, b) => (a.position || 0) - (b.position || 0));
         for (const id of entry.ids.layouts) this.activityLayouts.delete(id);
         for (const record of state.layouts) this.activityLayouts.set(record.activityId, this.cloneCanvasRecord(record));
@@ -7529,20 +7732,40 @@ class TimerHubApp {
     }
 
     async undoCanvas() {
-        const entry = this.canvasUndoStack.pop();
+        const entry = (this.canvasUndoStack || []).pop();
         if (!entry) return false;
-        await this.applyCanvasHistoryState(entry, 'before');
+        try {
+            await this.applyCanvasHistoryState(entry, 'before');
+        } catch (error) {
+            this.canvasUndoStack.push(entry);
+            this.diagnostics?.warn('canvas', 'undo', error, { status: 'failed' });
+            return false;
+        }
+        entry.undone = true;
         this.canvasRedoStack.push(entry);
         this.updateCanvasHistoryActions();
+        try { await this.storage.updateCanvasHistoryEntry?.(entry); } catch (error) {
+            this.diagnostics?.warn('canvas', 'persist-undo', error, { status: 'failed' });
+        }
         return true;
     }
 
     async redoCanvas() {
-        const entry = this.canvasRedoStack.pop();
+        const entry = (this.canvasRedoStack || []).pop();
         if (!entry) return false;
-        await this.applyCanvasHistoryState(entry, 'after');
+        try {
+            await this.applyCanvasHistoryState(entry, 'after');
+        } catch (error) {
+            this.canvasRedoStack.push(entry);
+            this.diagnostics?.warn('canvas', 'redo', error, { status: 'failed' });
+            return false;
+        }
+        entry.undone = false;
         this.canvasUndoStack.push(entry);
         this.updateCanvasHistoryActions();
+        try { await this.storage.updateCanvasHistoryEntry?.(entry); } catch (error) {
+            this.diagnostics?.warn('canvas', 'persist-redo', error, { status: 'failed' });
+        }
         return true;
     }
 
@@ -7626,7 +7849,7 @@ class TimerHubApp {
         this.groups = this.groups.filter(group => !deletingGroupIds.has(group.id));
         this.selectedGroupIds = new Set();
         this.selectedActivityIds = new Set();
-        this.recordCanvasHistory(historyEntry);
+        await this.recordCanvasHistory(historyEntry);
         this.renderMain();
         this.showToast(this.t('groupDeleted'));
         return true;
@@ -7851,6 +8074,7 @@ class TimerHubApp {
             this.showToast(this.t('selectActivitiesFirst'));
             return null;
         }
+        const historyBefore = this.snapshotCanvasState();
         const entries = members.map(activity => ({
             activity,
             layout: this.getActivityCanvasLayout(activity, this.activities.indexOf(activity))
@@ -7887,6 +8111,7 @@ class TimerHubApp {
         }
         this.renderMain();
         this.setCanvasSelection([]);
+        await this.recordCanvasHistoryFromSnapshot('create-group', historyBefore);
         this.showToast(this.t('groupCreated', { name: group.name }));
         return group;
     }
@@ -8279,7 +8504,9 @@ class TimerHubApp {
                 gesture.started = true;
                 clearTimeout(gesture.longPressTimer);
                 gesture.activityButton?.classList.add('dragging');
-
+                if (gesture.mode !== 'pan' && gesture.mode !== 'select') {
+                    gesture.canvasHistoryBefore = this.snapshotCanvasState();
+                }
 
                 if (gesture.mode === 'move') {
                     gesture.activityButton.style.zIndex = String(this.canvasZIndex++);
@@ -8425,6 +8652,7 @@ class TimerHubApp {
                         this.showToast(this.t('groupCreateFailed'));
                     });
                     this.refreshGroupLayout();
+                    this.recordCanvasHistoryFromSnapshot('resize-group', gesture.canvasHistoryBefore).catch(() => {});
                 }
                 return;
             }
@@ -8451,6 +8679,7 @@ class TimerHubApp {
                         // rebuilding the whole canvas.
                         this.refreshGroupLayout();
                     }
+                    this.recordCanvasHistoryFromSnapshot('move-group', gesture.canvasHistoryBefore).catch(() => {});
                 } else if (gesture.group) {
                     this.toggleGroupSelection(gesture.group.id, gesture.groupSelectionAdditive);
                 }
@@ -8512,6 +8741,7 @@ class TimerHubApp {
                         const currentId = activity ? (activity.groupId || null) : null;
                         if (activity && targetId !== currentId) {
                             this.reassignActivityToGroup(activity, target, finalLayout);
+                            this.recordCanvasHistoryFromSnapshot('move-activity-group', gesture.canvasHistoryBefore).catch(() => {});
                             return;
                         }
                     }
@@ -8519,6 +8749,7 @@ class TimerHubApp {
 
                     this.saveActivityCanvasLayout(finalLayout);
                     this.refreshGroupLayout();
+                    this.recordCanvasHistoryFromSnapshot('move-activity', gesture.canvasHistoryBefore).catch(() => {});
                 }
             }
         };
@@ -8617,7 +8848,10 @@ class TimerHubApp {
 
             if (handle) this.positionActivityResizeHandle(activityId, layout);
 
-            this.saveActivityCanvasLayout({ activityId, ...layout });
+            const historyBefore = this.snapshotCanvasState();
+            this.saveActivityCanvasLayout({ activityId, ...layout })
+                .then(() => this.recordCanvasHistoryFromSnapshot('keyboard-layout', historyBefore))
+                .catch(() => {});
         });
 
         viewport.tabIndex = 0;
@@ -9335,6 +9569,7 @@ class TimerHubApp {
             return;
         }
         const notes = document.getElementById('activityNotes')?.value.trim() || '';
+        const historyBefore = this.snapshotCanvasState();
 
         const selectedColor = document.querySelector('.color-option.selected');
         const selectedShape = document.querySelector('.shape-option.selected');
@@ -9437,6 +9672,7 @@ class TimerHubApp {
 
         this.closeActivityModal();
         this.renderMain();
+        await this.recordCanvasHistoryFromSnapshot('save-activity', historyBefore);
     }
 
     showActivityMenu(activityId) {
@@ -9461,6 +9697,7 @@ class TimerHubApp {
         const activity = this.activities.find(item => item.id === this.editingActivityId);
         this.closeActivityMenu();
         if (!activity) return null;
+        const historyBefore = this.snapshotCanvasState();
         const group = activity.groupId
             ? this.groups.find(item => item.id === activity.groupId)
             : null;
@@ -9511,12 +9748,14 @@ class TimerHubApp {
             return null;
         }
         this.renderMain();
+        await this.recordCanvasHistoryFromSnapshot('duplicate-activity', historyBefore);
         this.showToast(this.t('activityDuplicated', { name: duplicate.name }));
         return duplicate;
     }
 
     async archiveActivity() {
         const activity = this.activities.find(a => a.id === this.editingActivityId);
+        const historyBefore = this.snapshotCanvasState();
         if (activity) {
             activity.archived = true;
             activity.updatedAt = Date.now();
@@ -9528,6 +9767,7 @@ class TimerHubApp {
         this.closeActivityMenu();
         this.renderMain();
         this.pruneCanvasSelection();
+        await this.recordCanvasHistoryFromSnapshot('archive-activity', historyBefore);
     }
 
     async deleteActivity() {
@@ -9535,6 +9775,7 @@ class TimerHubApp {
             return;
         }
 
+        const historyBefore = this.snapshotCanvasState();
         const activity = this.activities.find(a => a.id === this.editingActivityId);
         if (activity) {
             await this.storage.deleteActivity(activity.id);
@@ -9543,6 +9784,7 @@ class TimerHubApp {
         this.closeActivityMenu();
         this.renderMain();
         this.pruneCanvasSelection();
+        await this.recordCanvasHistoryFromSnapshot('delete-activity', historyBefore);
     }
 
     renderLog() {
@@ -12944,6 +13186,9 @@ class TimerHubApp {
             }
             await this.storage.importAll(this.pendingRestoreData, merge);
             this.cancelPendingRestore();
+            // Old undo records point at the replaced canvas and must never be
+            // replayed against the restored database.
+            await this.clearCanvasHistory().catch(() => {});
             await this.loadActivities();
             await this.loadGroups();
             await this.migrateMissingGroupLayouts();
@@ -13032,6 +13277,7 @@ class TimerHubApp {
         this.activities = activities;
         this.timeEntries = timeEntries;
         this.activeActivityId = null;
+        await this.clearCanvasHistory();
 
         this.renderAll();
         this.showToast(this.t('demoDataLoaded'));

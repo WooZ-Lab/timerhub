@@ -334,7 +334,7 @@ function createTestApp(initialData = {}) {
 }
 
 function createIndexedDbHarness() {
-    const keyPaths = { activities: 'id', timeEntries: 'id', settings: 'key', syncBatches: 'id', layout: 'activityId', snapshots: 'id', groups: 'id' };
+    const keyPaths = { activities: 'id', timeEntries: 'id', settings: 'key', syncBatches: 'id', layout: 'activityId', snapshots: 'id', groups: 'id', canvasHistory: 'id' };
     const data = Object.fromEntries(Object.keys(keyPaths).map(name => [name, new Map()]));
     const stats = { snapshotTransactions: 0, failMutation: false, failSnapshot: false };
     const db = {
@@ -12766,4 +12766,118 @@ test('a pending backup permission is requested automatically on the first user g
     assert.equal(requestAccessCalls, 1);
     assert.equal(backupCalls, 1);
     assert.equal(app.backupPermissionGestureArmed, false);
+});
+
+test('canvas history captures activity properties and layout changes for undo and redo', async () => {
+    const { app } = createTestApp();
+    app.activities = [{ id: 'history-act', name: 'Old name', color: '#111111', position: 0 }];
+    app.activityLayouts.set('history-act', {
+        activityId: 'history-act', x: 32, y: 64, width: 192, height: 128
+    });
+    const before = app.snapshotCanvasState();
+    app.activities[0].name = 'New name';
+    app.activityLayouts.set('history-act', {
+        activityId: 'history-act', x: 96, y: 128, width: 192, height: 128
+    });
+    assert.equal(await app.recordCanvasHistoryFromSnapshot('test-change', before), true);
+    assert.equal(app.canvasUndoStack.length, 1);
+
+    assert.equal(await app.undoCanvas(), true);
+    assert.equal(app.activities.find(item => item.id === 'history-act').name, 'Old name');
+    assert.equal(app.activityLayouts.get('history-act').x, 32);
+    assert.equal(app.canvasRedoStack.length, 1);
+
+    assert.equal(await app.redoCanvas(), true);
+    assert.equal(app.activities.find(item => item.id === 'history-act').name, 'New name');
+    assert.equal(app.activityLayouts.get('history-act').x, 96);
+});
+
+test('saving an activity through the editor creates an undoable canvas history entry', async () => {
+    const { app, document } = createTestApp({
+        activities: [{ id: 'edited-act', name: 'Original', color: '#111111', position: 0 }]
+    });
+    await app.loadActivities();
+    app.editingActivityId = 'edited-act';
+    app.applyTranslations();
+    app.renderMain = () => {};
+    app.showToast = () => {};
+    document.getElementById('activityName').value = 'Renamed';
+    await app.saveActivity();
+    assert.equal(app.activities.find(item => item.id === 'edited-act').name, 'Renamed');
+    assert.equal(app.canvasUndoStack.length, 1);
+    await app.undoCanvas();
+    assert.equal(app.activities.find(item => item.id === 'edited-act').name, 'Original');
+});
+
+test('canvas history persists in IndexedDB and loads after a simulated restart', async () => {
+    const { app, context } = createTestApp();
+    const repository = vm.runInContext('new StorageRepository()', context);
+    const harness = createIndexedDbHarness();
+    repository.db = harness.db;
+    const entry = {
+        id: 'history-entry', label: 'rename', sequence: 1, createdAt: 123, undone: false,
+        ids: { groups: [], activities: ['activity-1'], layouts: [] },
+        before: { groups: [], activities: [{ id: 'activity-1', name: 'Before' }], layouts: [] },
+        after: { groups: [], activities: [{ id: 'activity-1', name: 'After' }], layouts: [] }
+    };
+    await repository.saveCanvasHistoryEntry(entry);
+    const reloaded = vm.runInContext('new StorageRepository()', context);
+    reloaded.db = harness.db;
+    const entries = await reloaded.getCanvasHistory();
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].label, 'rename');
+
+    app.storage = reloaded;
+    await app.loadCanvasHistory();
+    assert.equal(app.canvasUndoStack.length, 1);
+    await app.undoCanvas();
+    assert.equal(app.activities.find(item => item.id === 'activity-1').name, 'Before');
+
+    const entriesAfterUndo = await reloaded.getCanvasHistory();
+    assert.equal(entriesAfterUndo[0].undone, true);
+});
+
+test('canvas history is bounded to fifty persisted states', async () => {
+    const { context } = createTestApp();
+    const repository = vm.runInContext('new StorageRepository()', context);
+    const harness = createIndexedDbHarness();
+    repository.db = harness.db;
+    for (let index = 0; index < 55; index += 1) {
+        await repository.saveCanvasHistoryEntry({
+            id: `bounded-${index}`, label: 'move', sequence: index + 1, createdAt: index, undone: false,
+            ids: { groups: [], activities: ['activity-1'], layouts: [] },
+            before: { groups: [], activities: [{ id: 'activity-1', name: `Before ${index}` }], layouts: [] },
+            after: { groups: [], activities: [{ id: 'activity-1', name: `After ${index}` }], layouts: [] }
+        });
+    }
+    const entries = await repository.getCanvasHistory();
+    assert.equal(entries.length, 50);
+    assert.equal(entries[0].id, 'bounded-5');
+    assert.equal(entries.at(-1).id, 'bounded-54');
+});
+
+test('creating a group from a canvas selection is undoable and redoable', async () => {
+    const { app } = createTestApp();
+    app.activities = [{ id: 'group-history-act', name: 'Painting', position: 0 }];
+    app.archivedActivities = [];
+    app.groups = [];
+    app.activityLayouts.set('group-history-act', {
+        activityId: 'group-history-act', x: 40, y: 40, width: 192, height: 128
+    });
+    app.selectedActivityIds = new Set(['group-history-act']);
+    app.renderMain = () => {};
+    app.setCanvasSelection = () => {};
+    app.showToast = () => {};
+    const group = await app.createGroupFromSelection('Crew');
+    assert.ok(group);
+    assert.equal(app.activities[0].groupId, group.id);
+    assert.equal(app.canvasUndoStack.length, 1);
+
+    assert.equal(await app.undoCanvas(), true);
+    assert.equal(app.groups.length, 0);
+    assert.equal(app.activities[0].groupId, undefined);
+
+    assert.equal(await app.redoCanvas(), true);
+    assert.equal(app.groups[0].id, group.id);
+    assert.equal(app.activities[0].groupId, group.id);
 });
