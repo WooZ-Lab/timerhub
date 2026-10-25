@@ -12713,3 +12713,57 @@ test('Day Review cards show customer, project, and service directly', async () =
         assert.ok(html.includes(text), `card includes ${text}`);
     }
 });
+
+test('startup verifies the saved Clockodo configuration and connection automatically', async () => {
+    const { app, document } = createTestApp();
+    let configCalls = 0;
+    let testCalls = 0;
+    let toastCalls = 0;
+    app.getPushClientId = () => 'client_1234567890abcdef';
+    app.getClockodoAccessToken = () => 'a'.repeat(48);
+    app.loadClockodoReferenceData = () => true;
+    app.showToast = () => { toastCalls += 1; };
+    app.clockodoClient = {
+        async getConfig() {
+            configCalls += 1;
+            return { configured: true, apiUser: 'worker@example.test' };
+        },
+        async testConnection() {
+            testCalls += 1;
+            return { connected: true };
+        }
+    };
+    assert.equal(await app.refreshClockodoConnectionOnStartup({ silent: true }), true);
+    assert.equal(configCalls, 1);
+    assert.equal(testCalls, 1);
+    assert.equal(toastCalls, 0, 'the startup check is silent');
+    assert.equal(app.clockodoStatus, 'connected');
+    assert.match(document.getElementById('clockodoStatusValue').textContent, /Connection successful/);
+});
+
+test('a pending backup permission is requested automatically on the first user gesture', async () => {
+    const { app, document } = createTestApp();
+    const listeners = new Map();
+    document.addEventListener = (type, handler) => listeners.set(type, handler);
+    document.removeEventListener = type => listeners.delete(type);
+    let requestAccessCalls = 0;
+    let backupCalls = 0;
+    app.backupService = {
+        getStatus() {
+            return {
+                state: 'permission-required', savedHandleAvailable: true,
+                directoryName: 'Thunder', permissionState: 'prompt'
+            };
+        },
+        async requestAccess() { requestAccessCalls += 1; return { state: 'ready' }; }
+    };
+    app.ensureStartupExternalBackup = async () => { backupCalls += 1; return { name: 'backup.json' }; };
+    app.updateExternalBackupStatus = async () => {};
+    app.armBackupPermissionRequestOnFirstGesture();
+    assert.equal(listeners.has('click'), true);
+    assert.equal(listeners.has('keydown'), true);
+    await listeners.get('click')();
+    assert.equal(requestAccessCalls, 1);
+    assert.equal(backupCalls, 1);
+    assert.equal(app.backupPermissionGestureArmed, false);
+});

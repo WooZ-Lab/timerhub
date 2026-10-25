@@ -2270,6 +2270,8 @@ class TimerHubApp {
         this.lastExternalBackupAttempt = 0;
         this.backupRestoreRetryTimer = null;
         this.backupRestoreRetryDelay = 5000;
+        this.backupPermissionGestureArmed = false;
+        this.backupPermissionGestureHandler = null;
         this.pendingRestoreData = null;
         this.pendingRestoreIsEmpty = false;
         this.pendingRestoreEmptyConfirmed = false;
@@ -2612,10 +2614,16 @@ class TimerHubApp {
                 });
             }
 
+            if (backupWarning === 'permission-required' || backupWarning === 'permission-unknown') {
+                this.armBackupPermissionRequestOnFirstGesture();
+            }
             if (this.activities.length === 0) {
                 this.showOnboarding();
             }
             this.refreshMissingDataWarning();
+            this.refreshClockodoConnectionOnStartup({ silent: true }).catch(error => {
+                this.diagnostics?.warn('clockodo', 'startup-connection-check', error, { status: 'failed' });
+            });
             return true;
         } catch (error) {
             this.diagnostics?.error('init', 'startup-finalize', error, { status: 'failed' });
@@ -2628,6 +2636,47 @@ class TimerHubApp {
         }
     }
 
+
+    armBackupPermissionRequestOnFirstGesture() {
+        if (this.backupPermissionGestureArmed || !this.backupService) return;
+        const status = this.backupService.getStatus?.() || {};
+        if (status.state !== 'permission-required' && status.state !== 'permission-unknown') return;
+        this.backupPermissionGestureArmed = true;
+        const handler = async () => {
+            if (this.backupPermissionGestureHandler !== handler) return;
+            this.backupPermissionGestureHandler = null;
+            this.backupPermissionGestureArmed = false;
+            try {
+                await this.backupService.requestAccess();
+                await this.ensureStartupExternalBackup({ force: true });
+                await this.updateExternalBackupStatus();
+            } catch (error) {
+                this.diagnostics?.warn('backup', 'auto-restore-access', error, { status: 'failed' });
+                await this.updateExternalBackupStatus().catch(() => {});
+            }
+        };
+        this.backupPermissionGestureHandler = handler;
+        const options = { capture: true, once: true };
+        document.addEventListener?.('click', handler, options);
+        document.addEventListener?.('keydown', handler, options);
+    }
+
+    clearBackupPermissionGesture() {
+        if (this.backupPermissionGestureHandler) {
+            document.removeEventListener?.('click', this.backupPermissionGestureHandler, true);
+            document.removeEventListener?.('keydown', this.backupPermissionGestureHandler, true);
+            this.backupPermissionGestureHandler = null;
+        }
+        this.backupPermissionGestureArmed = false;
+    }
+
+    async refreshClockodoConnectionOnStartup({ silent = true } = {}) {
+        if (!this.clockodoClient) return false;
+        await this.refreshClockodoConfigurationStatus();
+        if (!this.clockodoConfigured) return false;
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
+        return this.testClockodoConnection({ silent });
+    }
 
     clearBackupRestoreRetry() {
         if (this.backupRestoreRetryTimer) {
@@ -2956,6 +3005,9 @@ class TimerHubApp {
         const status = this.backupService.getStatus();
         if (status.state === 'permission-required' || status.state === 'permission-denied' ||
             status.state === 'permission-unknown' || status.state === 'restore-error') {
+            if (status.state === 'permission-required' || status.state === 'permission-unknown') {
+                this.armBackupPermissionRequestOnFirstGesture();
+            }
             this.updateExternalBackupStatus().catch(() => {});
             return null;
         }
@@ -2976,6 +3028,7 @@ class TimerHubApp {
         const staleAfter = 24 * 60 * 60 * 1000;
         const needsBackup = force || !latest || (hasLocalData && Date.now() - Number(latest.createdAt || 0) > staleAfter);
         if (!needsBackup) {
+            this.clearBackupPermissionGesture();
             await this.updateExternalBackupStatus();
             return latest;
         }
@@ -2985,6 +3038,7 @@ class TimerHubApp {
             force: true,
             revision: this.storage.dataRevision
         });
+        this.clearBackupPermissionGesture();
         await this.updateExternalBackupStatus();
         return result;
     }
@@ -3086,6 +3140,7 @@ class TimerHubApp {
             });
             if (result?.skipped) return false;
             this.clearBackupRestoreRetry();
+            this.clearBackupPermissionGesture();
             await this.updateExternalBackupStatus();
             this.showToast(this.t('externalBackupSucceeded', { name: result?.name || '' }));
             return true;
@@ -3212,6 +3267,7 @@ class TimerHubApp {
             await this.backupService.verifyWritable();
             await this.ensureStartupExternalBackup({ force: true });
             this.clearBackupRestoreRetry();
+            this.clearBackupPermissionGesture();
             await this.updateExternalBackupStatus();
             this.showToast(this.t('backupSetupVerified'));
             return true;
@@ -4069,6 +4125,11 @@ class TimerHubApp {
         this.syncCanvasToolbarLayout();
         window.addEventListener?.('resize', () => this.syncCanvasToolbarLayout());
         window.addEventListener?.('orientationchange', () => this.syncCanvasToolbarLayout());
+        window.addEventListener?.('online', () => {
+            this.refreshClockodoConnectionOnStartup({ silent: true }).catch(error => {
+                this.diagnostics?.warn('clockodo', 'online-connection-check', error, { status: 'failed' });
+            });
+        });
 
         // Navigation
         sel('navTimer')?.addEventListener('click', () => this.switchScreen('main'));
@@ -10925,7 +10986,7 @@ class TimerHubApp {
         }
     }
 
-    async testClockodoConnection() {
+    async testClockodoConnection({ silent = false } = {}) {
         if (!this.clockodoConfigured || !this.clockodoClient || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.clockodoEmail)) {
             this.clockodoStatus = 'unconfigured';
             this.setClockodoStatus(this.t('clockodoStatusNotConfigured'));
@@ -10934,19 +10995,19 @@ class TimerHubApp {
         const button = document.getElementById('clockodoTestBtn');
         this.clockodoStatus = 'checking';
         this.setClockodoStatus(this.t('clockodoStatusChecking'));
-        button.disabled = true;
+        if (button) button.disabled = true;
         try {
             await this.clockodoClient.testConnection(this.getPushClientId(), this.getClockodoAccessToken());
             this.clockodoStatus = 'connected';
             this.setClockodoStatus(this.t('clockodoStatusConnected'));
-            this.showToast(this.t('clockodoTestSuccess'));
+            if (!silent) this.showToast(this.t('clockodoTestSuccess'));
             return true;
         } catch (error) {
             this.clockodoStatus = 'failed';
             this.setClockodoStatus(`${this.t('clockodoStatusFailed')}: ${this.clockodoErrorMessage(error)}`);
             return false;
         } finally {
-            button.disabled = false;
+            if (button) button.disabled = false;
         }
     }
 
