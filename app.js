@@ -5067,12 +5067,27 @@ class TimerHubApp {
 
     async persistSyncProgress(batch) {
         const currentById = new Map(this.timeEntries.map(entry => [entry.id, entry]));
+        const syncFields = [
+            'syncStatus', 'syncBatchId', 'clockodoEntryId', 'clockodoSyncedAt',
+            'clockodoError', 'clockodoErrorDetails', 'clockodoPayload',
+            'clockodoResend', 'clockodoIdempotencyKey'
+        ];
         const updatedEntries = batch.entries.map(snapshot => {
             const local = currentById.get(snapshot.id);
-            const updated = { ...snapshot };
-            if (local) Object.assign(local, updated);
-            else this.timeEntries.push(updated);
-            return updated;
+            if (!local) {
+                const created = { ...snapshot };
+                this.timeEntries.push(created);
+                return created;
+            }
+            // The batch freezes time/activity/project data, but sync status is
+            // the only thing a running sync is allowed to update in the local
+            // record. Copying the whole frozen snapshot here would overwrite a
+            // user's edit (for example, clearing an archived project) with the
+            // stale value before a retry.
+            for (const field of syncFields) {
+                if (Object.prototype.hasOwnProperty.call(snapshot, field)) local[field] = snapshot[field];
+            }
+            return local;
         });
         await this.storage.saveSyncProgress(batch, updatedEntries);
         const index = this.syncBatches.findIndex(item => item.id === batch.id);
@@ -5107,12 +5122,31 @@ class TimerHubApp {
 
         for (const snapshot of pending) {
             const entry = batch.entries.find(item => item.id === snapshot.id);
+            const retryingFailed = entry.syncStatus === SYNC_STATUS.FAILED;
             if (entry.clockodoEntryId && !entry.clockodoResend) {
                 entry.syncStatus = SYNC_STATUS.LOCAL_ONLY;
                 entry.clockodoError = null;
                 entry.clockodoErrorDetails = null;
                 await this.persistSyncProgress(batch);
                 continue;
+            }
+            if (retryingFailed) {
+                // A failed entry is still editable. Before retrying, use the
+                // current local record instead of a stale frozen snapshot or a
+                // cached payload from the rejected attempt. This is what makes
+                // clearing an archived project take effect on "Retry".
+                const local = this.timeEntries.find(item => String(item.id) === String(entry.id));
+                if (local) {
+                    for (const field of [
+                        'activityId', 'activityNameSnapshot', 'startTimestamp', 'endTimestamp',
+                        'notes', 'project', 'projectId', 'service', 'serviceId', 'customerId',
+                        'customerName', 'serviceName', 'isEdited', 'editedAt'
+                    ]) {
+                        entry[field] = local[field];
+                    }
+                    entry.durationMs = entry.endTimestamp - entry.startTimestamp;
+                }
+                entry.clockodoPayload = null;
             }
             entry.syncStatus = SYNC_STATUS.SYNCING;
             entry.clockodoError = null;
@@ -5128,7 +5162,12 @@ class TimerHubApp {
                         || this.archivedActivities?.find(item => item.id === entry.activityId);
                     entry.clockodoPayload = this.clockodoClient.buildEntryPayload(entry, {
                         customerId: activity?.customerId || this.clockodoCustomerId,
-                        projectId: activity?.projectId || this.clockodoProjectId,
+                        // On a failed retry the local entry is authoritative.
+                        // An empty project means no project; do not fall back to
+                        // an archived activity/default project.
+                        projectId: retryingFailed
+                            ? (entry.projectId || null)
+                            : (activity?.projectId || this.clockodoProjectId),
                         serviceId: activity?.serviceId || this.clockodoServiceId,
                         billable: this.clockodoBillable
                     });

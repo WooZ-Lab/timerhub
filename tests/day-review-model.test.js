@@ -12525,3 +12525,64 @@ test('manual backup uses its user gesture to renew access to the saved folder', 
     assert.equal(requestAccessCalls, 1);
     assert.equal(createCalls, 1);
 });
+
+test('retrying a failed entry uses the cleared local project instead of the stale batch project', async () => {
+    const { app } = createTestApp();
+    const start = new Date(2026, 9, 5, 15, 20).getTime();
+    await app.addEntry({
+        id: 'archived-project-entry', activityId: 'act-1', activityNameSnapshot: 'Treppenhaus',
+        startTimestamp: start, endTimestamp: start + 2 * 60 * 60 * 1000,
+        projectId: '99', project: 'Archived project',
+        customerId: '5', serviceId: '9'
+    });
+    app.reviewDate = '2026-10-05';
+    app.clockodoConfigured = true;
+    app.clockodoCustomerId = '5';
+    app.clockodoServiceId = '9';
+    app.clockodoProjectId = '99';
+    app.getPushClientId = () => 'client_1234567890abcdef';
+    app.getClockodoAccessToken = () => 'a'.repeat(48);
+    app.showToast = () => {};
+    app.renderReview = () => {};
+    const sent = [];
+    let rejectOnce = true;
+    app.clockodoClient = {
+        buildEntryPayload(entry, config) {
+            const projectId = Number(entry.projectId) || Number(entry.project) || Number(config.projectId) || null;
+            return {
+                customers_id: Number(entry.customerId || config.customerId),
+                services_id: Number(entry.serviceId || config.serviceId),
+                ...(projectId ? { projects_id: projectId } : {})
+            };
+        },
+        async createEntry(clientId, token, payload) {
+            sent.push(structuredClone(payload));
+            if (rejectOnce) {
+                rejectOnce = false;
+                throw Object.assign(new Error('rejected'), {
+                    code: 'clockodo_rejected',
+                    details: { status: 400, fields: ['projects_id'], message: 'The project does not exist or has been archived' }
+                });
+            }
+            return { created: true, entryId: 1001 };
+        }
+    };
+
+    app.showSyncConfirmationModal();
+    const batch = await app.confirmAndSyncClockodo();
+    assert.equal(batch.state, 'failed');
+    assert.equal(sent[0].projects_id, 99);
+
+    const local = app.timeEntries.find(entry => entry.id === 'archived-project-entry');
+    local.projectId = '';
+    local.project = '';
+    local.updatedAt += 1000;
+    // Keep the activity/default project stale to prove the retry uses the
+    // editable local entry, not those fallbacks.
+    app.activities = [{ id: 'act-1', name: 'Treppenhaus', projectId: '99', projectName: 'Archived project' }];
+
+    const retried = await app.retrySyncBatch(batch.id);
+    assert.equal(retried.state, 'synced');
+    assert.equal(sent.length, 2);
+    assert.equal(sent[1].projects_id, undefined, 'an empty local project must omit projects_id on retry');
+});
