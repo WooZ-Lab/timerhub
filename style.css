@@ -1505,6 +1505,12 @@ input:-webkit-autofill:active {
     gap: 6px;
 }
 
+.review-tag-label {
+    margin-right: 4px;
+    color: var(--text-tertiary);
+    font-weight: 650;
+}
+
 .review-tag {
     font-size: 11px;
     padding: 2px 6px;

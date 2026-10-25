@@ -12695,3 +12695,21 @@ test('Day Review hides gaps shorter than four minutes and shows rounded gaps tha
     assert.match(html, /10:25/);
     assert.match(html, /00:05:00/);
 });
+
+test('Day Review cards show customer, project, and service directly', async () => {
+    const { app, document } = createTestApp();
+    const start = new Date(2026, 9, 5, 8, 0).getTime();
+    await app.addEntry({
+        id: 'assignment-card', activityId: 'act-1', activityNameSnapshot: 'Painting',
+        startTimestamp: start, endTimestamp: start + 60 * 60 * 1000,
+        customerName: 'Acme GmbH', customerId: '11',
+        project: 'Bridge', projectId: '22',
+        service: 'Painting', serviceName: 'Painting', serviceId: '33'
+    });
+    app.reviewDate = '2026-10-05';
+    app.renderReview();
+    const html = document.getElementById('reviewEntriesList').innerHTML;
+    for (const text of ['Customer', 'Acme GmbH', 'Project', 'Bridge', 'Service', 'Painting']) {
+        assert.ok(html.includes(text), `card includes ${text}`);
+    }
+});

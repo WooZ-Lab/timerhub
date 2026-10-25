@@ -4833,7 +4833,14 @@ class TimerHubApp {
             const gap = hasRawGap && gapEnd > gapStart
                 ? `<div class="review-gap" aria-label="${this.t('gap')}"><span>${this.t('gap')}</span><time>${this.escapeHtml(this.formatTime(gapStart))}–${this.escapeHtml(this.formatTime(gapEnd))}</time><strong>${this.formatDuration(gapEnd - gapStart)}</strong><button class="review-gap-add" type="button" data-gap-start="${this.escapeHtml(gapStart)}" data-gap-end="${this.escapeHtml(gapEnd)}" aria-label="${this.escapeHtml(`${this.t('add')}: ${this.t('gap')} ${this.formatTime(gapStart)}–${this.formatTime(gapEnd)}`)}">${this.t('add')}</button></div>`
                 : '';
-            const meta = [entry.project, entry.service].filter(Boolean).map(value => this.escapeHtml(value)).join(' · ');
+            const assignmentTags = [
+                { key: 'customer', value: entry.customerName || (entry.customerId ? `#${entry.customerId}` : '') },
+                { key: 'project', value: entry.project || (entry.projectId ? `#${entry.projectId}` : '') },
+                { key: 'service', value: entry.serviceName || entry.service || (entry.serviceId ? `#${entry.serviceId}` : '') }
+            ].filter(tag => tag.value);
+            const assignmentHtml = assignmentTags.length
+                ? `<div class="review-entry-tags">${assignmentTags.map(tag => `<span class="review-tag"><span class="review-tag-label">${this.escapeHtml(this.t(tag.key))}</span>${this.escapeHtml(tag.value)}</span>`).join('')}</div>`
+                : '';
             const notes = entry.notes ? `<div class="review-entry-notes">${this.escapeHtml(entry.notes)}</div>` : '';
             const issueText = issues.map(issue => issueKeys[issue]).filter(Boolean).join(' · ');
             const isConflict = overlappingIds.has(String(entry.id));
@@ -4863,7 +4870,7 @@ class TimerHubApp {
                 <div class="review-entry-times"><strong>${this.escapeHtml(start)}</strong><span>–</span><strong>${this.escapeHtml(end)}</strong></div>
                 <span class="review-entry-duration">${this.escapeHtml(duration)}</span></div>
                 <div class="review-entry-title"><span class="review-activity-dot" style="background-color:${this.escapeHtml(activity?.color || '#27AE60')}"></span>${this.escapeHtml(activityLabel)}</div>
-                ${meta ? `<div class="review-entry-tags">${entry.project ? `<span class="review-tag">${this.escapeHtml(entry.project)}</span>` : ''}${entry.service ? `<span class="review-tag">${this.escapeHtml(entry.service)}</span>` : ''}</div>` : ''}${notes}${issueText ? `<small>${this.escapeHtml(issueText)}</small>` : ''}${conflictNote}${errorNotice}${unknownNotice}${localOnlyNotice}
+                ${assignmentHtml}${notes}${issueText ? `<small>${this.escapeHtml(issueText)}</small>` : ''}${conflictNote}${errorNotice}${unknownNotice}${localOnlyNotice}
                 <div class="review-entry-footer"><span class="sync-badge ${this.escapeHtml(entry.syncStatus)}">${this.escapeHtml(status)}</span><div class="review-entry-actions">${retryButton}${resendUnknownButton}${editIcon}</div></div>${retryDiagnostic}
             </article>`;
         }).join('');
