@@ -5260,7 +5260,7 @@ test('moving an existing entry to a non-overlapping interval is accepted', async
     assert.equal(storageData.timeEntries.find(entry => entry.id === 'entry-a').endTimestamp, t(12, 25));
 });
 
-test('sub-five-minute overlaps are still reported as conflicts', async () => {
+test('overlaps that disappear at Clockodo five-minute boundaries are not conflicts', async () => {
     const { app, document, storageData } = createTestApp();
     const t = (h, m, s = 0) => new Date(2026, 8, 28, h, m, s).getTime();
     await app.addEntry({ id: 'entry-a', activityId: 'act-1', activityNameSnapshot: 'A', startTimestamp: t(12, 0), endTimestamp: t(12, 30) });
@@ -5271,15 +5271,15 @@ test('sub-five-minute overlaps are still reported as conflicts', async () => {
     app.renderReview = () => {};
     const toasts = [];
     app.showToast = message => toasts.push(message);
-    assert.deepEqual([...app.getOverlappingEntryIds()].sort(), ['entry-a', 'entry-b']);
+    assert.deepEqual([...app.getOverlappingEntryIds()], [], 'rounded payload boundaries touch instead of overlap');
     app.showEntryEditModal('entry-a');
     document.getElementById('entryEditDate').value = '2026-09-28';
     document.getElementById('entryEditStart').value = '12:00';
     document.getElementById('entryEditEndDate').value = '2026-09-28';
     document.getElementById('entryEditEnd').value = '12:30';
     await app.saveTimeEntry();
-    assert.equal(document.getElementById('entryConflictWarning').style.display, 'block');
-    assert.deepEqual(toasts, [app.t('overlappingEntry')]);
+    assert.equal(document.getElementById('entryConflictWarning').style.display, 'none');
+    assert.deepEqual(toasts, []);
     assert.equal(storageData.timeEntries.find(entry => entry.id === 'entry-a').endTimestamp, t(12, 30));
 });
 
@@ -5533,7 +5533,7 @@ test('touching boundaries such as 10:00-11:00 and 11:00-12:00 are not overlappin
     assert.equal(document.getElementById('reviewEntriesList').innerHTML.includes('conflict-entry'), false);
 });
 
-test('conflict detection uses exact stored timestamps while Clockodo rounding stays display-only', async () => {
+test('conflict detection uses the five-minute boundaries that Clockodo receives', async () => {
     const { app, document, storageData, toasts, t } = await createConflictApp(t => [
         { id: 'entry-a', activityId: 'act-1', activityNameSnapshot: 'A', startTimestamp: t(12, 36, 0), endTimestamp: t(12, 37, 0) },
         { id: 'entry-b', activityId: 'act-2', activityNameSnapshot: 'B', startTimestamp: t(12, 36, 30), endTimestamp: t(12, 38, 0) }
@@ -5544,13 +5544,13 @@ test('conflict detection uses exact stored timestamps while Clockodo rounding st
     assert.equal(app.roundToFiveMinutes(t(12, 37, 29)), t(12, 35, 0), 'below the midpoint rounds down');
     assert.equal(app.roundToFiveMinutes(t(12, 37, 30)), t(12, 35, 0), 'the exact midpoint rounds down');
     assert.equal(app.roundToFiveMinutes(t(12, 37, 31)), t(12, 40, 0), 'above the midpoint rounds up');
-    assert.deepEqual([...app.getOverlappingEntryIds()].sort(), ['entry-a', 'entry-b'], 'the 30-second real overlap is not hidden by rounding');
+    assert.deepEqual([...app.getOverlappingEntryIds()], [], 'both payload intervals collapse to the same rounded boundaries');
 
     app.showEntryEditModal('entry-b');
     await app.saveTimeEntry();
 
-    assert.equal(document.getElementById('entryConflictWarning').style.display, 'block');
-    assert.deepEqual(toasts, [app.t('overlappingEntry')]);
+    assert.equal(document.getElementById('entryConflictWarning').style.display, 'none');
+    assert.deepEqual(toasts, []);
     assert.equal(storageData.timeEntries.find(entry => entry.id === 'entry-b').startTimestamp, t(12, 36, 30));
     assert.equal(storageData.timeEntries.find(entry => entry.id === 'entry-b').endTimestamp, t(12, 38, 0));
 });
@@ -12640,4 +12640,30 @@ test('activity-less manual entries survive backup validation and restore', async
     assert.doesNotThrow(() => repository.validateBackupData(exported));
     await repository.importAll(exported, false);
     assert.ok((await repository.getTimeEntries()).some(entry => entry.id === 'manual-no-activity' && entry.activityId === ''));
+});
+
+test('Day Review gaps expose an Add button that prefills the missing interval', async () => {
+    const { app, document } = createTestApp();
+    const t = (hour, minute = 0) => new Date(2026, 9, 5, hour, minute, 0).getTime();
+    await app.addEntry({
+        id: 'gap-before', activityId: 'act-1', activityNameSnapshot: 'Painting',
+        startTimestamp: t(8), endTimestamp: t(9)
+    });
+    await app.addEntry({
+        id: 'gap-after', activityId: 'act-2', activityNameSnapshot: 'Cleaning',
+        startTimestamp: t(10), endTimestamp: t(11)
+    });
+    app.reviewDate = '2026-10-05';
+    app.renderReview();
+    const html = document.getElementById('reviewEntriesList').innerHTML;
+    assert.match(html, /review-gap-add/);
+    assert.match(html, /data-gap-start="\d+"/);
+    assert.match(html, /data-gap-end="\d+"/);
+    assert.match(html, />Add</);
+
+    app.showAddEntryModal({ startTimestamp: t(9), endTimestamp: t(10) });
+    assert.equal(document.getElementById('entryEditDate').value, '2026-10-05');
+    assert.equal(document.getElementById('entryEditStart').value, '09:00');
+    assert.equal(document.getElementById('entryEditEndDate').value, '2026-10-05');
+    assert.equal(document.getElementById('entryEditEnd').value, '10:00');
 });

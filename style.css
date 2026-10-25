@@ -1691,7 +1691,7 @@ input:-webkit-autofill:active {
 
 .review-gap {
     display: grid;
-    grid-template-columns: minmax(42px, 0.5fr) minmax(0, 2fr) auto;
+    grid-template-columns: minmax(42px, 0.5fr) minmax(0, 2fr) auto auto;
     align-items: center;
     gap: 8px;
     padding: 5px 12px;
@@ -1700,6 +1700,19 @@ input:-webkit-autofill:active {
     color: var(--text-secondary);
     font-size: 12px;
 }
+.review-gap-add {
+    min-height: 26px;
+    padding: 2px 9px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm, 6px);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font: inherit;
+    font-weight: 650;
+    cursor: pointer;
+}
+.review-gap-add:active { background: var(--bg-tertiary); }
+.review-gap-add:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 
 .review-gap strong {
     color: var(--text-primary);
@@ -1751,11 +1764,17 @@ input:-webkit-autofill:active {
     }
 
     .review-gap {
-        grid-template-columns: auto 1fr;
+        grid-template-columns: auto 1fr auto;
     }
 
     .review-gap strong {
         grid-column: 2;
+    }
+
+    .review-gap-add {
+        grid-column: 3;
+        grid-row: 1 / span 2;
+        min-height: 32px;
     }
 }
 

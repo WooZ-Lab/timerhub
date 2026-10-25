@@ -26,6 +26,7 @@ const translations = {
         customColor: 'Custom color',
         shape: 'Shape',
         save: 'Save',
+        add: 'Add',
         cancel: 'Cancel',
         edit: 'Edit',
         archive: 'Archive',
@@ -81,6 +82,7 @@ const translations = {
         customColor: 'Eigene Farbe',
         shape: 'Form',
         save: 'Speichern',
+        add: 'Hinzufügen',
         cancel: 'Abbrechen',
         edit: 'Bearbeiten',
         archive: 'Archivieren',
@@ -136,6 +138,7 @@ const translations = {
         customColor: 'Свой цвет',
         shape: 'Форма',
         save: 'Сохранить',
+        add: 'Добавить',
         cancel: 'Отменить',
         edit: 'Редактировать',
         archive: 'Архивировать',
@@ -3686,10 +3689,13 @@ class TimerHubApp {
         const rawEnd = entry?.endTimestamp;
         const end = rawEnd === null || rawEnd === undefined ? Infinity : Number(rawEnd);
         if (end !== Infinity && (!Number.isFinite(end) || end <= 0 || end <= start)) return null;
-        // Conflict detection uses the exact stored interval. The five-minute
-        // Clockodo rounding is a transport concern and must never hide or
-        // invent a local overlap.
-        return { start, end };
+        // Overlap validation uses exactly the boundaries that Clockodo will
+        // receive, including its five-minute rounding. This keeps the red
+        // conflict state aligned with the actual synchronized payload.
+        return {
+            start: this.roundToFiveMinutes(start),
+            end: end === Infinity ? Infinity : this.roundToFiveMinutes(end)
+        };
     }
 
     entriesOverlap(first, second) {
@@ -4818,7 +4824,7 @@ class TimerHubApp {
             const status = statusKeys[entry.syncStatus] || this.t('statusLocal');
             const previous = entries[index - 1];
             const gap = previous?.endTimestamp !== null && previous?.endTimestamp !== undefined && previous.endTimestamp < entry.startTimestamp
-                ? `<div class="review-gap" aria-label="${this.t('gap')}"><span>${this.t('gap')}</span><time>${this.escapeHtml(this.formatTime(previous.endTimestamp))}–${this.escapeHtml(this.formatTime(entry.startTimestamp))}</time><strong>${this.formatDuration(entry.startTimestamp - previous.endTimestamp)}</strong></div>`
+                ? `<div class="review-gap" aria-label="${this.t('gap')}"><span>${this.t('gap')}</span><time>${this.escapeHtml(this.formatTime(previous.endTimestamp))}–${this.escapeHtml(this.formatTime(entry.startTimestamp))}</time><strong>${this.formatDuration(entry.startTimestamp - previous.endTimestamp)}</strong><button class="review-gap-add" type="button" data-gap-start="${this.escapeHtml(previous.endTimestamp)}" data-gap-end="${this.escapeHtml(entry.startTimestamp)}" aria-label="${this.escapeHtml(`${this.t('add')}: ${this.t('gap')} ${this.formatTime(previous.endTimestamp)}–${this.formatTime(entry.startTimestamp)}`)}">${this.t('add')}</button></div>`
                 : '';
             const meta = [entry.project, entry.service].filter(Boolean).map(value => this.escapeHtml(value)).join(' · ');
             const notes = entry.notes ? `<div class="review-entry-notes">${this.escapeHtml(entry.notes)}</div>` : '';
@@ -4876,6 +4882,13 @@ class TimerHubApp {
                 openEditor();
             });
         });
+        list.querySelectorAll('.review-gap-add').forEach(button => button.addEventListener('click', event => {
+            event.stopPropagation();
+            this.showAddEntryModal({
+                startTimestamp: Number(button.dataset.gapStart),
+                endTimestamp: Number(button.dataset.gapEnd)
+            });
+        }));
         list.querySelectorAll('.review-retry-entry').forEach(button => button.addEventListener('click', () => this.retryFailedEntry(button.dataset.batchId, button.dataset.entryId)));
         list.querySelectorAll('.review-resend-unknown').forEach(button => button.addEventListener('click', () => this.showUnknownResendConfirmation(button.dataset.entryId)));
     }
@@ -9625,7 +9638,7 @@ class TimerHubApp {
         activitySelect.value = selectedId || '';
     }
 
-    showAddEntryModal() {
+    showAddEntryModal({ startTimestamp = null, endTimestamp = null } = {}) {
         this.clockodoCustomerFilters.delete('entry');
         this.clockodoCustomerAutoSelected.delete('entry');
         this.editingEntryId = null;
@@ -9634,10 +9647,16 @@ class TimerHubApp {
         this.populateEntryActivitySelect('');
         this.populateEntryAssignmentForActivity('');
         this.loadClockodoReferenceData();
-        document.getElementById('entryEditDate').value = this.reviewDate;
-        document.getElementById('entryEditEndDate').value = this.reviewDate;
-        document.getElementById('entryEditStart').value = '';
-        document.getElementById('entryEditEnd').value = '';
+        const startDate = startTimestamp !== null && startTimestamp !== undefined && Number.isFinite(Number(startTimestamp))
+            ? new Date(Number(startTimestamp))
+            : null;
+        const endDate = endTimestamp !== null && endTimestamp !== undefined && Number.isFinite(Number(endTimestamp))
+            ? new Date(Number(endTimestamp))
+            : startDate;
+        document.getElementById('entryEditDate').value = startDate ? this.toDateString(startDate) : this.reviewDate;
+        document.getElementById('entryEditEndDate').value = endDate ? this.toDateString(endDate) : this.reviewDate;
+        document.getElementById('entryEditStart').value = startDate ? this.toTimeString(startDate) : '';
+        document.getElementById('entryEditEnd').value = endDate ? this.toTimeString(endDate) : '';
         document.getElementById('entryEditService').value = '';
         document.getElementById('entryEditNotes').value = '';
         document.getElementById('entryEditModalTitle').textContent = this.t('addEntry');
