@@ -12667,3 +12667,31 @@ test('Day Review gaps expose an Add button that prefills the missing interval', 
     assert.equal(document.getElementById('entryEditEndDate').value, '2026-10-05');
     assert.equal(document.getElementById('entryEditEnd').value, '10:00');
 });
+
+test('Day Review hides gaps shorter than four minutes and shows rounded gaps that remain', async () => {
+    const { app, document } = createTestApp();
+    const t = (hour, minute, second = 0) => new Date(2026, 9, 5, hour, minute, second, 0).getTime();
+    await app.addEntry({
+        id: 'short-gap-before', activityId: 'act-1', activityNameSnapshot: 'A',
+        startTimestamp: t(10, 0), endTimestamp: t(10, 20)
+    });
+    await app.addEntry({
+        id: 'short-gap-after', activityId: 'act-1', activityNameSnapshot: 'B',
+        startTimestamp: t(10, 23, 59), endTimestamp: t(11, 0)
+    });
+    app.reviewDate = '2026-10-05';
+    app.renderReview();
+    assert.equal(document.getElementById('reviewEntriesList').innerHTML.includes('review-gap'), false);
+
+    app.timeEntries = app.timeEntries.filter(entry => entry.id === 'short-gap-before');
+    await app.addEntry({
+        id: 'rounded-gap-after', activityId: 'act-1', activityNameSnapshot: 'B',
+        startTimestamp: t(10, 24), endTimestamp: t(11, 0)
+    });
+    app.renderReview();
+    const html = document.getElementById('reviewEntriesList').innerHTML;
+    assert.match(html, /review-gap/);
+    assert.match(html, /10:20/);
+    assert.match(html, /10:25/);
+    assert.match(html, /00:05:00/);
+});

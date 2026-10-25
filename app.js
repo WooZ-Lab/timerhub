@@ -4823,8 +4823,15 @@ class TimerHubApp {
             const duration = this.formatDuration(this.getEntryDuration(entry));
             const status = statusKeys[entry.syncStatus] || this.t('statusLocal');
             const previous = entries[index - 1];
-            const gap = previous?.endTimestamp !== null && previous?.endTimestamp !== undefined && previous.endTimestamp < entry.startTimestamp
-                ? `<div class="review-gap" aria-label="${this.t('gap')}"><span>${this.t('gap')}</span><time>${this.escapeHtml(this.formatTime(previous.endTimestamp))}–${this.escapeHtml(this.formatTime(entry.startTimestamp))}</time><strong>${this.formatDuration(entry.startTimestamp - previous.endTimestamp)}</strong><button class="review-gap-add" type="button" data-gap-start="${this.escapeHtml(previous.endTimestamp)}" data-gap-end="${this.escapeHtml(entry.startTimestamp)}" aria-label="${this.escapeHtml(`${this.t('add')}: ${this.t('gap')} ${this.formatTime(previous.endTimestamp)}–${this.formatTime(entry.startTimestamp)}`)}">${this.t('add')}</button></div>`
+            const gapStartRaw = Number(previous?.endTimestamp);
+            const gapEndRaw = Number(entry.startTimestamp);
+            const hasRawGap = previous?.endTimestamp !== null && previous?.endTimestamp !== undefined &&
+                Number.isFinite(gapStartRaw) && Number.isFinite(gapEndRaw) &&
+                gapEndRaw - gapStartRaw >= 4 * 60 * 1000;
+            const gapStart = hasRawGap ? this.roundToFiveMinutes(gapStartRaw) : null;
+            const gapEnd = hasRawGap ? this.roundToFiveMinutes(gapEndRaw) : null;
+            const gap = hasRawGap && gapEnd > gapStart
+                ? `<div class="review-gap" aria-label="${this.t('gap')}"><span>${this.t('gap')}</span><time>${this.escapeHtml(this.formatTime(gapStart))}–${this.escapeHtml(this.formatTime(gapEnd))}</time><strong>${this.formatDuration(gapEnd - gapStart)}</strong><button class="review-gap-add" type="button" data-gap-start="${this.escapeHtml(gapStart)}" data-gap-end="${this.escapeHtml(gapEnd)}" aria-label="${this.escapeHtml(`${this.t('add')}: ${this.t('gap')} ${this.formatTime(gapStart)}–${this.formatTime(gapEnd)}`)}">${this.t('add')}</button></div>`
                 : '';
             const meta = [entry.project, entry.service].filter(Boolean).map(value => this.escapeHtml(value)).join(' · ');
             const notes = entry.notes ? `<div class="review-entry-notes">${this.escapeHtml(entry.notes)}</div>` : '';
