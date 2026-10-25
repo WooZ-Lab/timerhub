@@ -54,6 +54,8 @@ const translations = {
         endTime: 'End Time',
         date: 'Date',
         activity: 'Activity',
+        activityOptional: 'Activity (optional)',
+        noActivity: 'No activity',
         duration: 'Duration',
         overlappingEntry: 'This time overlaps with another entry',
         undo: 'Undo',
@@ -107,6 +109,8 @@ const translations = {
         endTime: 'Endzeit',
         date: 'Datum',
         activity: 'Aktivität',
+        activityOptional: 'Aktivität (optional)',
+        noActivity: 'Keine Aktivität',
         duration: 'Dauer',
         overlappingEntry: 'Diese Zeit überlappt mit einem anderen Eintrag',
         undo: 'Rückgängig',
@@ -160,6 +164,8 @@ const translations = {
         endTime: 'Время окончания',
         date: 'Дата',
         activity: 'Занятие',
+        activityOptional: 'Занятие (необязательно)',
+        noActivity: 'Без занятия',
         duration: 'Длительность',
         overlappingEntry: 'Это время пересекается с другой записью',
         undo: 'Отменить',
@@ -2111,7 +2117,7 @@ class StorageRepository {
         }
         for (const entry of data.timeEntries) {
             requireKey(entry, 'id');
-            requireKey(entry, 'activityId');
+            if (entry.activityId !== undefined && typeof entry.activityId !== 'string') invalid();
             if (!Number.isFinite(entry.startTimestamp)) invalid();
             if (entry.endTimestamp !== null && !Number.isFinite(entry.endTimestamp)) invalid();
             optionalNumber(entry, 'createdAt');
@@ -3611,7 +3617,7 @@ class TimerHubApp {
         if (!entry || typeof entry !== 'object') {
             return { valid: false, error: 'invalidEntryObject' };
         }
-        if (!entry.activityId || typeof entry.activityId !== 'string' || !entry.activityId.trim()) {
+        if (entry.activityId !== undefined && entry.activityId !== null && typeof entry.activityId !== 'string') {
             return { valid: false, error: 'missingActivity' };
         }
         if (!Number.isFinite(entry.startTimestamp) || entry.startTimestamp <= 0) {
@@ -3932,6 +3938,7 @@ class TimerHubApp {
         const conflicts = [];
         const unresolved = [];
         this.timeEntries.forEach((entry, index) => {
+            if (!String(entry.activityId || '').trim()) return;
             const currentProjectId = this.normalizeClockodoId(entry.projectId);
             const currentProjectName = String(entry.project || '').trim();
             if (currentProjectId) {
@@ -4821,7 +4828,7 @@ class TimerHubApp {
                 ? `<small class="review-conflict-note">${this.escapeHtml(this.t('overlappingEntry'))}</small>`
                 : '';
             const batch = entry.syncBatchId ? this.syncBatches.find(item => item.id === entry.syncBatchId) : null;
-            const activityLabel = activity?.name || entry.activityNameSnapshot || this.t('activity');
+            const activityLabel = activity?.name || entry.activityNameSnapshot || this.t('noActivity');
             const retryButton = entry.syncStatus === SYNC_STATUS.FAILED && batch
                 ? `<button class="review-action-btn review-retry-entry" type="button" data-batch-id="${this.escapeHtml(batch.id)}" data-entry-id="${this.escapeHtml(entry.id)}" aria-label="${this.escapeHtml(`${this.t('retry')}: ${activityLabel}`)}"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 7v5h-5M4.8 9a7.5 7.5 0 0 1 12.7-2L20 12M4 17v-5h5m10.2 3a7.5 7.5 0 0 1-12.7 2L4 12"/></svg>${this.t('retry')}</button>`
                 : '';
@@ -4875,7 +4882,7 @@ class TimerHubApp {
 
     renderSyncConfirmEntry(entry) {
         const activity = this.activities.find(item => item.id === entry.activityId);
-        const title = activity?.name || entry.activityNameSnapshot || this.t('activity');
+        const title = activity?.name || entry.activityNameSnapshot || this.t('noActivity');
         const sendStart = this.clockodoSendTimestamp(entry.startTimestamp);
         const sendEnd = this.clockodoSendTimestamp(entry.endTimestamp);
         return `<div class="sync-confirm-item"><span>${this.escapeHtml(title)} · ${this.escapeHtml(this.formatTime(sendStart))}–${this.escapeHtml(this.formatTime(sendEnd))}</span><strong>${this.formatDuration(this.getEntryDuration(entry))}</strong></div>`;
@@ -9500,13 +9507,13 @@ class TimerHubApp {
                     <div class="log-day-total">${this.t('total')}: ${this.formatDuration(dayTotal)}</div>
                     ${Object.entries(activityTotals).map(([actId, total]) => {
                         const act = this.activities.find(a => a.id === actId);
-                        const snapshot = dayEntries.find(e => e.activityId === actId)?.activityNameSnapshot;
+                        const snapshot = dayEntries.find(e => e.activityId === actId)?.activityNameSnapshot || this.t('noActivity');
                         return `<div class="log-activity-stat">${this.escapeHtml(snapshot)} — ${this.formatDuration(total)}</div>`;
                     }).join('')}
                 </div>`;
 
             dayEntries.forEach(entry => {
-                const snapshot = entry.activityNameSnapshot;
+                const snapshot = entry.activityNameSnapshot || this.t('noActivity');
                 const duration = entry.endTimestamp - entry.startTimestamp;
                 const start = this.formatDateTime(entry.startTimestamp);
                 const end = this.formatDateTime(entry.endTimestamp);
@@ -9605,22 +9612,27 @@ class TimerHubApp {
     populateEntryActivitySelect(selectedId = '') {
         const activitySelect = document.getElementById('entryEditActivity');
         activitySelect.innerHTML = '';
+        const empty = document.createElement('option');
+        empty.value = '';
+        empty.textContent = this.t('noActivity');
+        activitySelect.appendChild(empty);
         this.activities.forEach(activity => {
             const option = document.createElement('option');
             option.value = activity.id;
             option.textContent = activity.name;
             activitySelect.appendChild(option);
         });
-        activitySelect.value = selectedId || this.activities[0]?.id || '';
+        activitySelect.value = selectedId || '';
     }
 
     showAddEntryModal() {
         this.clockodoCustomerFilters.delete('entry');
         this.clockodoCustomerAutoSelected.delete('entry');
         this.editingEntryId = null;
-        this.populateEntryActivitySelect(this.activities[0]?.id || '');
-        const defaultActivity = this.activities.find(item => item.id === document.getElementById('entryEditActivity').value);
-        this.populateEntryAssignmentForActivity(defaultActivity?.id || '');
+        // A manually created entry starts without an activity. The user can
+        // still choose one, but it is optional.
+        this.populateEntryActivitySelect('');
+        this.populateEntryAssignmentForActivity('');
         this.loadClockodoReferenceData();
         document.getElementById('entryEditDate').value = this.reviewDate;
         document.getElementById('entryEditEndDate').value = this.reviewDate;
@@ -9693,7 +9705,7 @@ class TimerHubApp {
         const warning = document.getElementById('entryConflictWarning');
         warning.style.display = 'none';
 
-        if (start === null || end === null || !activityId) {
+        if (start === null || end === null) {
             this.showToast(this.t('pleaseFillAllFields'));
             return;
         }
@@ -9719,11 +9731,16 @@ class TimerHubApp {
             warning.style.display = 'block';
         }
 
-        const activity = this.activities.find(item => item.id === activityId);
+        const activity = activityId
+            ? (this.activities.find(item => item.id === activityId)
+                || this.archivedActivities?.find(item => item.id === activityId))
+            : null;
         const assignment = this.readClockodoAssignment('entry');
         const updates = {
             activityId,
-            activityNameSnapshot: activity?.name || editing?.activityNameSnapshot || '',
+            activityNameSnapshot: activityId
+                ? (activity?.name || editing?.activityNameSnapshot || '')
+                : '',
             startTimestamp: start,
             endTimestamp: end,
             project: document.getElementById('entryEditProject').value.trim(),
@@ -11575,7 +11592,7 @@ class TimerHubApp {
                 <input type="checkbox" data-share-entry="${index}" ${this.shareLinkSelection.has(index) ? 'checked' : ''}>
                 <span class="exchange-preview-item">
                     <span class="exchange-preview-times"><strong>${this.escapeHtml(this.formatTime(entry.startTimestamp))}</strong><span>–</span><strong>${this.escapeHtml(this.formatTime(entry.endTimestamp))}</strong><span class="exchange-preview-duration">${this.escapeHtml(this.formatDuration(entry.endTimestamp - entry.startTimestamp))}</span></span>
-                    <span class="exchange-preview-activity">${this.escapeHtml(entry.activityNameSnapshot || '')}</span>
+                    <span class="exchange-preview-activity">${this.escapeHtml(entry.activityNameSnapshot || this.t('noActivity'))}</span>
                 </span>
             </label>`).join('');
         this.updateShareLinkSummary();
@@ -12548,7 +12565,7 @@ class TimerHubApp {
                 const start = this.formatDateTime(entry.startTimestamp);
                 const end = this.formatDateTime(entry.endTimestamp);
                 const duration = this.formatDuration(entry.endTimestamp - entry.startTimestamp);
-                text += `${start} – ${end} | ${entry.activityNameSnapshot} | ${duration}\n`;
+                text += `${start} – ${end} | ${entry.activityNameSnapshot || this.t('noActivity')} | ${duration}\n`;
             });
         }
 
@@ -12568,7 +12585,7 @@ class TimerHubApp {
             const start = this.formatTime(entry.startTimestamp);
             const end = this.formatTime(entry.endTimestamp);
             const duration = this.formatDuration(entry.endTimestamp - entry.startTimestamp);
-            csv += [date, start, end, entry.activityNameSnapshot, duration].map(csvCell).join(',') + '\n';
+            csv += [date, start, end, entry.activityNameSnapshot || this.t('noActivity'), duration].map(csvCell).join(',') + '\n';
         });
 
         return csv;

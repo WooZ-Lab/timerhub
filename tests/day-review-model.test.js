@@ -1332,12 +1332,18 @@ test('Task 2: Invalid data handling rejected during entry validation', async () 
     const validCheck1 = app.validateTimeEntry(null);
     assert.equal(validCheck1.valid, false);
 
-    const validCheck2 = app.validateTimeEntry({
+    const withoutActivity = app.validateTimeEntry({
         activityId: '',
         startTimestamp: Date.now()
     });
-    assert.equal(validCheck2.valid, false);
-    assert.equal(validCheck2.error, 'missingActivity');
+    assert.equal(withoutActivity.valid, true, 'manual entries may omit an activity');
+
+    const withoutStart = app.validateTimeEntry({
+        activityId: '',
+        startTimestamp: null
+    });
+    assert.equal(withoutStart.valid, false);
+    assert.equal(withoutStart.error, 'invalidStartTime');
 
     const validCheck3 = app.validateTimeEntry({
         activityId: 'act-1',
@@ -5211,7 +5217,6 @@ async function createOverlapApp() {
     app.activities = [{ id: 'act-1', name: 'A' }, { id: 'act-2', name: 'B' }];
     app.reviewDate = '2026-09-28';
     app.renderLog = () => {};
-    app.renderReview = () => {};
     const toasts = [];
     app.showToast = message => toasts.push(message);
     const setTimes = (start, end, date = '2026-09-28') => {
@@ -10259,7 +10264,7 @@ test('backup validation rejects malformed records before touching the database',
         ['null activity', { ...base, activities: [null] }],
         ['missing id', { ...base, activities: [{ name: 'No id' }] }],
         ['wrong position type', { ...base, activities: [{ id: 'a', position: 'first' }] }],
-        ['entry without activity', { ...base, timeEntries: [{ id: 'e', startTimestamp: 1, endTimestamp: 2 }] }],
+        ['entry with non-string activity', { ...base, timeEntries: [{ id: 'e', activityId: 5, startTimestamp: 1, endTimestamp: 2 }] }],
         ['entry with bad timestamp', { ...base, timeEntries: [{ id: 'e', activityId: 'a', startTimestamp: 'soon', endTimestamp: 2 }] }],
         ['layout without key', { ...base, layout: [{ x: 1 }] }],
         ['group with bad coordinates', { ...base, groups: [{ id: 'g', x: 'left' }] }],
@@ -10276,6 +10281,10 @@ test('backup validation rejects malformed records before touching the database',
         assert.equal(harness.data.timeEntries.has('keep-entry'), true, `${label}: entries untouched`);
     }
     assert.doesNotThrow(() => repository.validateBackupData({ activities: [{ id: 'ok', name: 'Legacy' }], timeEntries: [] }));
+    assert.doesNotThrow(() => repository.validateBackupData({
+        activities: [],
+        timeEntries: [{ id: 'manual', activityId: '', startTimestamp: 1, endTimestamp: 2 }]
+    }), 'activity-less manual entries are valid');
 });
 
 test('failed replace import rolls back and keeps the original database intact', async () => {
@@ -11748,12 +11757,12 @@ test('new time entries inherit the effective group customer without touching sto
     await app.loadGroups();
     await app.loadTimeEntries();
     app.showAddEntryModal();
-    assert.equal(document.getElementById('entryEditCustomerSelect').value, '5', 'the add-entry default follows the group chain');
-    assert.equal(document.getElementById('entryEditCustomerInput').value, 'Beta');
+    assert.equal(document.getElementById('entryEditActivity').value, '', 'a manual entry starts without an activity');
+    assert.equal(document.getElementById('entryEditCustomerSelect').value, '', 'no activity means no group customer default yet');
     assert.equal(app.editingEntryId, null);
 
     app.populateEntryAssignmentForActivity('inherit-override-leaf-a');
-    assert.equal(document.getElementById('entryEditCustomerSelect').value, '7', 'changing the activity in add mode follows its group chain');
+    assert.equal(document.getElementById('entryEditCustomerSelect').value, '7', 'choosing an activity follows its group chain');
     assert.equal(document.getElementById('entryEditCustomerInput').value, 'Gamma');
 
     const existing = app.timeEntries.find(item => item.id === 'inherit-entry');
@@ -12585,4 +12594,50 @@ test('retrying a failed entry uses the cleared local project instead of the stal
     assert.equal(retried.state, 'synced');
     assert.equal(sent.length, 2);
     assert.equal(sent[1].projects_id, undefined, 'an empty local project must omit projects_id on retry');
+});
+
+test('a manual Day Review entry starts without an activity and can be saved without one', async () => {
+    const { app, document, storageData } = createTestApp({
+        activities: [{ id: 'act-1', name: 'Painting', position: 0 }]
+    });
+    app.applyTranslations();
+    app.reviewDate = '2026-10-05';
+    app.renderLog = () => {};
+    const toasts = [];
+    app.showToast = message => toasts.push(message);
+
+    app.showAddEntryModal();
+    assert.equal(document.getElementById('entryEditActivity').value, '', 'manual entries do not auto-select the first activity');
+
+    document.getElementById('entryEditDate').value = '2026-10-05';
+    document.getElementById('entryEditStart').value = '08:00';
+    document.getElementById('entryEditEndDate').value = '2026-10-05';
+    document.getElementById('entryEditEnd').value = '09:00';
+    await app.saveTimeEntry();
+
+    const entry = app.timeEntries.find(item => item.startTimestamp === new Date(2026, 9, 5, 8, 0).getTime());
+    assert.ok(entry, `the manual entry is created: ${toasts.join(' | ')}`);
+    assert.equal(entry.activityId, '');
+    assert.equal(entry.activityNameSnapshot, '');
+    assert.equal(entry.endTimestamp, new Date(2026, 9, 5, 9, 0).getTime());
+    assert.ok(storageData.timeEntries.some(item => item.id === entry.id), 'the activity-less entry is persisted');
+    app.renderReview();
+    assert.match(document.getElementById('reviewEntriesList').innerHTML, /No activity/);
+});
+
+test('activity-less manual entries survive backup validation and restore', async () => {
+    const { app, context } = createTestApp();
+    const start = new Date(2026, 9, 5, 10, 0).getTime();
+    await app.addEntry({
+        id: 'manual-no-activity', activityId: '', activityNameSnapshot: '',
+        startTimestamp: start, endTimestamp: start + 60 * 60 * 1000,
+        source: 'manual'
+    });
+    const exported = await app.storage.exportAll();
+    const repository = vm.runInContext('new StorageRepository()', context);
+    const harness = createIndexedDbHarness();
+    repository.db = harness.db;
+    assert.doesNotThrow(() => repository.validateBackupData(exported));
+    await repository.importAll(exported, false);
+    assert.ok((await repository.getTimeEntries()).some(entry => entry.id === 'manual-no-activity' && entry.activityId === ''));
 });
