@@ -5176,7 +5176,7 @@ class TimerHubApp {
                 ? this.renderRetryDiagnostic(this.retryDiagnostic)
                 : '';
             const editIcon = `<span class="review-edit-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m4 16.5-.8 4.3 4.3-.8L19 8.5 15.5 5 4 16.5Z"/><path d="m13.5 7 3.5 3.5"/></svg></span>`;
-            const addActivityButton = `<button class="review-action-btn review-add-activity" type="button" data-entry-id="${this.escapeHtml(entry.id)}" aria-label="${this.escapeHtml(`${this.t('addActivityFromReview')}: ${activityLabel}`)}"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>${this.t('addActivityFromReview')}</button>`;
+            const addActivityButton = `<button class="review-action-btn review-add-activity" type="button" data-entry-id="${this.escapeHtml(entry.id)}" aria-label="${this.escapeHtml(`${this.t('addActivityFromReview')}: ${activityLabel}`)}" title="${this.escapeHtml(this.t('addActivityFromReview'))}"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>`;
             const locked = entry.syncStatus === SYNC_STATUS.CONFIRMED || entry.syncStatus === SYNC_STATUS.SYNCING;
             return `${gap}<article class="review-entry-card${issues.length ? ' suspicious-entry' : ''}${isConflict ? ' conflict-entry' : ''}${locked ? ' review-entry-locked' : ''}" data-entry-id="${this.escapeHtml(entry.id)}" role="button" tabindex="0" aria-label="${this.escapeHtml(`${this.t('edit')}: ${activityLabel}`)}"${locked ? ' aria-disabled="true"' : ''}>
                 <div class="review-entry-header">

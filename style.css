@@ -3191,3 +3191,16 @@ body.backup-locked .modal { display: none !important; }
     stroke-linecap: round;
     stroke-linejoin: round;
 }
+
+.review-add-activity {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+    padding: 0;
+    justify-content: center;
+}
+.review-add-activity svg {
+    width: 16px;
+    height: 16px;
+}
