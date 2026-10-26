@@ -2626,7 +2626,7 @@ test('a child group expanding pushes a sibling activity inside the same parent',
     assert.deepEqual({ ...app.activityDisplayOffset('inside-sibling') }, { x: 0, y: 0 });
 });
 
-test('expanding a group displaces conflicting free activities temporarily', async () => {
+test('expanding a group leaves conflicting free activities at their saved position', async () => {
     const harness = createGroupCanvasHarness();
     const { app, buttons, containers, overlays, storageData } = harness;
     app.groups = [{ id: 'free-group', name: 'Group', x: 304, y: 304, collapsed: true }];
@@ -2659,17 +2659,17 @@ test('expanding a group displaces conflicting free activities temporarily', asyn
     freeButton = buttons.find(button => button.dataset.activityId === 'free-activity');
     const freeDisplayed = app.getActivityCanvasLayout(free, 1);
     const freeOffset = app.activityDisplayOffset('free-activity');
-    assert.ok(freeOffset.x > 0 || freeOffset.y > 0, 'the conflicting free activity moves');
+    assert.deepEqual({ ...freeOffset }, { x: 0, y: 0 }, 'the free activity is not displaced by the group');
     assert.equal(freeDisplayed.x % 16, 0);
     assert.equal(freeDisplayed.y % 16, 0);
-    assert.deepEqual([freeButton.style.left, freeButton.style.top], [`${freeDisplayed.x}px`, `${freeDisplayed.y}px`]);
+    assert.deepEqual([freeButton.style.left, freeButton.style.top], [`${freeBase.x}px`, `${freeBase.y}px`]);
     assert.equal(groupOverlaps(groupExpanded, {
         left: freeDisplayed.x, top: freeDisplayed.y, width: freeDisplayed.width, height: freeDisplayed.height
-    }), false, 'the free activity clears the expanded group');
+    }), true, 'free activities may overlap a group without being moved');
     const overlay = overlays.find(item => item.dataset.activityId === 'free-activity');
     assert.deepEqual([overlay.style.left, overlay.style.top], [freeButton.style.left, freeButton.style.top]);
     assert.deepEqual([app.activityLayouts.get('free-activity').x, app.activityLayouts.get('free-activity').y],
-        [512, 320], 'temporary displacement does not rewrite the free activity layout');
+        [512, 320], 'the free activity layout is untouched');
     assert.deepEqual([storageData.layout.find(layout => layout.activityId === 'free-activity').x,
         storageData.layout.find(layout => layout.activityId === 'free-activity').y], [512, 320]);
 
@@ -2692,7 +2692,7 @@ test('expanding a group displaces conflicting free activities temporarily', asyn
     assert.deepEqual(
         [reloadedFree.x, reloadedFree.y, reloadedFree.width, reloadedFree.height],
         [afterReloadExpectation.x, afterReloadExpectation.y, afterReloadExpectation.width, afterReloadExpectation.height],
-        'reloading an expanded group recomputes the same free-activity displacement'
+        'reloading an expanded group keeps the free activity at its saved position'
     );
 });
 
@@ -13331,4 +13331,69 @@ test('releasing a dragged activity over the canvas trash deletes it instead of m
     assert.equal(app.activities.some(item => item.id === 'drag-trash'), false);
     assert.equal(storageData.activities.some(item => item.id === 'drag-trash'), false);
     assert.equal(savedLayout, null, 'a trashed activity never gets a new saved position');
+});
+
+test('resizing an ungrouped activity over a group does not teleport it and it stays draggable', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, buttons, handles, pointer } = harness;
+    app.activities = [
+        { id: 'resize-member', name: 'Member', position: 0, groupId: 'resize-group', size: 'medium' },
+        { id: 'resize-free', name: 'Free', position: 1, size: 'medium' }
+    ];
+    app.activityLayouts = new Map([
+        ['resize-member', { activityId: 'resize-member', x: 0, y: 0, width: 400, height: 300 }],
+        ['resize-free', { activityId: 'resize-free', x: 192, y: 0, width: 160, height: 112 }]
+    ]);
+    app.groups = [{ id: 'resize-group', name: 'Group', x: 100, y: 300, collapsed: false }];
+    app.renderMain();
+    assert.deepEqual({ ...app.activityDisplayOffset('resize-free') }, { x: 0, y: 0 });
+
+    const handle = handles.find(item => item.dataset.activityId === 'resize-free');
+    assert.ok(handle);
+    pointer('pointerdown', handle, 0, 0);
+    pointer('pointermove', handle, 280, 288);
+    pointer('pointerup', handle, 280, 288);
+
+    let free = buttons.find(button => button.dataset.activityId === 'resize-free');
+    assert.equal(free.style.left, '192px', 'resizing does not move the activity horizontally');
+    assert.equal(free.style.top, '0px', 'resizing does not move the activity vertically');
+    assert.deepEqual({ ...app.activityDisplayOffset('resize-free') }, { x: 0, y: 0 });
+
+    pointer('pointerdown', free, 0, 0);
+    pointer('pointermove', free, 32, 16);
+    pointer('pointerup', free, 32, 16);
+
+    free = buttons.find(button => button.dataset.activityId === 'resize-free');
+    assert.equal(free.style.left, '224px', 'the resized activity moves on the 16px grid');
+    assert.equal(free.style.top, '16px');
+    assert.equal(app.activities.find(item => item.id === 'resize-free').groupId, undefined,
+        'moving near a group does not silently add the activity to it');
+});
+
+test('a large activity that cannot fit in a group stays where it was dropped', async () => {
+    const harness = createGroupCanvasHarness();
+    const { app, buttons, pointer } = harness;
+    app.activities = [
+        { id: 'fit-member', name: 'Member', position: 0, groupId: 'fit-group', size: 'medium' },
+        { id: 'fit-large', name: 'Large', position: 1, size: 'large' }
+    ];
+    app.activityLayouts = new Map([
+        ['fit-member', { activityId: 'fit-member', x: 0, y: 0, width: 200, height: 120 }],
+        ['fit-large', { activityId: 'fit-large', x: 800, y: 800, width: 640, height: 520 }]
+    ]);
+    app.groups = [{ id: 'fit-group', name: 'Group', x: 400, y: 400, collapsed: false }];
+    app.renderMain();
+
+    const large = buttons.find(button => button.dataset.activityId === 'fit-large');
+    pointer('pointerdown', large, 0, 0);
+    pointer('pointermove', large, -620, -610);
+    pointer('pointerup', large, -620, -610);
+
+    const activity = app.activities.find(item => item.id === 'fit-large');
+    const stored = app.activityLayouts.get('fit-large');
+    assert.equal(activity.groupId, undefined, 'an oversized activity is not forced into the group');
+    assert.equal(stored.width, 640);
+    assert.ok(stored.height >= 520, 'the large size is preserved');
+    assert.ok(Math.abs(stored.x - 176) <= 16 && Math.abs(stored.y - 192) <= 16,
+        'the activity stays at the released position instead of a distant fallback slot');
 });

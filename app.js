@@ -6687,6 +6687,11 @@ class TimerHubApp {
         for (const activity of this.activities) {
             if (!this.isActivityVisible(activity)) continue;
             const group = this.activityGroup(activity);
+            // Free activities keep their saved position. Only members are
+            // displaced so group containers stay clear of each other. Moving a
+            // free activity because its box touched a group made resizing and
+            // dragging teleport the node and left stale temporary offsets.
+            if (!group) continue;
             const excluded = new Set();
             let ancestor = group;
             while (ancestor) {
@@ -7005,7 +7010,8 @@ class TimerHubApp {
         return boxes;
     }
 
-    findNearestFreePosition(movingBox, obstacles, step = CANVAS_GRID_SIZE) {
+    findNearestFreePosition(movingBox, obstacles, step = CANVAS_GRID_SIZE, options = {}) {
+        const { radius = 40, fallback = true } = options || {};
         const overlaps = box => obstacles.some(other =>
             box.x < other.x + other.width && other.x < box.x + box.width &&
             box.y < other.y + other.height && other.y < box.y + box.height
@@ -7014,7 +7020,6 @@ class TimerHubApp {
         const baseX = this.snapToCanvasGrid(movingBox.x);
         const baseY = this.snapToCanvasGrid(movingBox.y);
         const candidates = [];
-        const radius = 40;
         for (let dx = -radius; dx <= radius; dx += 1) {
             for (let dy = -radius; dy <= radius; dy += 1) {
                 if (!dx && !dy) continue;
@@ -7036,6 +7041,7 @@ class TimerHubApp {
             };
             if (!overlaps(box)) return { x: box.x, y: box.y };
         }
+        if (!fallback) return null;
         const bottom = Math.max(...obstacles.map(box => box.y + box.height));
         return { x: baseX, y: this.snapToCanvasGrid(bottom + step) };
     }
@@ -7060,7 +7066,16 @@ class TimerHubApp {
         };
         if (targetGroup) {
             const obstacles = this.groupMemberRelativeBoxes(targetGroup, activity.id);
-            const free = this.findNearestFreePosition(stored, obstacles);
+            const free = this.findNearestFreePosition(
+                stored,
+                obstacles,
+                CANVAS_GRID_SIZE,
+                { radius: 8, fallback: false }
+            );
+            // A large activity that cannot fit near the drop point must stay
+            // where the user released it instead of being thrown to a distant
+            // fallback slot.
+            if (!free) return null;
             const freeAbsoluteX = this.snapToCanvasGrid(originX + free.x);
             const freeAbsoluteY = this.snapToCanvasGrid(originY + free.y);
             stored.x = freeAbsoluteX - originX;
@@ -9237,9 +9252,11 @@ class TimerHubApp {
                         const targetId = target?.id || null;
                         const currentId = activity ? (activity.groupId || null) : null;
                         if (activity && targetId !== currentId) {
-                            this.reassignActivityToGroup(activity, target, finalLayout);
-                            this.recordCanvasHistoryFromSnapshot('move-activity-group', gesture.canvasHistoryBefore).catch(() => {});
-                            return;
+                            const reassigned = this.reassignActivityToGroup(activity, target, finalLayout);
+                            if (reassigned) {
+                                this.recordCanvasHistoryFromSnapshot('move-activity-group', gesture.canvasHistoryBefore).catch(() => {});
+                                return;
+                            }
                         }
                     }
 
