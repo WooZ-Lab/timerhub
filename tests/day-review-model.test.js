@@ -13079,7 +13079,7 @@ test('an activity created from a Day Review card uses the current default shape'
     assert.equal(created.shape, 'square', 'the reordered first shape wins over the source activity shape');
 });
 
-test('a Day Review activity name falls back to the next filled field when the project is empty', async () => {
+test('a Day Review activity name falls back to the customer before other fields', async () => {
     const { app } = createTestApp();
     app.activities = [];
     app.archivedActivities = [];
@@ -13095,5 +13095,24 @@ test('a Day Review activity name falls back to the next filled field when the pr
     app.renderMain = () => {};
     app.showToast = () => {};
     const created = await app.addActivityFromReviewEntry('address-fallback-entry');
+    assert.equal(created.name, 'Acme');
+});
+
+test('a Day Review activity name falls back to remaining data only when project and customer are empty', async () => {
+    const { app } = createTestApp();
+    app.activities = [];
+    app.archivedActivities = [];
+    app.groups = [];
+    app.activityLayouts = new Map();
+    app.canvasViewportSize = { width: 800, height: 600 };
+    const start = new Date(2026, 9, 5, 13, 0).getTime();
+    app.timeEntries = [{
+        id: 'name-fallback-entry', activityId: '', activityNameSnapshot: '',
+        startTimestamp: start, endTimestamp: start + 60 * 60 * 1000,
+        notes: 'Treppenhaus', project: '', service: 'Painting', customerName: ''
+    }];
+    app.renderMain = () => {};
+    app.showToast = () => {};
+    const created = await app.addActivityFromReviewEntry('name-fallback-entry');
     assert.equal(created.name, 'Treppenhaus');
 });

@@ -9922,11 +9922,11 @@ class TimerHubApp {
         // activity name first, then fall back to the next meaningful card field.
         const candidates = [
             entry.project,
+            entry.customerName,
             entry.activityNameSnapshot,
             existing?.name,
             String(entry.notes || '').split(/\r?\n/)[0],
-            entry.service,
-            entry.customerName
+            entry.service
         ].map(value => String(value || '').trim()).filter(Boolean);
         let name = candidates[0] || `${this.t('activity')} ${this.formatTime(entry.startTimestamp)}`;
         name = name.slice(0, 120);
