@@ -13051,3 +13051,30 @@ test('an activity created from Day Review is placed near the center without over
     assert.ok(Math.abs((layout.x + layout.width / 2) - 400) < 200, 'new activity stays near the viewport center');
     assert.ok(Math.abs((layout.y + layout.height / 2) - 300) < 200, 'new activity stays near the viewport center');
 });
+
+test('an activity created from a Day Review card uses the current default shape', async () => {
+    const { app } = createTestApp();
+    app.SHAPES = [
+        { id: 'circle', key: 'shapeCircle', svg: '' },
+        { id: 'square', key: 'shapeSquare', svg: '' },
+        { id: 'triangle', key: 'shapeTriangle', svg: '' }
+    ];
+    app.shapeOrder = ['square', 'circle', 'triangle'];
+    app.activities = [{
+        id: 'circle-source', name: 'Circle activity', shape: 'circle', color: '#111111',
+        position: 0, archived: false
+    }];
+    app.archivedActivities = [];
+    app.groups = [];
+    app.activityLayouts = new Map();
+    app.canvasViewportSize = { width: 800, height: 600 };
+    app.timeEntries = [{
+        id: 'shape-source-entry', activityId: 'circle-source', activityNameSnapshot: 'Circle activity',
+        startTimestamp: new Date(2026, 9, 5, 8, 0).getTime(),
+        endTimestamp: new Date(2026, 9, 5, 9, 0).getTime()
+    }];
+    app.renderMain = () => {};
+    app.showToast = () => {};
+    const created = await app.addActivityFromReviewEntry('shape-source-entry');
+    assert.equal(created.shape, 'square', 'the reordered first shape wins over the source activity shape');
+});

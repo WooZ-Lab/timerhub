@@ -9936,8 +9936,9 @@ class TimerHubApp {
             return text || fallback || '';
         };
         const now = Date.now();
-        const shapeIds = new Set((this.SHAPES || []).map(shape => shape.id));
-        const shape = shapeIds.has(existing?.shape) ? existing.shape : this.defaultActivityShape();
+        // The card does not expose a shape, so a new activity always follows the
+        // user's current default (the first shape in the reordered picker).
+        const shape = this.defaultActivityShape();
         const activity = {
             id: this.generateId(),
             name,
