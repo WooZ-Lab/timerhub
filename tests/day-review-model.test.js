@@ -13143,4 +13143,34 @@ test('Day Review activities get an icon from the service name', async () => {
     const created = await app.addActivityFromReviewEntry('anfahrt-entry');
     assert.equal(created.icon, 'car');
     assert.equal(created.name, 'Bridge');
+    const carStyle = app.iconStyleFor('car');
+    assert.equal(created.shape, carStyle.shape, 'the icon shape is used');
+    assert.equal(app.rgbStringToHex(created.color), app.rgbStringToHex(carStyle.color), 'the icon color is used');
+});
+
+test('saving an activity with an icon updates that icon’s color and shape defaults', async () => {
+    const { app, document, storageData } = createTestApp({
+        activities: [{
+            id: 'icon-style-activity', name: 'Car', icon: 'car', color: '#3498DB',
+            shape: 'rounded', position: 0, archived: false
+        }]
+    });
+    await app.loadActivities();
+    app.editingActivityId = 'icon-style-activity';
+    app.applyTranslations();
+    app.renderMain = () => {};
+    app.showToast = () => {};
+    document.getElementById('activityName').value = 'Custom car style';
+    document.querySelector = selector => {
+        if (selector === '.icon-option.selected') return { dataset: { icon: 'car' } };
+        if (selector === '.color-option.selected') return { style: { backgroundColor: 'rgb(255, 0, 0)' } };
+        if (selector === '.shape-option.selected') return { dataset: { shape: 'square' } };
+        return null;
+    };
+    await app.saveActivity();
+    assert.deepEqual(
+        JSON.parse(JSON.stringify(storageData.settings.activityIconStyles.car)),
+        { color: 'rgb(255, 0, 0)', shape: 'square' }
+    );
+    assert.deepEqual(JSON.parse(JSON.stringify(app.iconStyles.car)), { color: 'rgb(255, 0, 0)', shape: 'square' });
 });

@@ -371,6 +371,7 @@ const extendedTranslations = {
         iconVacuumAttic: 'Roof',
         iconVacuumBasement: 'Basement',
         iconMop: 'Mop',
+        iconStyleHint: 'The selected color and shape are saved as the defaults for this icon.',
         iconSqueegee: 'Window',
         iconDuster: 'Dust',
         iconCar: 'Car',
@@ -803,6 +804,7 @@ const extendedTranslations = {
         iconVacuumAttic: 'Dach',
         iconVacuumBasement: 'Keller',
         iconMop: 'Wischmopp',
+        iconStyleHint: 'Die gewählte Farbe und Form werden als Standard für dieses Symbol gespeichert.',
         iconSqueegee: 'Fenster',
         iconDuster: 'Staub',
         iconCar: 'Auto',
@@ -1235,6 +1237,7 @@ const extendedTranslations = {
         iconVacuumAttic: 'Крыша',
         iconVacuumBasement: 'Подвал',
         iconMop: 'Швабра',
+        iconStyleHint: 'Выбранные цвет и форма сохраняются как значения по умолчанию для этой иконки.',
         iconSqueegee: 'Окно',
         iconDuster: 'Пыль',
         iconCar: 'Машина',
@@ -2488,6 +2491,7 @@ class TimerHubApp {
         this.shapeOrder = this.SHAPES.map(shape => shape.id);
         this.shapeSelectionTouched = false;
         this.shapeDragSuppressClickUntil = 0;
+        this.iconStyles = {};
 
         // Activity templates: a stable id plus a recognizable illustration on
         // a 24x24 grid. Filled parts use currentColor with even-odd cut-outs;
@@ -3519,6 +3523,7 @@ class TimerHubApp {
         this.firstDayOfWeek = [0, 1].includes(firstDay) ? firstDay : 1;
         this.confirmDelete = await this.storage.getSetting('confirmDelete', true);
         this.shapeOrder = this.normalizeShapeOrder(await this.storage.getSetting('activityShapeOrder', null));
+        this.iconStyles = this.normalizeIconStyles(await this.storage.getSetting('activityIconStyles', null));
         this.showActivityAssignments =
             await this.storage.getSetting('showActivityAssignments', false) === true;
         this.notificationInterval =
@@ -4768,6 +4773,99 @@ class TimerHubApp {
         });
     }
 
+    defaultIconStyles() {
+        return {
+            'vacuum-attic': { color: '#9B59B6', shape: 'hexagon' },
+            'vacuum-basement': { color: '#4A5F9F', shape: 'triangle' },
+            mop: { color: '#27AE60', shape: 'square' },
+            squeegee: { color: '#16A085', shape: 'diamond' },
+            duster: { color: '#E67E22', shape: 'circle' },
+            car: { color: '#3498DB', shape: 'rounded' }
+        };
+    }
+
+    normalizeIconStyles(styles) {
+        const defaults = this.defaultIconStyles();
+        const icons = Array.isArray(this.ACTIVITY_ICONS) ? this.ACTIVITY_ICONS : [];
+        const shapes = new Set((Array.isArray(this.SHAPES) ? this.SHAPES : []).map(shape => shape.id));
+        const result = {};
+        for (const icon of icons) {
+            const base = defaults[icon.id] || {
+                color: (this.COLORS && this.COLORS[0]) || '#E74C3C',
+                shape: this.defaultActivityShape()
+            };
+            const saved = styles && typeof styles === 'object' && !Array.isArray(styles)
+                ? styles[icon.id]
+                : null;
+            const color = saved && typeof saved.color === 'string' && saved.color.trim()
+                ? saved.color.trim()
+                : base.color;
+            const shape = saved && shapes.has(saved.shape) ? saved.shape : base.shape;
+            result[icon.id] = { color, shape };
+        }
+        return result;
+    }
+
+    iconStyleFor(iconId) {
+        if (!iconId) return null;
+        const style = (this.iconStyles && this.iconStyles[iconId]) || this.defaultIconStyles()[iconId];
+        if (!style) return null;
+        const shapes = new Set((Array.isArray(this.SHAPES) ? this.SHAPES : []).map(shape => shape.id));
+        return {
+            color: typeof style.color === 'string' && style.color.trim() ? style.color.trim() : this.COLORS[0],
+            shape: shapes.has(style.shape) ? style.shape : this.defaultActivityShape()
+        };
+    }
+
+    selectActivityColor(color) {
+        const target = this.rgbStringToHex(color);
+        const options = [...document.querySelectorAll('.color-option')];
+        let match = options.find(option => this.rgbStringToHex(option.dataset.color) === target);
+        options.forEach(option => option.classList.remove('selected'));
+        if (!match) {
+            const custom = document.getElementById('customColorSwatch');
+            const input = document.getElementById('customColorInput');
+            if (custom) {
+                custom.style.backgroundColor = color;
+                custom.style.backgroundImage = 'none';
+                custom.dataset.color = color;
+                custom.textContent = '';
+                custom.setAttribute('aria-label', this.t('colorSample', { color: target }));
+                match = custom;
+            }
+            if (input) input.value = target;
+        }
+        match?.classList.add('selected');
+        return Boolean(match);
+    }
+
+    applyIconVisualStyle(iconId) {
+        const style = this.iconStyleFor(iconId);
+        if (!style) return false;
+        this.selectActivityColor(style.color);
+        this.selectActivityShape(style.shape);
+        this.shapeSelectionTouched = true;
+        return true;
+    }
+
+    async persistIconStyle(iconId, color, shape) {
+        if (!iconId) return false;
+        const shapeIds = new Set((Array.isArray(this.SHAPES) ? this.SHAPES : []).map(item => item.id));
+        const safeColor = typeof color === 'string' && color.trim() ? color.trim() : this.COLORS[0];
+        const safeShape = shapeIds.has(shape) ? shape : this.defaultActivityShape();
+        this.iconStyles = {
+            ...(this.iconStyles || {}),
+            [iconId]: { color: safeColor, shape: safeShape }
+        };
+        try {
+            await this.storage.setSetting('activityIconStyles', this.iconStyles);
+        } catch (error) {
+            this.diagnostics?.warn('settings', 'save-icon-style', error, { status: 'failed' });
+            return false;
+        }
+        return true;
+    }
+
     async persistShapeOrder() {
         const picker = document.getElementById('shapePicker');
         if (!picker?.querySelectorAll) return;
@@ -4970,6 +5068,7 @@ class TimerHubApp {
                 document.querySelectorAll('.icon-option').forEach(option => option.classList.remove('selected'));
                 btn.classList.add('selected');
                 this.applyIconServiceMapping(icon.id);
+                this.applyIconVisualStyle(icon.id);
             });
             picker.appendChild(btn);
         }
@@ -9861,6 +9960,7 @@ class TimerHubApp {
 
         this.closeActivityModal();
         this.renderMain();
+        if (icon) await this.persistIconStyle(icon, color, shape);
         await this.recordCanvasHistoryFromSnapshot('save-activity', historyBefore);
     }
 
@@ -9935,13 +10035,19 @@ class TimerHubApp {
             return text || fallback || '';
         };
         const now = Date.now();
-        // The card does not expose a shape, so a new activity always follows the
-        // user's current default (the first shape in the reordered picker).
-        const shape = this.defaultActivityShape();
+        const inferredIcon = this.activityIconForService(
+            entry.serviceName || entry.service,
+            entry.project,
+            existing?.icon || ''
+        );
+        const iconStyle = this.iconStyleFor(inferredIcon);
+        // The card does not expose a shape. Use the icon's saved style when an
+        // icon was inferred, otherwise the current default from the shape picker.
+        const shape = iconStyle?.shape || this.defaultActivityShape();
         const activity = {
             id: this.generateId(),
             name,
-            color: existing?.color || this.COLORS[0],
+            color: iconStyle?.color || existing?.color || this.COLORS[0],
             shape,
             size: existing?.size || 'medium',
             notes: value(entry.notes, existing?.notes),
@@ -9956,11 +10062,6 @@ class TimerHubApp {
             createdAt: now,
             updatedAt: now
         };
-        const inferredIcon = this.activityIconForService(
-            entry.serviceName || entry.service,
-            entry.project,
-            existing?.icon || ''
-        );
         if (inferredIcon) activity.icon = inferredIcon;
         if (existing?.displayMode) activity.displayMode = existing.displayMode;
         const historyBefore = this.snapshotCanvasState();
