@@ -372,6 +372,11 @@ const extendedTranslations = {
         iconVacuumBasement: 'Basement',
         iconMop: 'Mop',
         iconStyleHint: 'The selected color and shape are saved as the defaults for this icon.',
+        saveServiceStyle: 'Save icon, color and shape for this service',
+        serviceStyleHint: 'These defaults are applied when this service is selected for an activity.',
+        serviceStyleSaved: 'Defaults saved for {service}.',
+        serviceStyleNoService: 'Select a Clockodo service first.',
+        serviceStyleSaveFailed: 'Could not save the defaults for this service.',
         iconSqueegee: 'Window',
         iconDuster: 'Dust',
         iconCar: 'Car',
@@ -805,6 +810,11 @@ const extendedTranslations = {
         iconVacuumBasement: 'Keller',
         iconMop: 'Wischmopp',
         iconStyleHint: 'Die gewählte Farbe und Form werden als Standard für dieses Symbol gespeichert.',
+        saveServiceStyle: 'Symbol, Farbe und Form für diese Leistung speichern',
+        serviceStyleHint: 'Diese Vorgaben werden angewendet, wenn diese Leistung für eine Aktivität ausgewählt wird.',
+        serviceStyleSaved: 'Vorgaben für {service} gespeichert.',
+        serviceStyleNoService: 'Wähle zuerst eine Clockodo-Leistung.',
+        serviceStyleSaveFailed: 'Die Vorgaben für diese Leistung konnten nicht gespeichert werden.',
         iconSqueegee: 'Fenster',
         iconDuster: 'Staub',
         iconCar: 'Auto',
@@ -1238,6 +1248,11 @@ const extendedTranslations = {
         iconVacuumBasement: 'Подвал',
         iconMop: 'Швабра',
         iconStyleHint: 'Выбранные цвет и форма сохраняются как значения по умолчанию для этой иконки.',
+        saveServiceStyle: 'Сохранить иконку, цвет и форму для этой услуги',
+        serviceStyleHint: 'Эти значения применяются при выборе этой услуги для занятия.',
+        serviceStyleSaved: 'Значения по умолчанию для «{service}» сохранены.',
+        serviceStyleNoService: 'Сначала выберите услугу Clockodo.',
+        serviceStyleSaveFailed: 'Не удалось сохранить значения по умолчанию для этой услуги.',
         iconSqueegee: 'Окно',
         iconDuster: 'Пыль',
         iconCar: 'Машина',
@@ -2492,6 +2507,7 @@ class TimerHubApp {
         this.shapeSelectionTouched = false;
         this.shapeDragSuppressClickUntil = 0;
         this.iconStyles = {};
+        this.serviceStyles = [];
 
         // Activity templates: a stable id plus a recognizable illustration on
         // a 24x24 grid. Filled parts use currentColor with even-odd cut-outs;
@@ -3524,6 +3540,7 @@ class TimerHubApp {
         this.confirmDelete = await this.storage.getSetting('confirmDelete', true);
         this.shapeOrder = this.normalizeShapeOrder(await this.storage.getSetting('activityShapeOrder', null));
         this.iconStyles = this.normalizeIconStyles(await this.storage.getSetting('activityIconStyles', null));
+        this.serviceStyles = this.normalizeServiceStyles(await this.storage.getSetting('activityServiceStyles', null));
         this.showActivityAssignments =
             await this.storage.getSetting('showActivityAssignments', false) === true;
         this.notificationInterval =
@@ -4373,6 +4390,7 @@ class TimerHubApp {
             this.populateEntryAssignmentForActivity(e.target.value);
         });
         sel('activityClockodoRetryBtn')?.addEventListener('click', () => this.reloadClockodoReferenceData());
+        sel('activitySaveServiceStyleBtn')?.addEventListener('click', () => this.saveActivityServiceStyle());
         sel('entryEditClockodoRetryBtn')?.addEventListener('click', () => this.reloadClockodoReferenceData());
         sel('groupEditClockodoRetryBtn')?.addEventListener('click', () => this.reloadClockodoReferenceData());
         sel('groupEditCustomerClearBtn')?.addEventListener('click', () => this.clearGroupDefaultCustomer());
@@ -4846,6 +4864,112 @@ class TimerHubApp {
         this.selectActivityShape(style.shape);
         this.shapeSelectionTouched = true;
         return true;
+    }
+
+    normalizeServiceStyles(styles) {
+        const list = Array.isArray(styles) ? styles : [];
+        const icons = new Set([''].concat((Array.isArray(this.ACTIVITY_ICONS) ? this.ACTIVITY_ICONS : []).map(icon => icon.id)));
+        const shapes = new Set((Array.isArray(this.SHAPES) ? this.SHAPES : []).map(shape => shape.id));
+        const result = [];
+        const seen = new Set();
+        for (const item of list) {
+            if (!item || typeof item !== 'object') continue;
+            const serviceId = this.normalizeClockodoId(item.serviceId);
+            const serviceName = String(item.serviceName || '').trim().slice(0, 160);
+            if (!serviceId && !serviceName) continue;
+            const key = serviceId ? `id:${serviceId}` : `name:${serviceName.toLowerCase()}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            result.push({
+                serviceId,
+                serviceName,
+                icon: icons.has(item.icon) ? item.icon : '',
+                color: typeof item.color === 'string' && item.color.trim() ? item.color.trim() : this.COLORS[0],
+                shape: shapes.has(item.shape) ? item.shape : this.defaultActivityShape()
+            });
+        }
+        return result;
+    }
+
+    serviceStyleFor(serviceId, serviceName) {
+        const styles = Array.isArray(this.serviceStyles) ? this.serviceStyles : [];
+        const id = this.normalizeClockodoId(serviceId);
+        if (id) {
+            const match = styles.find(item => item.serviceId === id);
+            if (match) return { ...match };
+        }
+        const name = String(serviceName || '').trim().toLowerCase();
+        if (name) {
+            const match = styles.find(item => String(item.serviceName || '').trim().toLowerCase() === name);
+            if (match) return { ...match };
+        }
+        return null;
+    }
+
+    selectActivityIcon(iconId) {
+        const options = [...document.querySelectorAll('.icon-option')];
+        options.forEach(option => option.classList.remove('selected'));
+        const normalized = String(iconId || '');
+        const match = options.find(option => (option.dataset.icon || '') === normalized)
+            || options.find(option => (option.dataset.icon || '') === '');
+        match?.classList.add('selected');
+        return Boolean(match);
+    }
+
+    applyActivityVisualStyle(style) {
+        if (!style) return false;
+        if (Object.prototype.hasOwnProperty.call(style, 'icon')) this.selectActivityIcon(style.icon);
+        if (style.color) this.selectActivityColor(style.color);
+        if (style.shape) {
+            this.selectActivityShape(style.shape);
+            this.shapeSelectionTouched = true;
+        }
+        return true;
+    }
+
+    applyServiceVisualStyleToActivity() {
+        if (this.editingActivityId === undefined) return false;
+        const assignment = this.readClockodoAssignment('activity');
+        const style = this.serviceStyleFor(assignment.serviceId, assignment.serviceName);
+        if (!style) return false;
+        return this.applyActivityVisualStyle(style);
+    }
+
+    async saveActivityServiceStyle() {
+        const status = document.getElementById('activityServiceStyleStatus');
+        const assignment = this.readClockodoAssignment('activity');
+        const serviceId = this.normalizeClockodoId(assignment.serviceId);
+        const known = serviceId
+            ? (this.clockodoServices || []).find(item => String(item.id) === String(serviceId))
+            : null;
+        const serviceName = String(assignment.serviceName || known?.name || '').trim().slice(0, 160);
+        if (!serviceId && !serviceName) {
+            if (status) status.textContent = this.t('serviceStyleNoService');
+            return false;
+        }
+        const icon = document.querySelector('.icon-option.selected')?.dataset.icon || '';
+        const colorOption = document.querySelector('.color-option.selected');
+        const color = colorOption?.dataset.color
+            || colorOption?.style?.backgroundColor
+            || this.COLORS[0];
+        const shape = document.querySelector('.shape-option.selected')?.dataset.shape
+            || this.defaultActivityShape();
+        const entry = { serviceId, serviceName, icon, color, shape };
+        const filtered = (Array.isArray(this.serviceStyles) ? this.serviceStyles : [])
+            .filter(item => {
+                if (serviceId) return item.serviceId !== serviceId;
+                return String(item.serviceName || '').trim().toLowerCase() !== serviceName.toLowerCase();
+            });
+        this.serviceStyles = this.normalizeServiceStyles([...filtered, entry]);
+        try {
+            await this.storage.setSetting('activityServiceStyles', this.serviceStyles);
+            if (status) status.textContent = this.t('serviceStyleSaved', { service: serviceName || `#${serviceId}` });
+            return true;
+        } catch (error) {
+            this.diagnostics?.warn('settings', 'save-service-style', error, { status: 'failed' });
+            if (status) status.textContent = this.t('serviceStyleSaveFailed');
+            return false;
+        }
     }
 
     async persistIconStyle(iconId, color, shape) {
@@ -9703,6 +9827,8 @@ class TimerHubApp {
         this.clockodoCustomerAutoSelected.delete('activity');
         this.activityServiceManuallySelected = false;
         this.editingActivityId = activityId;
+        const serviceStyleStatus = document.getElementById('activityServiceStyleStatus');
+        if (serviceStyleStatus) serviceStyleStatus.textContent = '';
         const modal = document.getElementById('activityModal');
         const title = document.getElementById('modalTitle');
 
@@ -10035,19 +10161,22 @@ class TimerHubApp {
             return text || fallback || '';
         };
         const now = Date.now();
-        const inferredIcon = this.activityIconForService(
-            entry.serviceName || entry.service,
-            entry.project,
-            existing?.icon || ''
-        );
+        const serviceStyle = this.serviceStyleFor(entry.serviceId, entry.serviceName || entry.service);
+        const inferredIcon = serviceStyle
+            ? serviceStyle.icon
+            : this.activityIconForService(
+                entry.serviceName || entry.service,
+                entry.project,
+                existing?.icon || ''
+            );
         const iconStyle = this.iconStyleFor(inferredIcon);
-        // The card does not expose a shape. Use the icon's saved style when an
-        // icon was inferred, otherwise the current default from the shape picker.
-        const shape = iconStyle?.shape || this.defaultActivityShape();
+        // Service-specific defaults win; otherwise use the icon defaults and the
+        // current default shape from the reordered picker.
+        const shape = serviceStyle?.shape || iconStyle?.shape || this.defaultActivityShape();
         const activity = {
             id: this.generateId(),
             name,
-            color: iconStyle?.color || existing?.color || this.COLORS[0],
+            color: serviceStyle?.color || iconStyle?.color || existing?.color || this.COLORS[0],
             shape,
             size: existing?.size || 'medium',
             notes: value(entry.notes, existing?.notes),
@@ -11066,7 +11195,10 @@ class TimerHubApp {
         const hiddenEl = document.getElementById(hidden);
         const match = this.findClockodoItem(this.clockodoComboboxItems(context, fieldName), inputEl?.value);
         if (hiddenEl) hiddenEl.value = match ? String(match.id) : '';
-        if (context === 'activity' && fieldName === 'service') this.activityServiceManuallySelected = true;
+        if (context === 'activity' && fieldName === 'service') {
+            this.activityServiceManuallySelected = true;
+            this.applyServiceVisualStyleToActivity();
+        }
         if (fieldName === 'customer') {
             this.clockodoCustomerFilters.delete(context);
             this.clockodoCustomerAutoSelected.delete(context);
@@ -11210,7 +11342,10 @@ class TimerHubApp {
         if (hiddenEl) hiddenEl.value = option.unassigned ? '' : option.id;
         if (inputEl) inputEl.value = option.unassigned ? '' : option.label;
         this.closeClockodoCombobox();
-        if (context === 'activity' && fieldName === 'service') this.activityServiceManuallySelected = true;
+        if (context === 'activity' && fieldName === 'service') {
+            this.activityServiceManuallySelected = true;
+            this.applyServiceVisualStyleToActivity();
+        }
         if (fieldName === 'customer') {
             this.clockodoCustomerFilters.delete(context);
             this.clockodoCustomerAutoSelected.delete(context);

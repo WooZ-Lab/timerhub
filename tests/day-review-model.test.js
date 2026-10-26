@@ -210,6 +210,7 @@ function createTestApp(initialData = {}) {
         'groupDeleteActivitiesKeep', 'groupDeleteActivitiesDelete', 'groupDeleteNestedKeep', 'groupDeleteNestedDelete',
         'groupDeleteCancelBtn', 'groupDeleteConfirmBtn', 'groupEditLockedInput', 'undoCanvasBtn', 'redoCanvasBtn', 'iconPicker',
         'activityAssignmentsToggleBtn',
+        'activitySaveServiceStyleBtn', 'activityServiceStyleStatus',
         'backupSetupScreen', 'backupSetupTitle', 'backupSetupStatus', 'backupSetupDirectory',
         'backupSetupData', 'backupSetupError', 'backupSetupCompatibility',
         'backupSetupChooseBtn', 'backupSetupReauthorizeBtn', 'backupSetupRetryBtn',
@@ -13173,4 +13174,76 @@ test('saving an activity with an icon updates that icon’s color and shape defa
         { color: 'rgb(255, 0, 0)', shape: 'square' }
     );
     assert.deepEqual(JSON.parse(JSON.stringify(app.iconStyles.car)), { color: 'rgb(255, 0, 0)', shape: 'square' });
+});
+
+test('service defaults override icon defaults for activities created from Day Review', async () => {
+    const { app } = createTestApp();
+    app.activities = [];
+    app.archivedActivities = [];
+    app.groups = [];
+    app.activityLayouts = new Map();
+    app.canvasViewportSize = { width: 800, height: 600 };
+    app.serviceStyles = app.normalizeServiceStyles([{
+        serviceId: '31', serviceName: 'Anfahrt',
+        icon: 'mop', color: '#123456', shape: 'triangle'
+    }]);
+    const start = new Date(2026, 9, 5, 10, 0).getTime();
+    app.timeEntries = [{
+        id: 'service-style-entry', activityId: '', activityNameSnapshot: '',
+        startTimestamp: start, endTimestamp: start + 60 * 60 * 1000,
+        serviceId: '31', service: 'Anfahrt', serviceName: 'Anfahrt',
+        project: 'Bridge', customerName: 'Acme'
+    }];
+    app.renderMain = () => {};
+    app.showToast = () => {};
+    const created = await app.addActivityFromReviewEntry('service-style-entry');
+    assert.equal(created.icon, 'mop');
+    assert.equal(created.color, '#123456');
+    assert.equal(created.shape, 'triangle');
+    assert.equal(created.name, 'Bridge');
+});
+
+test('the activity editor can save a service-specific icon, color and shape', async () => {
+    const { app, document, storageData } = createTestApp();
+    app.clockodoServices = [{ id: 31, name: 'Anfahrt', active: true }];
+    document.getElementById('activityServiceSelect').value = '31';
+    document.getElementById('activityServiceInput').value = 'Anfahrt';
+    document.querySelector = selector => {
+        if (selector === '.icon-option.selected') return { dataset: { icon: 'mop' } };
+        if (selector === '.color-option.selected') return { dataset: { color: '#654321' }, style: { backgroundColor: 'rgb(101, 67, 33)' } };
+        if (selector === '.shape-option.selected') return { dataset: { shape: 'hexagon' } };
+        return null;
+    };
+    assert.equal(await app.saveActivityServiceStyle(), true);
+    const saved = storageData.settings.activityServiceStyles;
+    assert.deepEqual(JSON.parse(JSON.stringify(saved)), [{
+        serviceId: '31', serviceName: 'Anfahrt',
+        icon: 'mop', color: '#654321', shape: 'hexagon'
+    }]);
+    assert.equal(app.serviceStyleFor('31', '').icon, 'mop');
+});
+
+test('service defaults are applied when the service is chosen in the activity editor', () => {
+    const { app, document } = createTestApp();
+    app.serviceStyles = app.normalizeServiceStyles([{
+        serviceId: '31', serviceName: 'Anfahrt',
+        icon: 'car', color: '#3498DB', shape: 'rounded'
+    }]);
+    document.getElementById('activityServiceSelect').value = '31';
+    document.getElementById('activityServiceInput').value = 'Anfahrt';
+    let iconSelected = null;
+    let colorSelected = null;
+    let shapeSelected = null;
+    const originalQuerySelectorAll = document.querySelectorAll;
+    document.querySelectorAll = selector => {
+        if (selector === '.icon-option') return [{ dataset: { icon: 'car' }, classList: { add: () => { iconSelected = 'car'; }, remove() {} } }];
+        if (selector === '.color-option') return [{ dataset: { color: '#3498DB' }, classList: { add: () => { colorSelected = '#3498DB'; }, remove() {} } }];
+        if (selector === '.shape-option') return [{ dataset: { shape: 'rounded' }, classList: { add: () => { shapeSelected = 'rounded'; }, remove() {}, toggle: () => { shapeSelected = 'rounded'; } } }];
+        return [];
+    };
+    assert.equal(app.applyServiceVisualStyleToActivity(), true);
+    assert.equal(iconSelected, 'car');
+    assert.equal(colorSelected, '#3498DB');
+    assert.equal(shapeSelected, 'rounded');
+    document.querySelectorAll = originalQuerySelectorAll;
 });
