@@ -3171,3 +3171,23 @@ body.backup-locked #reviewScreen,
 body.backup-locked #logScreen,
 body.backup-locked #settingsScreen,
 body.backup-locked .modal { display: none !important; }
+
+.review-entry-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+.review-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+.review-action-btn svg {
+    width: 14px;
+    height: 14px;
+    flex: 0 0 auto;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}

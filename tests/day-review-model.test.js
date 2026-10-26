@@ -12967,3 +12967,87 @@ test('touch long-press reorders shapes and persists the new order', () => {
     assert.ok(app.shapeDragSuppressClickUntil > Date.now());
     context.setTimeout = originalTimeout;
 });
+
+test('a Day Review card can create a canvas activity with its assignment data', async () => {
+    const { app, document } = createTestApp();
+    app.activities = [];
+    app.archivedActivities = [];
+    app.groups = [];
+    app.activityLayouts = new Map();
+    app.canvasPan = { x: 0, y: 0 };
+    app.canvasZoom = 1;
+    app.canvasViewportSize = { width: 800, height: 600 };
+    const start = new Date(2026, 9, 5, 15, 20).getTime();
+    app.timeEntries = [{
+        id: 'review-activity-source', activityId: '', activityNameSnapshot: '',
+        startTimestamp: start, endTimestamp: start + 2 * 60 * 60 * 1000,
+        notes: 'Treppenhaus streichen', customerId: '11', customerName: 'Acme',
+        projectId: '22', project: 'Bridge', serviceId: '33', serviceName: 'Painting'
+    }];
+    app.reviewDate = '2026-10-05';
+    app.renderMain = () => {};
+    app.showToast = () => {};
+    app.renderReview();
+    const html = document.getElementById('reviewEntriesList').innerHTML;
+    assert.match(html, /review-add-activity/);
+    assert.match(html, /Add Activity/);
+
+    const activity = await app.addActivityFromReviewEntry('review-activity-source');
+    assert.ok(activity);
+    assert.equal(activity.name, 'Treppenhaus streichen');
+    assert.equal(activity.customerId, '11');
+    assert.equal(activity.customerName, 'Acme');
+    assert.equal(activity.projectId, '22');
+    assert.equal(activity.projectName, 'Bridge');
+    assert.equal(activity.serviceId, '33');
+    assert.equal(activity.serviceName, 'Painting');
+    assert.equal(app.activityLayouts.has(activity.id), true);
+    assert.equal(app.canvasUndoStack.length, 1);
+    await app.undoCanvas();
+    assert.equal(app.activities.some(item => item.id === activity.id), false);
+    await app.redoCanvas();
+    assert.equal(app.activities.some(item => item.id === activity.id), true);
+});
+
+test('an activity created from Day Review is placed near the center without overlapping canvas content', () => {
+    const { app } = createTestApp();
+    app.activities = [
+        { id: 'center-blocker', name: 'Blocker', position: 0, shape: 'square', size: 'medium', groupId: 'center-group' },
+        { id: 'group-member', name: 'Member', position: 1, shape: 'circle', size: 'medium', groupId: 'center-group' }
+    ];
+    app.groups = [{ id: 'center-group', name: 'Crew', x: 80, y: 80, collapsed: false }];
+    app.activityLayouts = new Map([
+        ['center-blocker', { activityId: 'center-blocker', x: 0, y: 0, width: 260, height: 260 }],
+        ['group-member', { activityId: 'group-member', x: 100, y: 0, width: 160, height: 160 }]
+    ]);
+    app.canvasPan = { x: 0, y: 0 };
+    app.canvasZoom = 1;
+    app.canvasViewportSize = { width: 800, height: 600 };
+    const candidate = {
+        id: 'new-from-review', name: 'New', position: 2, shape: 'rounded', size: 'medium', createdAt: Date.now()
+    };
+    const layout = app.findActivityPlacementLayout(candidate);
+    const overlaps = (a, b) => a.x < b.x + b.width && b.x < a.x + a.width &&
+        a.y < b.y + b.height && b.y < a.y + a.height;
+    const boxes = [
+        ...app.activities.map(activity => {
+            const saved = app.activityLayouts.get(activity.id);
+            const group = app.groups.find(item => item.id === activity.groupId);
+            return {
+                x: group.x + saved.x,
+                y: group.y + saved.y,
+                width: saved.width,
+                height: saved.height
+            };
+        }),
+        (() => {
+            const bounds = app.groupBaseBounds(app.groups[0]);
+            return { x: bounds.left, y: bounds.top, width: bounds.width, height: bounds.height };
+        })()
+    ];
+    for (const box of boxes) {
+        assert.equal(overlaps(layout, box), false, 'new activity must not overlap an existing activity or group');
+    }
+    assert.ok(Math.abs((layout.x + layout.width / 2) - 400) < 200, 'new activity stays near the viewport center');
+    assert.ok(Math.abs((layout.y + layout.height / 2) - 300) < 200, 'new activity stays near the viewport center');
+});

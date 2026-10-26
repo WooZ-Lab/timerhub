@@ -577,6 +577,9 @@ const extendedTranslations = {
         activityCopyName: '{name} (copy)',
         activityDuplicated: 'Activity "{name}" duplicated',
         activityDuplicateFailed: 'Could not duplicate the activity. The original was not changed.',
+        addActivityFromReview: 'Add Activity',
+        activityAddedFromReview: 'Activity "{name}" added to the canvas.',
+        activityAddFromReviewFailed: 'Could not add the activity. Nothing was changed.',
         groupDuplicated: 'Group "{name}" duplicated',
         editGroup: 'Edit group', resizeGroup: 'Resize collapsed group',
         groupSelectedGroups: 'Group selected groups',
@@ -1006,6 +1009,9 @@ const extendedTranslations = {
         activityCopyName: '{name} (Kopie)',
         activityDuplicated: 'Aktivität „{name}“ dupliziert',
         activityDuplicateFailed: 'Die Aktivität konnte nicht dupliziert werden. Das Original wurde nicht verändert.',
+        addActivityFromReview: 'Aktivität hinzufügen',
+        activityAddedFromReview: 'Aktivität „{name}“ zur Fläche hinzugefügt.',
+        activityAddFromReviewFailed: 'Die Aktivität konnte nicht hinzugefügt werden. Es wurde nichts verändert.',
         groupDuplicated: 'Gruppe "{name}" dupliziert',
         editGroup: 'Gruppe bearbeiten', resizeGroup: 'Eingeklappte Gruppe skalieren',
         groupSelectedGroups: 'Ausgewählte Gruppen gruppieren',
@@ -1435,6 +1441,9 @@ const extendedTranslations = {
         activityCopyName: '{name} (копия)',
         activityDuplicated: 'Занятие «{name}» дублировано',
         activityDuplicateFailed: 'Не удалось дублировать занятие. Оригинал не изменён.',
+        addActivityFromReview: 'Добавить занятие',
+        activityAddedFromReview: 'Занятие «{name}» добавлено на холст.',
+        activityAddFromReviewFailed: 'Не удалось добавить занятие. Ничего не изменено.',
         groupDuplicated: 'Группа «{name}» дублирована',
         editGroup: 'Редактировать группу', resizeGroup: 'Изменить размер свёрнутой группы',
         groupSelectedGroups: 'Сгруппировать выбранные группы',
@@ -2366,6 +2375,7 @@ class TimerHubApp {
         this.activityLayouts = new Map();
         this.canvasPan = this.readCanvasPan();
         this.canvasZoom = this.readCanvasZoom();
+        this.canvasViewportSize = null;
         this.canvasPointers = new Map();
         this.canvasPinch = null;
         this.canvasZIndex = 1;
@@ -5166,6 +5176,7 @@ class TimerHubApp {
                 ? this.renderRetryDiagnostic(this.retryDiagnostic)
                 : '';
             const editIcon = `<span class="review-edit-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m4 16.5-.8 4.3 4.3-.8L19 8.5 15.5 5 4 16.5Z"/><path d="m13.5 7 3.5 3.5"/></svg></span>`;
+            const addActivityButton = `<button class="review-action-btn review-add-activity" type="button" data-entry-id="${this.escapeHtml(entry.id)}" aria-label="${this.escapeHtml(`${this.t('addActivityFromReview')}: ${activityLabel}`)}"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>${this.t('addActivityFromReview')}</button>`;
             const locked = entry.syncStatus === SYNC_STATUS.CONFIRMED || entry.syncStatus === SYNC_STATUS.SYNCING;
             return `${gap}<article class="review-entry-card${issues.length ? ' suspicious-entry' : ''}${isConflict ? ' conflict-entry' : ''}${locked ? ' review-entry-locked' : ''}" data-entry-id="${this.escapeHtml(entry.id)}" role="button" tabindex="0" aria-label="${this.escapeHtml(`${this.t('edit')}: ${activityLabel}`)}"${locked ? ' aria-disabled="true"' : ''}>
                 <div class="review-entry-header">
@@ -5173,7 +5184,7 @@ class TimerHubApp {
                 <span class="review-entry-duration">${this.escapeHtml(duration)}</span></div>
                 <div class="review-entry-title"><span class="review-activity-dot" style="background-color:${this.escapeHtml(activity?.color || '#27AE60')}"></span>${this.escapeHtml(activityLabel)}</div>
                 ${assignmentHtml}${notes}${issueText ? `<small>${this.escapeHtml(issueText)}</small>` : ''}${conflictNote}${errorNotice}${unknownNotice}${localOnlyNotice}
-                <div class="review-entry-footer"><span class="sync-badge ${this.escapeHtml(entry.syncStatus)}">${this.escapeHtml(status)}</span><div class="review-entry-actions">${retryButton}${resendUnknownButton}${editIcon}</div></div>${retryDiagnostic}
+                <div class="review-entry-footer"><span class="sync-badge ${this.escapeHtml(entry.syncStatus)}">${this.escapeHtml(status)}</span><div class="review-entry-actions">${retryButton}${resendUnknownButton}${addActivityButton}${editIcon}</div></div>${retryDiagnostic}
             </article>`;
         }).join('');
         list.querySelectorAll('.review-entry-card').forEach(card => {
@@ -5204,6 +5215,10 @@ class TimerHubApp {
                 startTimestamp: Number(button.dataset.gapStart),
                 endTimestamp: Number(button.dataset.gapEnd)
             });
+        }));
+        list.querySelectorAll('.review-add-activity').forEach(button => button.addEventListener('click', event => {
+            event.stopPropagation();
+            this.addActivityFromReviewEntry(button.dataset.entryId).catch(() => {});
         }));
         list.querySelectorAll('.review-retry-entry').forEach(button => button.addEventListener('click', () => this.retryFailedEntry(button.dataset.batchId, button.dataset.entryId)));
         list.querySelectorAll('.review-resend-unknown').forEach(button => button.addEventListener('click', () => this.showUnknownResendConfirmation(button.dataset.entryId)));
@@ -5694,6 +5709,13 @@ class TimerHubApp {
     renderMain() {
         this.updateDataPresenceMarker();
         const grid = document.getElementById('activitiesGrid');
+        const viewport = document.getElementById('activityCanvasViewport');
+        if (viewport && typeof viewport.getBoundingClientRect === 'function') {
+            const rect = viewport.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0) {
+                this.canvasViewportSize = { width: rect.width, height: rect.height };
+            }
+        }
         this.updateTimerStatus();
         if (!grid) return;
         this.updateCanvasGroupAction();
@@ -9840,6 +9862,124 @@ class TimerHubApp {
         this.closeActivityModal();
         this.renderMain();
         await this.recordCanvasHistoryFromSnapshot('save-activity', historyBefore);
+    }
+
+    findActivityPlacementLayout(activity) {
+        const dimensions = this.normalizeActivityGeometryDimensions(activity, undefined, undefined);
+        const viewportSize = this.canvasViewportSize;
+        const center = viewportSize && viewportSize.width > 0 && viewportSize.height > 0
+            ? this.screenToWorld(viewportSize.width / 2, viewportSize.height / 2)
+            : { x: 400, y: 300 };
+        const desired = {
+            x: this.snapToCanvasGrid(center.x - dimensions.width / 2),
+            y: this.snapToCanvasGrid(center.y - dimensions.height / 2),
+            width: dimensions.width,
+            height: dimensions.height
+        };
+        const obstacles = [];
+        this.activities.forEach((item, index) => {
+            if (item.id === activity.id) return;
+            const layout = this.getActivityCanvasLayout(item, index, true);
+            obstacles.push({ x: layout.x, y: layout.y, width: layout.width, height: layout.height });
+        });
+        for (const group of this.groups) {
+            let bounds = this.groupDisplayBounds?.get(group.id);
+            if (!bounds) {
+                const base = group.collapsed ? this.groupCollapsedBounds(group) : this.groupBaseBounds(group);
+                if (!base) continue;
+                const offset = this.groupDisplayOffset(group.id);
+                bounds = {
+                    left: base.left + offset.x,
+                    top: base.top + offset.y,
+                    width: base.width,
+                    height: base.height
+                };
+            }
+            obstacles.push({
+                x: bounds.left,
+                y: bounds.top,
+                width: bounds.width,
+                height: bounds.height
+            });
+        }
+        const free = this.findNearestFreePosition(desired, obstacles, CANVAS_GRID_SIZE);
+        return {
+            activityId: activity.id,
+            x: this.snapToCanvasGrid(free.x),
+            y: this.snapToCanvasGrid(free.y),
+            width: dimensions.width,
+            height: dimensions.height
+        };
+    }
+
+    async addActivityFromReviewEntry(entryId) {
+        const entry = this.timeEntries.find(item => String(item.id) === String(entryId));
+        if (!entry) return null;
+        const existing = this.activities.find(item => item.id === entry.activityId)
+            || this.archivedActivities?.find(item => item.id === entry.activityId)
+            || null;
+        let name = [
+            entry.activityNameSnapshot,
+            existing?.name,
+            String(entry.notes || '').split(/\r?\n/)[0],
+            entry.project,
+            entry.service,
+            entry.customerName
+        ].map(value => String(value || '').trim()).find(Boolean);
+        if (!name) name = `${this.t('activity')} ${this.formatTime(entry.startTimestamp)}`;
+        name = name.slice(0, 120);
+        if (this.activities.some(item => item.name === name)) {
+            name = this.t('activityCopyName', { name }).slice(0, 120);
+        }
+        const value = (primary, fallback) => {
+            const text = primary === null || primary === undefined ? '' : String(primary).trim();
+            return text || fallback || '';
+        };
+        const now = Date.now();
+        const shapeIds = new Set((this.SHAPES || []).map(shape => shape.id));
+        const shape = shapeIds.has(existing?.shape) ? existing.shape : this.defaultActivityShape();
+        const activity = {
+            id: this.generateId(),
+            name,
+            color: existing?.color || this.COLORS[0],
+            shape,
+            size: existing?.size || 'medium',
+            notes: value(entry.notes, existing?.notes),
+            customerId: value(entry.customerId, existing?.customerId),
+            customerName: value(entry.customerName, existing?.customerName),
+            projectId: value(entry.projectId, existing?.projectId),
+            projectName: value(entry.project, existing?.projectName || existing?.project),
+            serviceId: value(entry.serviceId, existing?.serviceId),
+            serviceName: value(entry.serviceName, existing?.serviceName),
+            position: Math.max(0, ...this.activities.map(item => Number(item.position) || 0)) + 1,
+            archived: false,
+            createdAt: now,
+            updatedAt: now
+        };
+        if (existing?.icon) activity.icon = existing.icon;
+        if (existing?.displayMode) activity.displayMode = existing.displayMode;
+        const historyBefore = this.snapshotCanvasState();
+        const layout = this.findActivityPlacementLayout(activity);
+        this.activities.push(activity);
+        this.activityLayouts.set(activity.id, layout);
+        try {
+            await this.storage.saveActivity(activity);
+            await this.storage.saveLayout(layout);
+        } catch (error) {
+            this.activities = this.activities.filter(item => item.id !== activity.id);
+            this.activityLayouts.delete(activity.id);
+            try {
+                await this.storage.deleteActivity?.(activity.id);
+                await this.storage.deleteLayout?.(activity.id);
+            } catch { /* best-effort cleanup */ }
+            this.diagnostics?.error('canvas', 'add-activity-from-review', error, { status: 'rolled_back' });
+            this.showToast(this.t('activityAddFromReviewFailed'));
+            return null;
+        }
+        await this.recordCanvasHistoryFromSnapshot('add-activity-from-review', historyBefore);
+        this.renderMain();
+        this.showToast(this.t('activityAddedFromReview', { name }));
+        return activity;
     }
 
     showActivityMenu(activityId) {
