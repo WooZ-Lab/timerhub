@@ -2475,6 +2475,9 @@ class TimerHubApp {
             { id: 'heart', key: 'shapeHeart', svg: 'M 0 10 C -30 -20 -50 -10 -50 -20 C -50 -40 -30 -50 -15 -50 C 0 -60 15 -50 15 -50 C 30 -50 50 -40 50 -20 C 50 -10 30 -20 0 10' },
             { id: 'oval', key: 'shapeOval', svg: 'M -50 0 A 50 30 0 0 1 50 0 A 50 30 0 0 1 -50 0' }
         ];
+        this.shapeOrder = this.SHAPES.map(shape => shape.id);
+        this.shapeSelectionTouched = false;
+        this.shapeDragSuppressClickUntil = 0;
 
         // Activity templates: a stable id plus a recognizable illustration on
         // a 24x24 grid. Filled parts use currentColor with even-odd cut-outs;
@@ -3505,6 +3508,7 @@ class TimerHubApp {
         const firstDay = Number(await this.storage.getSetting('firstDayOfWeek', 1));
         this.firstDayOfWeek = [0, 1].includes(firstDay) ? firstDay : 1;
         this.confirmDelete = await this.storage.getSetting('confirmDelete', true);
+        this.shapeOrder = this.normalizeShapeOrder(await this.storage.getSetting('activityShapeOrder', null));
         this.showActivityAssignments =
             await this.storage.getSetting('showActivityAssignments', false) === true;
         this.notificationInterval =
@@ -4722,10 +4726,132 @@ class TimerHubApp {
         return contrastWithBlack >= contrastWithWhite ? '#000000' : '#ffffff';
     }
 
+    normalizeShapeOrder(order) {
+        const shapes = Array.isArray(this.SHAPES) ? this.SHAPES : [];
+        const known = new Map(shapes.map(shape => [shape.id, shape]));
+        const result = [];
+        if (Array.isArray(order)) {
+            for (const id of order) {
+                if (known.has(id) && !result.includes(id)) result.push(id);
+            }
+        }
+        for (const shape of shapes) {
+            if (!result.includes(shape.id)) result.push(shape.id);
+        }
+        return result;
+    }
+
+    orderedActivityShapes() {
+        const byId = new Map((Array.isArray(this.SHAPES) ? this.SHAPES : []).map(shape => [shape.id, shape]));
+        return this.normalizeShapeOrder(this.shapeOrder)
+            .map(id => byId.get(id))
+            .filter(Boolean);
+    }
+
+    defaultActivityShape() {
+        return this.normalizeShapeOrder(this.shapeOrder)[0] || 'circle';
+    }
+
+    selectActivityShape(shapeId) {
+        document.querySelectorAll('.shape-option').forEach(option => {
+            option.classList.toggle('selected', option.dataset.shape === shapeId);
+        });
+    }
+
+    async persistShapeOrder() {
+        const picker = document.getElementById('shapePicker');
+        if (!picker?.querySelectorAll) return;
+        const ids = [...picker.querySelectorAll('.shape-option')].map(option => option.dataset.shape);
+        this.shapeOrder = this.normalizeShapeOrder(ids);
+        if (this.editingActivityId === null && !this.shapeSelectionTouched) {
+            this.selectActivityShape(this.defaultActivityShape());
+        }
+        try {
+            await this.storage.setSetting('activityShapeOrder', this.shapeOrder);
+        } catch (error) {
+            this.diagnostics?.warn('settings', 'save-shape-order', error, { status: 'failed' });
+        }
+    }
+
+    bindShapeReorder(button, picker) {
+        let pressTimer = null;
+        let pointerId = null;
+        let startX = 0;
+        let startY = 0;
+        let active = false;
+        let dragging = false;
+
+        const clearTimer = () => {
+            if (pressTimer) clearTimeout(pressTimer);
+            pressTimer = null;
+        };
+        const beginDrag = () => {
+            dragging = true;
+            button.classList.add('dragging');
+            picker.classList.add('shape-reordering');
+            try { button.setPointerCapture?.(pointerId); } catch { /* ignore */ }
+        };
+        const finish = event => {
+            if (!active || event.pointerId !== pointerId) return;
+            const wasDragging = dragging;
+            active = false;
+            dragging = false;
+            pointerId = null;
+            clearTimer();
+            button.classList.remove('dragging');
+            picker.classList.remove('shape-reordering');
+            if (wasDragging) {
+                this.shapeDragSuppressClickUntil = Date.now() + 400;
+                this.persistShapeOrder();
+            }
+        };
+
+        button.addEventListener('pointerdown', event => {
+            if (event.button !== undefined && event.button !== 0) return;
+            pointerId = event.pointerId;
+            startX = event.clientX;
+            startY = event.clientY;
+            active = true;
+            dragging = false;
+            if (event.pointerType === 'touch') {
+                pressTimer = setTimeout(() => {
+                    if (!active || dragging) return;
+                    beginDrag();
+                }, 300);
+            }
+        });
+        button.addEventListener('pointermove', event => {
+            if (!active || event.pointerId !== pointerId) return;
+            const distance = Math.hypot(event.clientX - startX, event.clientY - startY);
+            if (!dragging) {
+                if (distance < 8) return;
+                if (event.pointerType === 'touch') {
+                    // The user is scrolling the picker, not reordering it.
+                    active = false;
+                    clearTimer();
+                    return;
+                }
+                beginDrag();
+            }
+            event.preventDefault();
+            const target = document.elementFromPoint?.(event.clientX, event.clientY)?.closest?.('.shape-option');
+            if (!target || target === button || !picker.contains?.(target)) return;
+            const rect = target.getBoundingClientRect();
+            const insertBefore = event.clientX < rect.left + rect.width / 2;
+            picker.insertBefore(button, insertBefore ? target : target.nextSibling);
+        });
+        button.addEventListener('pointerup', finish);
+        button.addEventListener('pointercancel', finish);
+        button.addEventListener('contextmenu', event => event.preventDefault());
+    }
+
     populateShapePicker() {
         const picker = document.getElementById('shapePicker');
-        this.SHAPES.forEach(shape => {
+        if (!picker) return;
+        picker.replaceChildren?.();
+        this.orderedActivityShapes().forEach(shape => {
             const btn = document.createElement('button');
+            btn.type = 'button';
             btn.className = 'shape-option';
             const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
             icon.setAttribute('viewBox', '-60 -60 120 120');
@@ -4739,10 +4865,15 @@ class TimerHubApp {
             btn.dataset.i18nAriaLabel = shape.key;
             btn.setAttribute('aria-label', this.t(shape.key));
             btn.title = this.t(shape.key);
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.shape-option').forEach(b => b.classList.remove('selected'));
-                btn.classList.add('selected');
+            btn.addEventListener('click', event => {
+                if (Date.now() < (this.shapeDragSuppressClickUntil || 0)) {
+                    event.preventDefault();
+                    return;
+                }
+                this.shapeSelectionTouched = true;
+                this.selectActivityShape(shape.id);
             });
+            this.bindShapeReorder(btn, picker);
             picker.appendChild(btn);
         });
     }
@@ -9422,6 +9553,7 @@ class TimerHubApp {
         if (activityId) {
             const activity = this.activities.find(a => a.id === activityId);
             if (!activity) return;
+            this.shapeSelectionTouched = false;
             title.textContent = this.t('editActivity');
             document.getElementById('activityName').value = activity.name;
             document.getElementById('activityNotes').value = activity.notes || '';
@@ -9482,8 +9614,8 @@ class TimerHubApp {
             }
             const customInput = document.getElementById('customColorInput');
             if (customInput) customInput.value = '#4A90E2';
-            document.querySelectorAll('.shape-option').forEach(opt => opt.classList.remove('selected'));
-            document.querySelectorAll('.shape-option')[0]?.classList.add('selected');
+            this.shapeSelectionTouched = false;
+            this.selectActivityShape(this.defaultActivityShape());
             document.querySelectorAll('.icon-option').forEach(opt => opt.classList.remove('selected'));
             document.querySelector('.icon-option[data-icon=""]')?.classList.add('selected');
             document.querySelectorAll('.display-mode-btn').forEach(opt => opt.classList.remove('selected'));
@@ -9577,7 +9709,7 @@ class TimerHubApp {
         const selectedDisplayMode = document.querySelector('.display-mode-btn.selected');
 
         const color = selectedColor ? selectedColor.style.backgroundColor : this.COLORS[0];
-        const shape = selectedShape ? selectedShape.dataset.shape : 'circle';
+        const shape = selectedShape ? selectedShape.dataset.shape : this.defaultActivityShape();
         const icon = selectedIcon && selectedIcon.dataset.icon ? selectedIcon.dataset.icon : '';
         // Normalize the default mode away: an absent property means icon + text.
         const displayMode = selectedDisplayMode?.dataset.displayMode === 'icon-only' ? 'icon-only' : '';

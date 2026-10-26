@@ -765,6 +765,19 @@ button:focus-visible,
     background-color: var(--bg-tertiary);
 }
 
+.shape-option.dragging {
+    opacity: .62;
+    transform: scale(1.06);
+    cursor: grabbing;
+    border-color: var(--brand);
+}
+
+.shape-picker.shape-reordering {
+    user-select: none;
+    -webkit-user-select: none;
+    cursor: grabbing;
+}
+
 .icon-picker {
     display: flex;
     flex-wrap: nowrap;

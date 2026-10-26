@@ -12881,3 +12881,39 @@ test('creating a group from a canvas selection is undoable and redoable', async 
     assert.equal(app.groups[0].id, group.id);
     assert.equal(app.activities[0].groupId, group.id);
 });
+
+test('the first shape in the reordered picker becomes the default for a new activity', async () => {
+    const { app, document, storageData } = createTestApp();
+    app.applyTranslations();
+    app.activities = [];
+    app.archivedActivities = [];
+    app.editingActivityId = null;
+    app.shapeOrder = app.normalizeShapeOrder(['triangle', 'square', 'circle']);
+    app.renderMain = () => {};
+    app.showToast = () => {};
+    document.getElementById('activityName').value = 'Triangle by default';
+    await app.saveActivity();
+    const activity = storageData.activities.find(item => item.name === 'Triangle by default');
+    assert.ok(activity);
+    assert.equal(activity.shape, 'triangle');
+    assert.equal(app.defaultActivityShape(), 'triangle');
+});
+
+test('shape order accepts only known shapes and persists the reordered list', async () => {
+    const { app, document, storageData } = createTestApp();
+    assert.deepEqual(Array.from(app.normalizeShapeOrder(['triangle', 'triangle', 'unknown'])).slice(0, 3), ['triangle', 'circle', 'square']);
+    const picker = {
+        querySelectorAll: () => [
+            { dataset: { shape: 'square' } },
+            { dataset: { shape: 'triangle' } },
+            { dataset: { shape: 'circle' } }
+        ]
+    };
+    const originalGetById = document.getElementById;
+    document.getElementById = id => id === 'shapePicker' ? picker : originalGetById(id);
+    app.editingActivityId = null;
+    app.shapeSelectionTouched = false;
+    await app.persistShapeOrder();
+    assert.deepEqual(Array.from(app.shapeOrder).slice(0, 3), ['square', 'triangle', 'circle']);
+    assert.deepEqual(Array.from(storageData.settings.activityShapeOrder).slice(0, 3), ['square', 'triangle', 'circle']);
+});
