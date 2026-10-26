@@ -5326,6 +5326,8 @@ class TimerHubApp {
         if (!dateInput || !summary || !list || !banner) return;
 
         dateInput.value = this.reviewDate;
+        const weekday = document.getElementById('reviewWeekday');
+        if (weekday) weekday.textContent = this.formatReviewWeekday(this.reviewDate);
         const entries = this.getDayEntries(this.reviewDate);
         const total = this.calculateDayTotal(this.reviewDate);
         const syncedCount = entries.filter(entry => entry.syncStatus === SYNC_STATUS.SYNCED).length;
@@ -13981,6 +13983,14 @@ class TimerHubApp {
         const minutes = Math.floor((seconds % 3600) / 60);
         const secs = seconds % 60;
         return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    formatReviewWeekday(dateString) {
+        const locale = { en: 'en-US', de: 'de-DE', ru: 'ru-RU' }[this.currentLanguage] || 'en-US';
+        const date = new Date(`${dateString}T12:00:00`);
+        if (Number.isNaN(date.getTime())) return '';
+        const value = new Intl.DateTimeFormat(locale, { weekday: 'long' }).format(date);
+        return value.charAt(0).toLocaleUpperCase(locale) + value.slice(1);
     }
 
     formatTime(timestamp) {

@@ -99,7 +99,10 @@
         <div id="reviewScreen" class="screen">
             <div class="review-date-bar">
                 <button id="reviewPrevDayBtn" class="date-nav-btn" aria-label="Previous day" data-i18n-aria-label="previousDay">‹</button>
-                <input type="date" id="reviewDateInput" class="review-date-input" aria-label="Review date" data-i18n-aria-label="reviewDate">
+                <div class="review-date-field">
+                    <input type="date" id="reviewDateInput" class="review-date-input" aria-label="Review date" data-i18n-aria-label="reviewDate">
+                    <span id="reviewWeekday" class="review-weekday"></span>
+                </div>
                 <button id="reviewNextDayBtn" class="date-nav-btn" aria-label="Next day" data-i18n-aria-label="nextDay">›</button>
                 <button id="reviewTodayBtn" class="action-btn small-btn" data-i18n="today">Today</button>
             </div>

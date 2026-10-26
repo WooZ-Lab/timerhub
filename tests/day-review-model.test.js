@@ -164,7 +164,7 @@ function createTestApp(initialData = {}) {
 
     const elements = new Map();
     for (const id of [
-        'reviewDateInput', 'reviewSummaryBar', 'reviewEntriesList', 'reviewSuspiciousBanner',
+        'reviewDateInput', 'reviewWeekday', 'reviewSummaryBar', 'reviewEntriesList', 'reviewSuspiciousBanner',
         'activitiesGrid', 'timerRunningStatus', 'logActivityFilter', 'logDateFilter',
         'entryEditDate', 'entryEditEndDate', 'entryEditStart', 'entryEditEnd', 'entryEditActivity',
         'entryEditProject', 'entryEditService', 'entryEditNotes', 'entryEditModalTitle',
@@ -13396,4 +13396,16 @@ test('a large activity that cannot fit in a group stays where it was dropped', a
     assert.ok(stored.height >= 520, 'the large size is preserved');
     assert.ok(Math.abs(stored.x - 176) <= 16 && Math.abs(stored.y - 192) <= 16,
         'the activity stays at the released position instead of a distant fallback slot');
+});
+
+test('Day Review shows the localized weekday together with the date', () => {
+    const { app, document } = createTestApp();
+    const expected = { en: 'Monday', de: 'Montag', ru: 'Понедельник' };
+    for (const [language, weekday] of Object.entries(expected)) {
+        app.currentLanguage = language;
+        app.reviewDate = '2024-01-01';
+        app.renderReview();
+        assert.equal(document.getElementById('reviewWeekday').textContent, weekday);
+        assert.equal(document.getElementById('reviewDateInput').value, '2024-01-01');
+    }
 });
