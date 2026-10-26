@@ -4776,6 +4776,7 @@ class TimerHubApp {
     bindShapeReorder(button, picker) {
         let pressTimer = null;
         let pointerId = null;
+        let touchId = null;
         let startX = 0;
         let startY = 0;
         let active = false;
@@ -4789,14 +4790,23 @@ class TimerHubApp {
             dragging = true;
             button.classList.add('dragging');
             picker.classList.add('shape-reordering');
-            try { button.setPointerCapture?.(pointerId); } catch { /* ignore */ }
+            if (pointerId !== null && pointerId !== 'touch') {
+                try { button.setPointerCapture?.(pointerId); } catch { /* ignore */ }
+            }
         };
-        const finish = event => {
-            if (!active || event.pointerId !== pointerId) return;
+        const reorderAt = (x, y) => {
+            const target = document.elementFromPoint?.(x, y)?.closest?.('.shape-option');
+            if (!target || target === button || !picker.contains?.(target)) return;
+            const rect = target.getBoundingClientRect();
+            const insertBefore = x < rect.left + rect.width / 2;
+            picker.insertBefore(button, insertBefore ? target : target.nextSibling);
+        };
+        const finish = () => {
             const wasDragging = dragging;
             active = false;
             dragging = false;
             pointerId = null;
+            touchId = null;
             clearTimer();
             button.classList.remove('dragging');
             picker.classList.remove('shape-reordering');
@@ -4806,42 +4816,67 @@ class TimerHubApp {
             }
         };
 
+        // Mouse and pen use pointer events. Touch uses touch events with a
+        // non-passive move listener so the long-press drag can cancel native
+        // scrolling after it begins.
         button.addEventListener('pointerdown', event => {
+            if (event.pointerType === 'touch') return;
             if (event.button !== undefined && event.button !== 0) return;
             pointerId = event.pointerId;
             startX = event.clientX;
             startY = event.clientY;
             active = true;
             dragging = false;
-            if (event.pointerType === 'touch') {
-                pressTimer = setTimeout(() => {
-                    if (!active || dragging) return;
-                    beginDrag();
-                }, 300);
-            }
         });
         button.addEventListener('pointermove', event => {
-            if (!active || event.pointerId !== pointerId) return;
+            if (!active || pointerId === 'touch' || event.pointerId !== pointerId) return;
             const distance = Math.hypot(event.clientX - startX, event.clientY - startY);
             if (!dragging) {
                 if (distance < 8) return;
-                if (event.pointerType === 'touch') {
-                    // The user is scrolling the picker, not reordering it.
-                    active = false;
-                    clearTimer();
-                    return;
-                }
                 beginDrag();
             }
             event.preventDefault();
-            const target = document.elementFromPoint?.(event.clientX, event.clientY)?.closest?.('.shape-option');
-            if (!target || target === button || !picker.contains?.(target)) return;
-            const rect = target.getBoundingClientRect();
-            const insertBefore = event.clientX < rect.left + rect.width / 2;
-            picker.insertBefore(button, insertBefore ? target : target.nextSibling);
+            reorderAt(event.clientX, event.clientY);
         });
-        button.addEventListener('pointerup', finish);
-        button.addEventListener('pointercancel', finish);
+        button.addEventListener('pointerup', event => {
+            if (!active || pointerId === 'touch' || event.pointerId !== pointerId) return;
+            finish();
+        });
+        button.addEventListener('pointercancel', () => {
+            if (!active || pointerId === 'touch') return;
+            finish();
+        });
+
+        button.addEventListener('touchstart', event => {
+            if (event.touches?.length !== 1) return;
+            const touch = event.touches[0];
+            touchId = touch.identifier;
+            startX = touch.clientX;
+            startY = touch.clientY;
+            active = true;
+            dragging = false;
+            pressTimer = setTimeout(() => {
+                if (!active || dragging) return;
+                beginDrag();
+            }, 300);
+        }, { passive: true });
+        button.addEventListener('touchmove', event => {
+            if (!active || touchId === null) return;
+            const touch = Array.from(event.touches || []).find(item => item.identifier === touchId);
+            if (!touch) return;
+            const distance = Math.hypot(touch.clientX - startX, touch.clientY - startY);
+            if (!dragging) {
+                if (distance < 8) return;
+                // The user is scrolling the picker, not reordering it.
+                active = false;
+                clearTimer();
+                return;
+            }
+            event.preventDefault();
+            reorderAt(touch.clientX, touch.clientY);
+        }, { passive: false });
+        button.addEventListener('touchend', finish, { passive: true });
+        button.addEventListener('touchcancel', finish, { passive: true });
         button.addEventListener('contextmenu', event => event.preventDefault());
     }
 

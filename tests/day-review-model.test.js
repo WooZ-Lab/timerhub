@@ -12917,3 +12917,53 @@ test('shape order accepts only known shapes and persists the reordered list', as
     assert.deepEqual(Array.from(app.shapeOrder).slice(0, 3), ['square', 'triangle', 'circle']);
     assert.deepEqual(Array.from(storageData.settings.activityShapeOrder).slice(0, 3), ['square', 'triangle', 'circle']);
 });
+
+test('touch long-press reorders shapes and persists the new order', () => {
+    const { app, context } = createTestApp();
+    const handlers = new Map();
+    const classes = new Set();
+    const button = {
+        dataset: { shape: 'circle' },
+        classList: {
+            add: name => classes.add(name),
+            remove: name => classes.delete(name),
+            contains: name => classes.has(name)
+        },
+        setPointerCapture() {},
+        addEventListener(type, handler) { handlers.set(type, handler); }
+    };
+    const target = {
+        dataset: { shape: 'square' },
+        classList: { contains: () => false },
+        getBoundingClientRect: () => ({ left: 0, width: 40 }),
+        nextSibling: null,
+        closest: () => target
+    };
+    const pickerClasses = new Set();
+    const picker = {
+        classList: { add: name => pickerClasses.add(name), remove: name => pickerClasses.delete(name) },
+        contains: () => true,
+        insertBefore: () => { picker.inserted = (picker.inserted || 0) + 1; }
+    };
+    let persisted = 0;
+    let prevented = 0;
+    app.persistShapeOrder = () => { persisted += 1; };
+    context.document.elementFromPoint = () => target;
+    const originalTimeout = context.setTimeout;
+    context.setTimeout = handler => { handler(); return 1; };
+    app.bindShapeReorder(button, picker);
+
+    handlers.get('touchstart')({ touches: [{ identifier: 7, clientX: 5, clientY: 5 }] });
+    assert.equal(classes.has('dragging'), true, 'long press starts the drag');
+    handlers.get('touchmove')({
+        touches: [{ identifier: 7, clientX: 25, clientY: 5 }],
+        preventDefault: () => { prevented += 1; }
+    });
+    assert.equal(picker.inserted, 1);
+    assert.equal(prevented, 1, 'dragging prevents the native scroll');
+    handlers.get('touchend')({});
+    assert.equal(classes.has('dragging'), false);
+    assert.equal(persisted, 1);
+    assert.ok(app.shapeDragSuppressClickUntil > Date.now());
+    context.setTimeout = originalTimeout;
+});
