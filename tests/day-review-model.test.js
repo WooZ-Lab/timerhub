@@ -13116,3 +13116,31 @@ test('a Day Review activity name falls back to remaining data only when project 
     const created = await app.addActivityFromReviewEntry('name-fallback-entry');
     assert.equal(created.name, 'Treppenhaus');
 });
+
+test('Day Review activities get an icon from the service name', async () => {
+    const { app } = createTestApp();
+    assert.equal(app.activityIconForService('Anfahrt'), 'car');
+    assert.equal(app.activityIconForService('  ANFAHRT  '), 'car');
+    assert.equal(app.activityIconForService('Treppenhaus/Keller Reinigung'), 'mop');
+    assert.equal(app.activityIconForService('Keller Reinigung'), 'mop');
+    assert.equal(app.activityIconForService('Fensterreinigung'), 'squeegee');
+    assert.equal(app.activityIconForService('Painting', '', 'duster'), 'duster');
+
+    app.activities = [];
+    app.archivedActivities = [];
+    app.groups = [];
+    app.activityLayouts = new Map();
+    app.canvasViewportSize = { width: 800, height: 600 };
+    const start = new Date(2026, 9, 5, 7, 0).getTime();
+    app.timeEntries = [{
+        id: 'anfahrt-entry', activityId: '', activityNameSnapshot: '',
+        startTimestamp: start, endTimestamp: start + 30 * 60 * 1000,
+        serviceId: '31', service: 'Anfahrt', serviceName: 'Anfahrt',
+        project: 'Bridge', customerName: 'Acme'
+    }];
+    app.renderMain = () => {};
+    app.showToast = () => {};
+    const created = await app.addActivityFromReviewEntry('anfahrt-entry');
+    assert.equal(created.icon, 'car');
+    assert.equal(created.name, 'Bridge');
+});

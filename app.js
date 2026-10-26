@@ -9956,7 +9956,12 @@ class TimerHubApp {
             createdAt: now,
             updatedAt: now
         };
-        if (existing?.icon) activity.icon = existing.icon;
+        const inferredIcon = this.activityIconForService(
+            entry.serviceName || entry.service,
+            entry.project,
+            existing?.icon || ''
+        );
+        if (inferredIcon) activity.icon = inferredIcon;
         if (existing?.displayMode) activity.displayMode = existing.displayMode;
         const historyBefore = this.snapshotCanvasState();
         const layout = this.findActivityPlacementLayout(activity);
@@ -10689,6 +10694,18 @@ class TimerHubApp {
             squeegee: 'Fensterreinigung',
             mop: 'Treppenhaus/Keller Reinigung'
         }[iconId] || '';
+    }
+
+    activityIconForService(serviceName = '', projectName = '', fallback = '') {
+        const text = `${serviceName || ''} ${projectName || ''}`
+            .trim()
+            .toLowerCase()
+            .replace(/\s+/g, ' ');
+        if (text.includes('anfahrt')) return 'car';
+        if (text.includes('fenster')) return 'squeegee';
+        if (text.includes('treppenhaus') || text.includes('keller') || text.includes('reinigung')) return 'mop';
+        if (text.includes('staub') || text.includes('dust')) return 'duster';
+        return fallback || '';
     }
 
     findClockodoServiceByName(serviceName) {
