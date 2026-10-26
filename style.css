@@ -2762,6 +2762,68 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     overscroll-behavior: none;
 }
 
+#activityCanvasViewport .canvas-trash-zone {
+    position: absolute;
+    z-index: 1000000;
+    left: 50%;
+    bottom: max(18px, calc(env(safe-area-inset-bottom, 0px) + 12px));
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    max-width: calc(100% - 24px);
+    padding: 10px 17px;
+    border: 2px dashed color-mix(in srgb, var(--danger-color) 58%, var(--border-color));
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--danger-color) 12%, var(--bg-secondary));
+    color: var(--danger-color);
+    box-shadow: var(--shadow-card);
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.2;
+    text-align: center;
+    pointer-events: none;
+    user-select: none;
+    opacity: 0;
+    transform: translate(-50%, 10px) scale(.96);
+    transition: opacity .14s ease, transform .14s ease, background-color .14s ease;
+}
+
+#activityCanvasViewport .canvas-trash-zone[hidden] {
+    display: none !important;
+}
+
+#activityCanvasViewport .canvas-trash-zone.is-visible {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+}
+
+#activityCanvasViewport .canvas-trash-zone.drop-active {
+    border-style: solid;
+    border-color: var(--danger-color);
+    background: var(--danger-color);
+    color: #fff;
+    transform: translate(-50%, 0) scale(1.05);
+}
+
+.canvas-trash-zone-icon {
+    width: 21px;
+    height: 21px;
+    flex: 0 0 auto;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.9;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+@media (max-width: 600px) {
+    #activityCanvasViewport .canvas-trash-zone {
+        bottom: max(12px, calc(env(safe-area-inset-bottom, 0px) + 8px));
+        padding: 9px 14px;
+        font-size: 12px;
+    }
+}
+
 #activitiesGrid {
     width: 20000px;
     height: 20000px;
@@ -2963,6 +3025,58 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 /* Triangle */
 #activitiesGrid .activity-btn.activity-shape-triangle {
     clip-path: polygon(50% 0, 100% 100%, 0 100%);
+    /* Use the largest axis-aligned rectangle that fits inside a triangle:
+       its lower half is the only area wide enough for text. */
+    padding:
+        calc(var(--activity-height, 160px) * 0.52)
+        26%
+        calc(var(--activity-height, 160px) * 0.02);
+    justify-content: center;
+    gap: 1px;
+}
+
+#activitiesGrid .activity-btn.activity-shape-triangle .btn-name {
+    font-size: clamp(12px, 5.5cqmin, 30px) !important;
+    line-height: 1.06;
+}
+
+#activitiesGrid .activity-btn.activity-shape-triangle .btn-duration {
+    font-size: clamp(14px, 8cqmin, 36px) !important;
+    line-height: 1;
+}
+
+/* The triangle has no space for secondary labels; the duration already
+   communicates the running state. */
+#activitiesGrid .activity-btn.activity-shape-triangle .btn-state,
+#activitiesGrid .activity-btn.activity-shape-triangle .btn-hint,
+#activitiesGrid .activity-btn.activity-shape-triangle .btn-time {
+    display: none !important;
+}
+
+/* When a named activity is running, keep the text and duration and drop the
+   icon so the remaining content still fits in the safe area. */
+#activitiesGrid .activity-btn.activity-shape-triangle.active.has-icon:not(.is-icon-only) .activity-icon {
+    display: none !important;
+}
+
+#activitiesGrid .activity-btn.activity-node.activity-shape-triangle .activity-icon {
+    width: clamp(16px, 13cqmin, 34px);
+    height: clamp(16px, 13cqmin, 34px);
+}
+
+#activitiesGrid .activity-btn.activity-node.activity-shape-triangle.is-icon-only {
+    justify-content: center;
+}
+
+#activitiesGrid .activity-btn.activity-node.activity-shape-triangle.is-icon-only .activity-icon {
+    width: clamp(22px, 30cqmin, 64px);
+    height: clamp(22px, 30cqmin, 64px);
+}
+
+#activitiesGrid .activity-btn.activity-shape-triangle .btn-note-mark {
+    top: auto;
+    bottom: 7%;
+    left: 8%;
 }
 
 /* Hexagon */

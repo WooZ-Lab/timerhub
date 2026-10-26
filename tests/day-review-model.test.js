@@ -210,6 +210,7 @@ function createTestApp(initialData = {}) {
         'groupDeleteActivitiesKeep', 'groupDeleteActivitiesDelete', 'groupDeleteNestedKeep', 'groupDeleteNestedDelete',
         'groupDeleteCancelBtn', 'groupDeleteConfirmBtn', 'groupEditLockedInput', 'undoCanvasBtn', 'redoCanvasBtn', 'iconPicker',
         'activityAssignmentsToggleBtn',
+        'canvasTrashZone', 'canvasTrashLabel',
         'activitySaveServiceStyleBtn', 'activityServiceStyleStatus',
         'backupSetupScreen', 'backupSetupTitle', 'backupSetupStatus', 'backupSetupDirectory',
         'backupSetupData', 'backupSetupError', 'backupSetupCompatibility',
@@ -13246,4 +13247,88 @@ test('service defaults are applied when the service is chosen in the activity ed
     assert.equal(colorSelected, '#3498DB');
     assert.equal(shapeSelected, 'rounded');
     document.querySelectorAll = originalQuerySelectorAll;
+});
+
+test('canvas trash exposes a safe hit area while dragging an activity', () => {
+    const { app, document } = createTestApp();
+    const zone = document.getElementById('canvasTrashZone');
+    const label = document.getElementById('canvasTrashLabel');
+    const classes = new Set();
+    zone.classList = {
+        add(...names) { names.forEach(name => classes.add(name)); },
+        remove(...names) { names.forEach(name => classes.delete(name)); },
+        toggle(name, enabled) { enabled ? classes.add(name) : classes.delete(name); },
+        contains(name) { return classes.has(name); }
+    };
+    zone.getBoundingClientRect = () => ({
+        left: 100, right: 300, top: 500, bottom: 600
+    });
+
+    app.showCanvasTrash(true);
+    assert.equal(zone.hidden, false);
+    assert.equal(classes.has('is-visible'), true);
+    assert.equal(label.textContent, app.t('canvasTrashHint'));
+    assert.equal(app.canvasTrashContainsPoint(200, 550), true);
+    assert.equal(app.canvasTrashContainsPoint(92, 550), true, 'the hit area includes a small margin');
+    assert.equal(app.canvasTrashContainsPoint(91, 550), false);
+    assert.equal(app.canvasTrashContainsPoint(200, 480), false);
+
+    app.setCanvasTrashTarget(true);
+    assert.equal(classes.has('drop-active'), true);
+    assert.equal(label.textContent, app.t('canvasTrashActive'));
+
+    app.showCanvasTrash(false);
+    assert.equal(zone.hidden, true);
+    assert.equal(classes.has('is-visible'), false);
+    assert.equal(classes.has('drop-active'), false);
+});
+
+test('canvas trash deletes the dragged activity by id without touching others', async () => {
+    const { app, storageData } = createTestApp({
+        activities: [
+            { id: 'trash-a', name: 'Throw away' },
+            { id: 'trash-b', name: 'Keep me' }
+        ]
+    });
+    await app.loadActivities();
+    app.confirmDelete = false;
+    const deleted = await app.deleteActivity('trash-a');
+    assert.equal(deleted, true);
+    assert.deepEqual(app.activities.map(item => item.id), ['trash-b']);
+    assert.deepEqual(storageData.activities.map(item => item.id), ['trash-b']);
+});
+
+test('releasing a dragged activity over the canvas trash deletes it instead of moving it', async () => {
+    const { app, context, storageData, buttons, pointer } = createGroupCanvasHarness();
+    const activity = { id: 'drag-trash', name: 'Drag me', position: 0, size: 'medium', color: '#ffffff', shape: 'rounded' };
+    app.activities = [activity];
+    app.activityLayouts = new Map([['drag-trash', {
+        activityId: 'drag-trash', x: 100, y: 100, width: 272, height: 160
+    }]]);
+    app.confirmDelete = false;
+    app.canvasPan = { x: 0, y: 0 };
+    app.canvasZoom = 1;
+    app.renderMain();
+    const button = buttons.find(item => item.dataset.activityId === 'drag-trash');
+    assert.ok(button);
+
+    const trash = context.document.getElementById('canvasTrashZone');
+    trash.getBoundingClientRect = () => ({ left: 300, right: 500, top: 500, bottom: 560 });
+
+    let savedLayout = null;
+    const originalSaveLayout = app.storage.saveLayout;
+    app.storage.saveLayout = async layout => {
+        savedLayout = layout;
+        return originalSaveLayout(layout);
+    };
+
+    pointer('pointerdown', button, 150, 140);
+    pointer('pointermove', button, 400, 530);
+    assert.equal(app.canvasGesture.trashTarget, true, 'the pointer enters the trash target');
+    pointer('pointerup', button, 400, 530);
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    assert.equal(app.activities.some(item => item.id === 'drag-trash'), false);
+    assert.equal(storageData.activities.some(item => item.id === 'drag-trash'), false);
+    assert.equal(savedLayout, null, 'a trashed activity never gets a new saved position');
 });

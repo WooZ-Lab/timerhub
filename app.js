@@ -15,6 +15,9 @@ const translations = {
         activityStopHint: 'Tap to stop',
         activityStartAria: 'Start or switch to {activity}', activityStopAria: 'Stop timing {activity}',
         activityCanvas: 'Activity canvas',
+        canvasTrashHint: 'Drop here to delete',
+        canvasTrashActive: 'Release to delete',
+        activityDeleteFailed: 'Could not delete the activity. Try again.',
         activityResize: 'Resize {activity}', canvasLayoutSaveFailed: 'Could not save this activity position. Try again.',
         noActivitiesTitle: 'No activities yet', noActivitiesMessage: 'Add an activity to start tracking your work.',
         appName: 'TimerHub',
@@ -71,6 +74,9 @@ const translations = {
         activityStopHint: 'Tippen zum Stoppen',
         activityStartAria: '{activity} starten oder dorthin wechseln', activityStopAria: 'Zeit für {activity} stoppen',
         activityCanvas: 'Aktivitätsfläche',
+        canvasTrashHint: 'Zum Löschen hier ablegen',
+        canvasTrashActive: 'Loslassen zum Löschen',
+        activityDeleteFailed: 'Die Aktivität konnte nicht gelöscht werden. Bitte erneut versuchen.',
         activityResize: 'Größe von {activity} ändern', canvasLayoutSaveFailed: 'Position konnte nicht gespeichert werden. Bitte erneut versuchen.',
         noActivitiesTitle: 'Noch keine Aktivitäten', noActivitiesMessage: 'Füge eine Aktivität hinzu, um deine Arbeit zu erfassen.',
         appName: 'TimerHub',
@@ -127,6 +133,9 @@ const translations = {
         activityStopHint: 'Нажмите, чтобы остановить',
         activityStartAria: 'Начать или переключиться на «{activity}»', activityStopAria: 'Остановить отсчёт для «{activity}»',
         activityCanvas: 'Поле занятий',
+        canvasTrashHint: 'Перетащите сюда, чтобы удалить',
+        canvasTrashActive: 'Отпустите, чтобы удалить',
+        activityDeleteFailed: 'Не удалось удалить активность. Попробуйте ещё раз.',
         activityResize: 'Изменить размер: {activity}', canvasLayoutSaveFailed: 'Не удалось сохранить расположение занятия. Попробуйте ещё раз.',
         noActivitiesTitle: 'Занятий пока нет', noActivitiesMessage: 'Добавьте занятие, чтобы начать учёт времени.',
         appName: 'TimerHub',
@@ -5990,6 +5999,8 @@ class TimerHubApp {
             btn.style.top = `${layout.y}px`;
             btn.style.width = `${layout.width}px`;
             btn.style.height = `${layout.height}px`;
+            btn.style.setProperty('--activity-width', `${layout.width}px`);
+            btn.style.setProperty('--activity-height', `${layout.height}px`);
             const nodeZIndex = this.canvasZIndex;
             this.canvasZIndex += 2;
             btn.style.zIndex = String(nodeZIndex);
@@ -6725,6 +6736,8 @@ class TimerHubApp {
         button.style.top = `${resolved.y}px`;
         button.style.width = `${resolved.width}px`;
         button.style.height = `${resolved.height}px`;
+        button.style.setProperty('--activity-width', `${resolved.width}px`);
+        button.style.setProperty('--activity-height', `${resolved.height}px`);
         this.positionActivityResizeHandle(activity.id, resolved);
     }
 
@@ -6827,6 +6840,41 @@ class TimerHubApp {
             if (!container) continue;
             container.classList.toggle('group-drop-target', group.id === groupId);
         }
+    }
+
+    showCanvasTrash(visible) {
+        const trash = document.getElementById('canvasTrashZone');
+        if (!trash) return;
+        if (visible) {
+            const label = document.getElementById('canvasTrashLabel');
+            if (label) label.textContent = this.t('canvasTrashHint');
+            trash.hidden = false;
+            trash.classList.remove('drop-active');
+            trash.classList.add('is-visible');
+            return;
+        }
+        trash.classList.remove('is-visible', 'drop-active');
+        trash.hidden = true;
+    }
+
+    setCanvasTrashTarget(active) {
+        const trash = document.getElementById('canvasTrashZone');
+        if (!trash || trash.hidden) return;
+        trash.classList.toggle('drop-active', Boolean(active));
+        const label = document.getElementById('canvasTrashLabel');
+        if (label) label.textContent = active ? this.t('canvasTrashActive') : this.t('canvasTrashHint');
+    }
+
+    canvasTrashContainsPoint(clientX, clientY) {
+        const trash = document.getElementById('canvasTrashZone');
+        if (!trash || trash.hidden || typeof trash.getBoundingClientRect !== 'function') return false;
+        const rect = trash.getBoundingClientRect();
+        if (!rect || !Number.isFinite(rect.left) || !Number.isFinite(rect.top)) return false;
+        const margin = 8;
+        return clientX >= rect.left - margin &&
+            clientX <= rect.right + margin &&
+            clientY >= rect.top - margin &&
+            clientY <= rect.bottom + margin;
     }
 
     // Find the visible group under the pointer that can become the new parent
@@ -8783,6 +8831,7 @@ class TimerHubApp {
                     this.canvasGesture.groupTitle?.classList.remove('dragging');
                     if (this.canvasGesture.mode === 'select') this.hideCanvasSelectionRect();
                     if (this.canvasGesture.mode === 'move') this.setCanvasDropTarget(null);
+                    this.showCanvasTrash(false);
                     this.canvasGesture = null;
                 }
 
@@ -8850,6 +8899,7 @@ class TimerHubApp {
                 groupStartX: gestureGroup?.x,
                 groupStartY: gestureGroup?.y,
                 dropTargetGroupId: null,
+                trashTarget: false,
                 startX: event.clientX,
                 startY: event.clientY,
                 lastX: event.clientX,
@@ -8926,6 +8976,7 @@ class TimerHubApp {
                         gesture.layout,
                         this.canvasZIndex - 1
                     );
+                    this.showCanvasTrash(true);
                 }
             }
 
@@ -9001,7 +9052,19 @@ class TimerHubApp {
                     y: nextY
                 });
 
-                this.updateMoveDropTarget(gesture);
+                const overTrash = this.canvasTrashContainsPoint(event.clientX, event.clientY);
+                if (gesture.trashTarget !== overTrash) {
+                    gesture.trashTarget = overTrash;
+                    this.setCanvasTrashTarget(overTrash);
+                }
+                if (overTrash) {
+                    if (gesture.dropTargetGroupId !== null) {
+                        gesture.dropTargetGroupId = null;
+                        this.setCanvasDropTarget(null);
+                    }
+                } else {
+                    this.updateMoveDropTarget(gesture);
+                }
             } else if (gesture.mode === 'resize') {
                 const { x: worldDx, y: worldDy } = CanvasGeometry.screenDeltaToWorld(dx, dy, this.canvasZoom);
                 const activity = this.activities.find(item => item.id === gesture.activityId);
@@ -9024,6 +9087,8 @@ class TimerHubApp {
                 if (gesture.activityButton) {
                     gesture.activityButton.style.width = `${width}px`;
                     gesture.activityButton.style.height = `${height}px`;
+                    gesture.activityButton.style.setProperty('--activity-width', `${width}px`);
+                    gesture.activityButton.style.setProperty('--activity-height', `${height}px`);
 
                     this.positionActivityResizeHandle(gesture.activityId, {
                         ...gesture.layout,
@@ -9041,7 +9106,7 @@ class TimerHubApp {
             }
         });
 
-        const finishGesture = event => {
+        const finishGesture = async event => {
             this.canvasPointers.delete(event.pointerId);
 
             if (this.canvasPointers.size < 2 && this.canvasPinch) {
@@ -9056,6 +9121,27 @@ class TimerHubApp {
             this.canvasGesture = null;
             gesture.activityButton?.classList.remove('dragging');
             gesture.groupTitle?.classList.remove('dragging');
+            const shouldDelete = event.type === 'pointerup' &&
+                gesture.started &&
+                gesture.mode === 'move' &&
+                gesture.trashTarget;
+            this.showCanvasTrash(false);
+
+            if (shouldDelete) {
+                this.suppressActivityClick = {
+                    activityId: gesture.activityId,
+                    until: Date.now() + 5000
+                };
+                try {
+                    const deleted = await this.deleteActivity(gesture.activityId);
+                    if (!deleted) this.renderMain();
+                } catch (error) {
+                    this.diagnostics?.warn('canvas', 'drag-delete', error, { status: 'failed' });
+                    this.showToast(this.t('activityDeleteFailed'));
+                    this.renderMain();
+                }
+                return;
+            }
 
             if (gesture.mode === 'group-resize') {
                 if (gesture.started) {
@@ -9255,6 +9341,8 @@ class TimerHubApp {
                 node.style.top = `${layout.y}px`;
                 node.style.width = `${layout.width}px`;
                 node.style.height = `${layout.height}px`;
+                node.style.setProperty('--activity-width', `${layout.width}px`);
+                node.style.setProperty('--activity-height', `${layout.height}px`);
             }
 
             if (handle) this.positionActivityResizeHandle(activityId, layout);
@@ -10312,21 +10400,25 @@ class TimerHubApp {
         await this.recordCanvasHistoryFromSnapshot('archive-activity', historyBefore);
     }
 
-    async deleteActivity() {
+    async deleteActivity(activityId = this.editingActivityId) {
+        const id = activityId || this.editingActivityId;
         if (this.confirmDelete && !confirm(this.t('deleteConfirm'))) {
-            return;
+            return false;
         }
 
-        const historyBefore = this.snapshotCanvasState();
-        const activity = this.activities.find(a => a.id === this.editingActivityId);
-        if (activity) {
-            await this.storage.deleteActivity(activity.id);
-            this.activities = this.activities.filter(a => a.id !== activity.id);
+        const activity = this.activities.find(a => a.id === id);
+        if (!activity) {
+            this.closeActivityMenu();
+            return false;
         }
+        const historyBefore = this.snapshotCanvasState();
+        await this.storage.deleteActivity(activity.id);
+        this.activities = this.activities.filter(a => a.id !== activity.id);
         this.closeActivityMenu();
         this.renderMain();
         this.pruneCanvasSelection();
         await this.recordCanvasHistoryFromSnapshot('delete-activity', historyBefore);
+        return true;
     }
 
     renderLog() {
