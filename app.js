@@ -9918,19 +9918,18 @@ class TimerHubApp {
         const existing = this.activities.find(item => item.id === entry.activityId)
             || this.archivedActivities?.find(item => item.id === entry.activityId)
             || null;
-        let name = [
+        // The card's project represents the object/address. Use it as the new
+        // activity name first, then fall back to the next meaningful card field.
+        const candidates = [
+            entry.project,
             entry.activityNameSnapshot,
             existing?.name,
             String(entry.notes || '').split(/\r?\n/)[0],
-            entry.project,
             entry.service,
             entry.customerName
-        ].map(value => String(value || '').trim()).find(Boolean);
-        if (!name) name = `${this.t('activity')} ${this.formatTime(entry.startTimestamp)}`;
+        ].map(value => String(value || '').trim()).filter(Boolean);
+        let name = candidates[0] || `${this.t('activity')} ${this.formatTime(entry.startTimestamp)}`;
         name = name.slice(0, 120);
-        if (this.activities.some(item => item.name === name)) {
-            name = this.t('activityCopyName', { name }).slice(0, 120);
-        }
         const value = (primary, fallback) => {
             const text = primary === null || primary === undefined ? '' : String(primary).trim();
             return text || fallback || '';

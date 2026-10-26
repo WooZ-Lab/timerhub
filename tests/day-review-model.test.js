@@ -12994,7 +12994,7 @@ test('a Day Review card can create a canvas activity with its assignment data', 
 
     const activity = await app.addActivityFromReviewEntry('review-activity-source');
     assert.ok(activity);
-    assert.equal(activity.name, 'Treppenhaus streichen');
+    assert.equal(activity.name, 'Bridge', 'the card project/address becomes the activity name');
     assert.equal(activity.customerId, '11');
     assert.equal(activity.customerName, 'Acme');
     assert.equal(activity.projectId, '22');
@@ -13077,4 +13077,23 @@ test('an activity created from a Day Review card uses the current default shape'
     app.showToast = () => {};
     const created = await app.addActivityFromReviewEntry('shape-source-entry');
     assert.equal(created.shape, 'square', 'the reordered first shape wins over the source activity shape');
+});
+
+test('a Day Review activity name falls back to the next filled field when the project is empty', async () => {
+    const { app } = createTestApp();
+    app.activities = [];
+    app.archivedActivities = [];
+    app.groups = [];
+    app.activityLayouts = new Map();
+    app.canvasViewportSize = { width: 800, height: 600 };
+    const start = new Date(2026, 9, 5, 12, 0).getTime();
+    app.timeEntries = [{
+        id: 'address-fallback-entry', activityId: '', activityNameSnapshot: '',
+        startTimestamp: start, endTimestamp: start + 60 * 60 * 1000,
+        notes: 'Treppenhaus', project: '', service: 'Painting', customerName: 'Acme'
+    }];
+    app.renderMain = () => {};
+    app.showToast = () => {};
+    const created = await app.addActivityFromReviewEntry('address-fallback-entry');
+    assert.equal(created.name, 'Treppenhaus');
 });
