@@ -11315,6 +11315,7 @@ class TimerHubApp {
             this.clockodoCustomerAutoSelected.delete(context);
         }
         if (fieldName === 'project' && context !== 'group') {
+            if (context === 'activity' && match) this.applyProjectNameToNewActivity(match.id);
             this.syncCustomerFromProject(context);
             if (this.clockodoReferenceStatus === 'ready') this.openClockodoCombobox(context, fieldName, inputEl?.value || '');
             else this.closeClockodoCombobox();
@@ -11332,6 +11333,19 @@ class TimerHubApp {
         );
         if (this.clockodoReferenceStatus === 'ready') this.openClockodoCombobox(context, fieldName, inputEl?.value || '');
         else this.closeClockodoCombobox();
+    }
+
+    applyProjectNameToNewActivity(projectId) {
+        if (this.editingActivityId) return false;
+        const id = this.normalizeClockodoId(projectId);
+        if (!id) return false;
+        const project = (this.clockodoProjects || []).find(item => String(item.id) === id);
+        const name = String(project?.name || '').trim();
+        if (!name) return false;
+        const input = document.getElementById('activityName');
+        if (!input) return false;
+        input.value = name;
+        return true;
     }
 
     openClockodoCombobox(context, fieldName, query = '') {
@@ -11462,6 +11476,7 @@ class TimerHubApp {
             this.clockodoCustomerAutoSelected.delete(context);
         }
         if (fieldName === 'project' && context !== 'group') {
+            if (context === 'activity' && !option.unassigned) this.applyProjectNameToNewActivity(option.id);
             this.syncCustomerFromProject(context, { fromSelection: true });
             return;
         }

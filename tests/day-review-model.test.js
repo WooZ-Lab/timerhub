@@ -10927,6 +10927,54 @@ test('project choices follow the selected customer in activity and entry editors
     app.closeClockodoCombobox();
 });
 
+test('selecting a project copies its name into a new activity name', () => {
+    const { app, document } = createTestApp();
+    app.clockodoReferenceStatus = 'ready';
+    app.clockodoCustomers = [{ id: 5, name: 'Beta' }];
+    app.clockodoProjects = [{ id: 4, name: 'Object A', active: true, customerId: 5 }];
+    app.editingActivityId = null;
+    document.getElementById('activityName').value = '';
+
+    app.populateClockodoAssignmentSelects('activity', '5', null, 'Beta', '');
+    app.openClockodoCombobox('activity', 'project');
+    app.selectClockodoComboboxOption('activity', 'project', app.clockodoCombobox.options[1]);
+
+    assert.equal(document.getElementById('activityProjectSelect').value, '4');
+    assert.equal(document.getElementById('activityName').value, 'Object A');
+});
+
+test('typing the exact project name copies it into a new activity name', () => {
+    const { app, document } = createTestApp();
+    app.clockodoReferenceStatus = 'ready';
+    app.clockodoCustomers = [{ id: 5, name: 'Beta' }];
+    app.clockodoProjects = [{ id: 4, name: 'Object A', active: true, customerId: 5 }];
+    app.editingActivityId = null;
+    document.getElementById('activityName').value = '';
+    document.getElementById('activityCustomerSelect').value = '5';
+    document.getElementById('activityCustomerInput').value = 'Beta';
+
+    document.getElementById('activityProjectInput').value = 'Object A';
+    app.applyClockodoAssignmentInput('activity', 'project');
+
+    assert.equal(document.getElementById('activityProjectSelect').value, '4');
+    assert.equal(document.getElementById('activityName').value, 'Object A');
+});
+
+test('editing an activity keeps its name when the project changes', () => {
+    const { app, document } = createTestApp();
+    app.clockodoReferenceStatus = 'ready';
+    app.clockodoCustomers = [{ id: 5, name: 'Beta' }];
+    app.clockodoProjects = [{ id: 4, name: 'Object A', active: true, customerId: 5 }];
+    app.editingActivityId = 'existing-activity';
+    document.getElementById('activityName').value = 'Custom name';
+
+    app.populateClockodoAssignmentSelects('activity', '5', null, 'Beta', '');
+    app.openClockodoCombobox('activity', 'project');
+    app.selectClockodoComboboxOption('activity', 'project', app.clockodoCombobox.options[1]);
+
+    assert.equal(document.getElementById('activityName').value, 'Custom name');
+});
+
 test('activity project assignments persist into entries and reach the Clockodo payload', async () => {
     const { app, document, context } = createTestApp();
     app.clockodoConfigured = true;
