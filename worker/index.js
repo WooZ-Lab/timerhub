@@ -27,7 +27,42 @@ function base64ToBytes(value) {
     return Uint8Array.from(atob(value), character => character.charCodeAt(0));
 }
 
-const WORKER_VERSION = "2026-10-18-projects-v4";
+const WORKER_VERSION = "2026-11-14-clockodo-download-v1";
+const CLOCKODO_ENTRY_RANGE_MAX_MS = 32 * 24 * 60 * 60 * 1000;
+
+function normalizeClockodoRangeValue(value) {
+    if (typeof value !== "string" || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?(?:Z|[+-]\d\d:\d\d)$/.test(value)) {
+        return null;
+    }
+    const timestamp = Date.parse(value);
+    return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function normalizeClockodoEntry(item) {
+    if (!item || typeof item !== "object" || Array.isArray(item) ||
+        !Number.isSafeInteger(item.id) || item.id < 1 ||
+        !Number.isSafeInteger(item.customers_id) || item.customers_id < 0 ||
+        !Number.isSafeInteger(item.services_id) || item.services_id < 0) {
+        return null;
+    }
+    const since = normalizeClockodoRangeValue(item.time_since);
+    const until = normalizeClockodoRangeValue(item.time_until);
+    if (since === null || until === null || until <= since) return null;
+    const projectId = item.projects_id === undefined || item.projects_id === null
+        ? null
+        : (Number.isSafeInteger(item.projects_id) && item.projects_id >= 0 ? item.projects_id : undefined);
+    if (projectId === undefined) return null;
+    return {
+        id: item.id,
+        customers_id: item.customers_id,
+        services_id: item.services_id,
+        projects_id: projectId,
+        time_since: item.time_since,
+        time_until: item.time_until,
+        billable: Number(item.billable) === 0 ? 0 : 1,
+        text: typeof item.text === "string" ? item.text.slice(0, 1000) : null
+    };
+}
 
 function jsonError(error, status) {
     return Response.json({ error }, { status });
@@ -354,6 +389,52 @@ export class TimerHubDurableObject {
         return Response.json({ [responseKey]: items });
     }
 
+    async clockodoEntriesResponse(token, credentials, since, until) {
+        const entries = [];
+        try {
+            for (let page = 1; page <= 20; page += 1) {
+                const query = new URLSearchParams({
+                    time_since: since,
+                    time_until: until,
+                    items_per_page: "1000",
+                    page: String(page)
+                });
+                const response = await this.clockodoFetch(
+                    null,
+                    token,
+                    credentials,
+                    `v2/entries?${query.toString()}`
+                );
+                if (!response.ok) {
+                    const error = this.clockodoErrorCode(response.status);
+                    const errorData = await response.json().catch(() => null);
+                    const rejection = this.clockodoRejectionDetails(response.status, errorData);
+                    return Response.json({ error, ...(rejection ? { clockodo: rejection } : {}) }, { status: response.status });
+                }
+                const data = await response.json().catch(() => null);
+                if (!data || typeof data !== "object" || Array.isArray(data) || !Array.isArray(data.entries)) {
+                    return jsonError("malformed_response", 502);
+                }
+                for (const item of data.entries) {
+                    // A currently running Clockodo timer has no end timestamp and
+                    // cannot be imported as a completed interval.
+                    if (item && typeof item === "object" && (item.time_until === null || item.time_until === undefined)) continue;
+                    const normalized = normalizeClockodoEntry(item);
+                    if (!normalized) return jsonError("malformed_response", 502);
+                    entries.push(normalized);
+                }
+                const countPages = data.paging && Number.isSafeInteger(data.paging.count_pages)
+                    ? data.paging.count_pages
+                    : 1;
+                if (page >= countPages) break;
+            }
+        } catch (error) {
+            return jsonError(error?.name === "AbortError" ? "timeout" : "network_error", 502);
+        }
+        entries.sort((a, b) => Date.parse(a.time_since) - Date.parse(b.time_since) || a.id - b.id);
+        return Response.json({ entries });
+    }
+
     async clockodoFetch(request, token, credentials, path, body, method = body === undefined ? "GET" : "POST") {
         const apiKey = await this.decryptClockodoKey(token, credentials);
         const controller = new AbortController();
@@ -445,6 +526,19 @@ export class TimerHubDurableObject {
             } catch (error) {
                 return jsonError(error?.name === "AbortError" ? "timeout" : "network_error", 502);
             }
+        }
+
+        if (path === "/clockodo/entries" && request.method === "GET") {
+            const since = url.searchParams.get("since") || "";
+            const until = url.searchParams.get("until") || "";
+            const sinceTimestamp = normalizeClockodoRangeValue(since);
+            const untilTimestamp = normalizeClockodoRangeValue(until);
+            if (sinceTimestamp === null || untilTimestamp === null ||
+                untilTimestamp <= sinceTimestamp ||
+                untilTimestamp - sinceTimestamp > CLOCKODO_ENTRY_RANGE_MAX_MS) {
+                return jsonError("invalid_time_range", 400);
+            }
+            return this.clockodoEntriesResponse(token, credentials, since, until);
         }
 
         if (path === "/clockodo/entries" && request.method === "POST") {
@@ -656,7 +750,7 @@ export default {
         const clockodoRoutes = new Map([
             ["/api/clockodo/config", { path: "/clockodo/config", methods: ["GET", "PUT", "DELETE"] }],
             ["/api/clockodo/test", { path: "/clockodo/test", methods: ["POST"] }],
-            ["/api/clockodo/entries", { path: "/clockodo/entries", methods: ["POST"] }],
+            ["/api/clockodo/entries", { path: "/clockodo/entries", methods: ["GET", "POST"] }],
             ["/api/clockodo/customers", { path: "/clockodo/customers", methods: ["GET"] }],
             ["/api/clockodo/services", { path: "/clockodo/services", methods: ["GET"] }],
             ["/api/clockodo/projects", { path: "/clockodo/projects", methods: ["GET"] }]

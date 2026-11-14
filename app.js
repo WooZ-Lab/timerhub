@@ -300,6 +300,22 @@ const extendedTranslations = {
         externalBackupNotConfigured: 'No usable backup folder is configured.',
         externalBackupFolderMissing: 'Backup folder was not found. Choose the folder again in Backup settings.',
         externalBackupUnsupported: 'External folder backups are not supported in this browser.',
+        loadFromClockodo: 'Load from Clockodo',
+        clockodoLoadTitle: 'Load from Clockodo',
+        clockodoLoadDesc: 'Download entries from Clockodo into TimerHub so you can review or share the day.',
+        clockodoLoadDayLabel: 'Single day',
+        clockodoLoadDayBtn: 'Load day',
+        clockodoLoadRangeLabel: 'Selected days',
+        clockodoLoadFromLabel: 'From date',
+        clockodoLoadToLabel: 'To date',
+        clockodoLoadRangeBtn: 'Load selected days',
+        clockodoLoadLoading: 'Loading entries from Clockodo…',
+        clockodoLoadLoaded: '{count} entries loaded from Clockodo.',
+        clockodoLoadNone: 'No new entries found. {skipped} entries were already in TimerHub.',
+        clockodoLoadPartial: '{loaded} entries loaded. {skipped} already in TimerHub, {failed} could not be imported.',
+        clockodoLoadFailed: 'Could not load entries from Clockodo. Check the connection and try again.',
+        clockodoLoadConfigRequired: 'Configure Clockodo first to load entries.',
+        clockodoLoadInvalidRange: 'Choose a valid date range of up to 31 days.',
         shareLinkBtn: 'Share link',
         shareLinkTitle: 'Share day as a link',
         shareLinkDesc: 'Selected entries are encrypted on this device before upload. Only encrypted data is stored temporarily, and the link expires automatically.',
@@ -738,6 +754,22 @@ const extendedTranslations = {
         externalBackupNotConfigured: 'Kein nutzbarer Sicherungsordner konfiguriert.',
         externalBackupFolderMissing: 'Sicherungsordner nicht gefunden. Wähle den Ordner in den Sicherungseinstellungen erneut aus.',
         externalBackupUnsupported: 'Externe Ordnersicherungen werden von diesem Browser nicht unterstützt.',
+        loadFromClockodo: 'Aus Clockodo laden',
+        clockodoLoadTitle: 'Aus Clockodo laden',
+        clockodoLoadDesc: 'Einträge aus Clockodo in TimerHub laden, um den Tag zu prüfen oder zu teilen.',
+        clockodoLoadDayLabel: 'Einzelner Tag',
+        clockodoLoadDayBtn: 'Tag laden',
+        clockodoLoadRangeLabel: 'Ausgewählte Tage',
+        clockodoLoadFromLabel: 'Von Datum',
+        clockodoLoadToLabel: 'Bis Datum',
+        clockodoLoadRangeBtn: 'Ausgewählte Tage laden',
+        clockodoLoadLoading: 'Einträge werden aus Clockodo geladen…',
+        clockodoLoadLoaded: '{count} Einträge aus Clockodo geladen.',
+        clockodoLoadNone: 'Keine neuen Einträge gefunden. {skipped} Einträge waren bereits in TimerHub.',
+        clockodoLoadPartial: '{loaded} Einträge geladen. {skipped} bereits in TimerHub, {failed} konnten nicht importiert werden.',
+        clockodoLoadFailed: 'Einträge konnten nicht aus Clockodo geladen werden. Prüfe die Verbindung und versuche es erneut.',
+        clockodoLoadConfigRequired: 'Richte Clockodo zuerst ein, um Einträge zu laden.',
+        clockodoLoadInvalidRange: 'Wähle einen gültigen Zeitraum von bis zu 31 Tagen.',
         shareLinkBtn: 'Link teilen',
         shareLinkTitle: 'Tag als Link teilen',
         shareLinkDesc: 'Ausgewählte Einträge werden vor dem Hochladen auf diesem Gerät verschlüsselt. Es werden nur verschlüsselte Daten vorübergehend gespeichert, und der Link läuft automatisch ab.',
@@ -1176,6 +1208,22 @@ const extendedTranslations = {
         externalBackupNotConfigured: 'Нет доступной папки для резервных копий.',
         externalBackupFolderMissing: 'Папка резервных копий не найдена. Выберите её снова в настройках резервных копий.',
         externalBackupUnsupported: 'Внешние резервные копии в папку не поддерживаются этим браузером.',
+        loadFromClockodo: 'Загрузить из Clockodo',
+        clockodoLoadTitle: 'Загрузить из Clockodo',
+        clockodoLoadDesc: 'Загрузите записи из Clockodo в TimerHub, чтобы просмотреть или поделиться днём.',
+        clockodoLoadDayLabel: 'Один день',
+        clockodoLoadDayBtn: 'Загрузить день',
+        clockodoLoadRangeLabel: 'Выбранные дни',
+        clockodoLoadFromLabel: 'Дата с',
+        clockodoLoadToLabel: 'Дата по',
+        clockodoLoadRangeBtn: 'Загрузить выбранные дни',
+        clockodoLoadLoading: 'Загрузка записей из Clockodo…',
+        clockodoLoadLoaded: 'Загружено записей: {count}.',
+        clockodoLoadNone: 'Новых записей нет. {skipped} записей уже были в TimerHub.',
+        clockodoLoadPartial: 'Загружено: {loaded}. Уже было: {skipped}, не удалось импортировать: {failed}.',
+        clockodoLoadFailed: 'Не удалось загрузить записи из Clockodo. Проверьте соединение и попробуйте снова.',
+        clockodoLoadConfigRequired: 'Сначала настройте Clockodo, чтобы загружать записи.',
+        clockodoLoadInvalidRange: 'Выберите корректный период не длиннее 31 дня.',
         shareLinkBtn: 'Поделиться ссылкой',
         shareLinkTitle: 'Поделиться днём по ссылке',
         shareLinkDesc: 'Выбранные записи шифруются на этом устройстве перед загрузкой. На сервере временно хранятся только зашифрованные данные, а ссылка автоматически истекает.',
@@ -2457,6 +2505,8 @@ class TimerHubApp {
         this.pendingExchange = null;
         this.pendingAssignment = null;
         this.pendingShareLink = null;
+        this.clockodoLoadInProgress = false;
+        this.clockodoLoadStatus = '';
         this.pendingSharedDay = null;
         this.sharedImport = null;
         this.sharedImportNeedsConfig = false;
@@ -3748,7 +3798,7 @@ class TimerHubApp {
             serviceId: this.normalizeClockodoId(raw.serviceId),
             customerName: typeof raw.customerName === 'string' ? raw.customerName : '',
             serviceName: typeof raw.serviceName === 'string' ? raw.serviceName : '',
-            source: raw.source === 'manual' ? 'manual' : 'timer',
+            source: ['manual', 'clockodo'].includes(raw.source) ? raw.source : 'timer',
             isEdited: raw.isEdited === true || (raw.editedAt !== null && raw.editedAt !== undefined && Number.isFinite(Number(raw.editedAt)) && Number(raw.editedAt) > 0),
             editedAt: raw.editedAt !== null && raw.editedAt !== undefined && Number.isFinite(Number(raw.editedAt)) && Number(raw.editedAt) > 0 ? Number(raw.editedAt) : null,
             syncStatus,
@@ -4281,6 +4331,18 @@ class TimerHubApp {
         sel('reviewImportDayBtn')?.addEventListener('click', () => this.showDayImportModal());
         sel('reviewShareDayBtn')?.addEventListener('click', () => this.shareDayExchange());
         sel('reviewShareLinkBtn')?.addEventListener('click', () => this.openShareLinkModal());
+        sel('reviewLoadClockodoBtn')?.addEventListener('click', () => this.openClockodoLoadModal());
+        sel('clockodoLoadCloseBtn')?.addEventListener('click', () => this.closeClockodoLoadModal());
+        sel('clockodoLoadDoneBtn')?.addEventListener('click', () => this.closeClockodoLoadModal());
+        sel('clockodoLoadDayBtn')?.addEventListener('click', () => {
+            const date = document.getElementById('clockodoLoadDayInput')?.value || this.reviewDate;
+            this.loadClockodoDay(date);
+        });
+        sel('clockodoLoadRangeBtn')?.addEventListener('click', () => {
+            const from = document.getElementById('clockodoLoadFromInput')?.value || '';
+            const to = document.getElementById('clockodoLoadToInput')?.value || '';
+            this.loadClockodoSelectedDays(from, to);
+        });
         sel('shareLinkCloseBtn')?.addEventListener('click', () => this.closeShareLinkModal());
         sel('shareLinkCancelBtn')?.addEventListener('click', () => this.closeShareLinkModal());
         sel('shareLinkCreateBtn')?.addEventListener('click', () => this.createShareLink());
@@ -11765,6 +11827,217 @@ class TimerHubApp {
         token = btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
         localStorage.setItem(storageKey, token);
         return token;
+    }
+
+    clockodoLoadDateRange(fromDate, toDate) {
+        const validDate = value => {
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ''))) return null;
+            const parsed = new Date(`${value}T12:00:00`);
+            if (Number.isNaN(parsed.getTime()) || this.toDateString(parsed) !== value) return null;
+            return value;
+        };
+        const from = validDate(fromDate);
+        const to = validDate(toDate);
+        if (!from || !to || to < from) return null;
+        const dayNumber = value => {
+            const [year, month, day] = value.split('-').map(Number);
+            return Date.UTC(year, month - 1, day);
+        };
+        const dayCount = Math.round((dayNumber(to) - dayNumber(from)) / (24 * 60 * 60 * 1000)) + 1;
+        if (dayCount < 1 || dayCount > 31) return null;
+        const startDate = new Date(`${from}T00:00:00`);
+        const endDate = new Date(`${to}T00:00:00`);
+        endDate.setDate(endDate.getDate() + 1);
+        const start = startDate.getTime();
+        const end = endDate.getTime();
+        if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return null;
+        return { from, to, since: new Date(start).toISOString(), until: new Date(end).toISOString() };
+    }
+
+    clockodoEntryNames(item) {
+        const find = (list, id) => (Array.isArray(list) ? list : [])
+            .find(entry => Number(entry.id) === Number(id)) || null;
+        const customer = find(this.clockodoCustomers, item.customers_id);
+        const service = find(this.clockodoServices, item.services_id);
+        const project = item.projects_id === null || item.projects_id === undefined
+            ? null
+            : find(this.clockodoProjects, item.projects_id);
+        return {
+            customerName: customer?.name || '',
+            serviceName: service?.name || '',
+            projectName: project?.name || ''
+        };
+    }
+
+    findActivityForClockodoEntry(item, names) {
+        const activities = [...(this.activities || []), ...(this.archivedActivities || [])];
+        const same = (left, right) => String(left || '') === String(right || '');
+        const exact = activities.find(activity =>
+            same(activity.customerId, item.customers_id) &&
+            same(activity.serviceId, item.services_id) &&
+            (item.projects_id === null || !activity.projectId || same(activity.projectId, item.projects_id))
+        );
+        if (exact) return exact;
+        if (!names?.serviceName) return null;
+        const serviceName = this.normalizeExchangeActivityName(names.serviceName);
+        return activities.find(activity =>
+            this.normalizeExchangeActivityName(activity.name) === serviceName
+        ) || null;
+    }
+
+    async importClockodoEntries(items, range) {
+        const known = new Set(this.timeEntries
+            .map(entry => entry.clockodoEntryId !== null && entry.clockodoEntryId !== undefined ? String(entry.clockodoEntryId) : '')
+            .filter(Boolean));
+        const seen = new Set();
+        let loaded = 0;
+        let skipped = 0;
+        let failed = 0;
+        for (const item of Array.isArray(items) ? items : []) {
+            const remoteId = String(item?.id ?? '');
+            if (!remoteId || seen.has(remoteId)) continue;
+            seen.add(remoteId);
+            if (known.has(remoteId)) {
+                skipped += 1;
+                continue;
+            }
+            const startTimestamp = Date.parse(item.time_since);
+            const endTimestamp = Date.parse(item.time_until);
+            if (!Number.isFinite(startTimestamp) || !Number.isFinite(endTimestamp) || endTimestamp <= startTimestamp) {
+                failed += 1;
+                continue;
+            }
+            const localDate = this.toDateString(new Date(startTimestamp));
+            if (localDate < range.from || localDate > range.to) continue;
+            const names = this.clockodoEntryNames(item);
+            const activity = this.findActivityForClockodoEntry(item, names);
+            try {
+                await this.addEntry({
+                    activityId: activity?.id || '',
+                    activityNameSnapshot: activity?.name
+                        || names.serviceName
+                        || names.projectName
+                        || item.text
+                        || this.t('noActivity'),
+                    startTimestamp,
+                    endTimestamp,
+                    createdAt: startTimestamp,
+                    notes: item.text || '',
+                    project: names.projectName,
+                    projectId: item.projects_id,
+                    service: names.serviceName,
+                    customerId: item.customers_id,
+                    serviceId: item.services_id,
+                    customerName: names.customerName,
+                    serviceName: names.serviceName,
+                    source: 'clockodo',
+                    syncStatus: SYNC_STATUS.SYNCED,
+                    clockodoEntryId: item.id,
+                    clockodoSyncedAt: Date.now()
+                });
+                known.add(remoteId);
+                loaded += 1;
+            } catch {
+                failed += 1;
+            }
+        }
+        return { loaded, skipped, failed };
+    }
+
+    setClockodoLoadStatus(message) {
+        this.clockodoLoadStatus = message || '';
+        const node = document.getElementById('clockodoLoadStatus');
+        if (node) {
+            node.textContent = this.clockodoLoadStatus;
+            node.style.display = this.clockodoLoadStatus ? '' : 'none';
+        }
+    }
+
+    setClockodoLoadBusy(busy) {
+        const dayButton = document.getElementById('clockodoLoadDayBtn');
+        const rangeButton = document.getElementById('clockodoLoadRangeBtn');
+        if (dayButton) dayButton.disabled = Boolean(busy);
+        if (rangeButton) rangeButton.disabled = Boolean(busy);
+    }
+
+    openClockodoLoadModal() {
+        if (!this.clockodoConfigured || !this.clockodoClient) {
+            this.showToast(this.t('clockodoLoadConfigRequired'));
+            return false;
+        }
+        this.setClockodoLoadStatus('');
+        const dayInput = document.getElementById('clockodoLoadDayInput');
+        const fromInput = document.getElementById('clockodoLoadFromInput');
+        const toInput = document.getElementById('clockodoLoadToInput');
+        if (dayInput) dayInput.value = this.reviewDate;
+        if (fromInput) fromInput.value = this.reviewDate;
+        if (toInput) toInput.value = this.reviewDate;
+        document.getElementById('clockodoLoadModal')?.classList.add('active');
+        return true;
+    }
+
+    closeClockodoLoadModal() {
+        document.getElementById('clockodoLoadModal')?.classList.remove('active');
+    }
+
+    async loadClockodoDay(date = this.reviewDate) {
+        const loaded = await this.downloadClockodoEntries(date, date);
+        if (loaded) this.setReviewDay(date);
+        return loaded;
+    }
+
+    loadClockodoSelectedDays(fromDate, toDate) {
+        return this.downloadClockodoEntries(fromDate, toDate);
+    }
+
+    async downloadClockodoEntries(fromDate, toDate) {
+        if (this.clockodoLoadInProgress) return false;
+        const range = this.clockodoLoadDateRange(fromDate, toDate);
+        if (!range) {
+            this.setClockodoLoadStatus(this.t('clockodoLoadInvalidRange'));
+            return false;
+        }
+        if (!this.clockodoConfigured || !this.clockodoClient || typeof this.clockodoClient.getEntries !== 'function') {
+            this.setClockodoLoadStatus(this.t('clockodoLoadConfigRequired'));
+            return false;
+        }
+        this.clockodoLoadInProgress = true;
+        this.setClockodoLoadBusy(true);
+        this.setClockodoLoadStatus(this.t('clockodoLoadLoading'));
+        try {
+            await this.loadClockodoReferenceData().catch(() => false);
+            const result = await this.clockodoClient.getEntries(
+                this.getPushClientId(),
+                this.getClockodoAccessToken(),
+                { since: range.since, until: range.until }
+            );
+            const summary = await this.importClockodoEntries(result?.entries, range);
+            this.renderReview();
+            if (summary.loaded === 0) {
+                this.setClockodoLoadStatus(this.t('clockodoLoadNone', { skipped: summary.skipped }));
+            } else if (summary.skipped > 0 || summary.failed > 0) {
+                this.setClockodoLoadStatus(this.t('clockodoLoadPartial', {
+                    loaded: summary.loaded,
+                    skipped: summary.skipped,
+                    failed: summary.failed
+                }));
+            } else {
+                this.setClockodoLoadStatus(this.t('clockodoLoadLoaded', { count: summary.loaded }));
+            }
+            return summary.loaded > 0;
+        } catch (error) {
+            const message = error?.code === 'invalid_time_range'
+                ? this.t('clockodoLoadInvalidRange')
+                : ['invalid_credentials', 'configuration_missing', 'unauthorized'].includes(error?.code)
+                    ? this.t('clockodoLoadConfigRequired')
+                    : this.t('clockodoLoadFailed');
+            this.setClockodoLoadStatus(message);
+            this.diagnostics?.warn('clockodo', 'load-day-entries', error, { status: 'failed' });
+            return false;
+        } finally {
+            this.clockodoLoadInProgress = false;
+            this.setClockodoLoadBusy(false);
+        }
     }
 
     clockodoSendTimestamp(timestamp) {

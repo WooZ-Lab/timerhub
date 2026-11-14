@@ -1051,6 +1051,114 @@ test('Clockodo Worker loads customers and services from documented paginated end
     assert.equal(serviceMethodNotAllowed.status, 405);
 });
 
+test('Clockodo Worker loads day entries for a range without leaking private fields', async t => {
+    const backend = makeBackend();
+    const originalFetch = globalThis.fetch;
+    const requests = [];
+    globalThis.fetch = async (url, init) => {
+        requests.push({ url: String(url), init });
+        const parsed = new URL(String(url));
+        if (parsed.pathname === '/api/v2/entries') {
+            if (parsed.searchParams.get('page') === '1') {
+                return Response.json({
+                    paging: { items_per_page: 1000, current_page: 1, count_pages: 2, count_items: 2 },
+                    entries: [{
+                        id: 12,
+                        customers_id: 5,
+                        services_id: 9,
+                        projects_id: null,
+                        users_id: 1,
+                        time_since: '2026-11-14T09:00:00Z',
+                        time_until: '2026-11-14T10:00:00Z',
+                        billable: 1,
+                        text: 'Second',
+                        note: 'private clockodo note'
+                    }]
+                });
+            }
+            return Response.json({
+                paging: { items_per_page: 1000, current_page: 2, count_pages: 2, count_items: 2 },
+                entries: [{
+                    id: 11,
+                    customers_id: 5,
+                    services_id: 9,
+                    projects_id: 4,
+                    users_id: 1,
+                    time_since: '2026-11-14T08:00:00Z',
+                    time_until: '2026-11-14T09:00:00Z',
+                    billable: 0,
+                    text: null
+                }, {
+                    id: 13,
+                    customers_id: 5,
+                    services_id: 9,
+                    projects_id: null,
+                    users_id: 1,
+                    time_since: '2026-11-14T10:00:00Z',
+                    time_until: null,
+                    billable: 1,
+                    text: 'Running timer'
+                }]
+            });
+        }
+        return Response.json({ error: 'unexpected upstream route' }, { status: 500 });
+    };
+    t.after(() => { globalThis.fetch = originalFetch; });
+
+    const clientId = 'clockodo_entries_client_12345';
+    const token = 'clockodo-entries-token'.padEnd(48, 'k');
+    const apiKey = 'entries-access-api-key';
+    const auth = { Authorization: `Bearer ${token}` };
+    await backend.request(`/api/clockodo/config?clientId=${clientId}`, {
+        method: 'PUT', headers: { ...auth, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiUser: 'person@example.test', apiKey })
+    });
+
+    const since = '2026-11-14T00:00:00Z';
+    const until = '2026-11-15T00:00:00Z';
+    const response = await backend.request(
+        `/api/clockodo/entries?clientId=${clientId}&since=${encodeURIComponent(since)}&until=${encodeURIComponent(until)}`,
+        { headers: auth }
+    );
+    assert.equal(response.status, 200);
+    const body = await response.text();
+    assert.deepEqual(JSON.parse(body), {
+        entries: [
+            {
+                id: 11, customers_id: 5, services_id: 9, projects_id: 4,
+                time_since: '2026-11-14T08:00:00Z', time_until: '2026-11-14T09:00:00Z',
+                billable: 0, text: null
+            },
+            {
+                id: 12, customers_id: 5, services_id: 9, projects_id: null,
+                time_since: '2026-11-14T09:00:00Z', time_until: '2026-11-14T10:00:00Z',
+                billable: 1, text: 'Second'
+            }
+        ]
+    });
+    assert.equal(body.includes('private clockodo note'), false);
+    assert.equal(body.includes(apiKey), false);
+    assert.equal(requests.length, 2);
+    assert.ok(requests.every(item => item.init.method === 'GET'));
+    assert.ok(requests.every(item => item.url.includes(`time_since=${encodeURIComponent(since)}`)));
+    assert.ok(requests.every(item => item.url.includes(`time_until=${encodeURIComponent(until)}`)));
+    assert.ok(requests.every(item => item.init.headers['X-ClockodoApiKey'] === apiKey));
+    assert.ok(requests.every(item => item.init.headers['X-ClockodoApiUser'] === 'person@example.test'));
+
+    const invalidRange = await backend.request(
+        `/api/clockodo/entries?clientId=${clientId}&since=bad&until=${encodeURIComponent(until)}`,
+        { headers: auth }
+    );
+    assert.equal(invalidRange.status, 400);
+    assert.deepEqual(await invalidRange.json(), { error: 'invalid_time_range' });
+
+    const methodNotAllowed = await backend.request(
+        `/api/clockodo/entries?clientId=${clientId}&since=${encodeURIComponent(since)}&until=${encodeURIComponent(until)}`,
+        { method: 'PUT', headers: auth }
+    );
+    assert.equal(methodNotAllowed.status, 405);
+});
+
 test('Clockodo customer and service loads classify upstream failures without leaking details', async t => {
     const backend = makeBackend();
     const originalFetch = globalThis.fetch;
@@ -1613,7 +1721,7 @@ test('the Worker reports its version so stale deployments are detectable', async
     const backend = makeBackend();
     const response = await backend.request('/api/version');
     assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { version: '2026-10-18-projects-v4' });
+    assert.deepEqual(await response.json(), { version: '2026-11-14-clockodo-download-v1' });
 });
 
 test('activity menu exposes Duplicate and the group editor exposes the default customer', () => {

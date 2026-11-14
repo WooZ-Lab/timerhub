@@ -130,6 +130,60 @@ test('Clockodo client loads customers and services through the authenticated pro
     assert.equal(JSON.stringify(requests.map(item => item.init)).includes('ClockodoApiKey'), false);
 });
 
+test('Clockodo client loads entries for a range through the authenticated proxy', async () => {
+    let request;
+    const { client } = makeClient(async (url, init) => {
+        request = { url, init };
+        return Response.json({
+            entries: [{
+                id: 31,
+                customers_id: 5,
+                services_id: 9,
+                projects_id: null,
+                time_since: '2026-11-14T08:00:00Z',
+                time_until: '2026-11-14T09:00:00Z',
+                billable: 0,
+                text: 'Repair'
+            }]
+        });
+    });
+    const result = await client.getEntries(...Object.values(clientOptions), {
+        since: '2026-11-14T00:00:00Z',
+        until: '2026-11-15T00:00:00Z'
+    });
+    assert.deepEqual(JSON.parse(JSON.stringify(result)), {
+        entries: [{
+            id: 31,
+            customers_id: 5,
+            services_id: 9,
+            projects_id: null,
+            time_since: '2026-11-14T08:00:00Z',
+            time_until: '2026-11-14T09:00:00Z',
+            billable: 0,
+            text: 'Repair'
+        }]
+    });
+    assert.match(request.url, /\/api\/clockodo\/entries\?since=2026-11-14T00%3A00%3A00Z&until=2026-11-15T00%3A00%3A00Z&clientId=/);
+    assert.equal(request.init.headers.Authorization, `Bearer ${clientOptions.accessToken}`);
+    assert.equal(request.init.method, 'GET');
+    assert.equal(JSON.stringify(request.init).includes('ClockodoApiKey'), false);
+});
+
+test('Clockodo client rejects malformed entry lists', async () => {
+    const missingList = makeClient(async () => Response.json({ entries: 'not-a-list' }));
+    await assert.rejects(
+        () => missingList.client.getEntries(...Object.values(clientOptions), { since: 'a', until: 'b' }),
+        error => error.code === 'malformed_response'
+    );
+    const badItem = makeClient(async () => Response.json({
+        entries: [{ id: 31, customers_id: 5, services_id: 9, time_since: 'bad', time_until: 'worse' }]
+    }));
+    await assert.rejects(
+        () => badItem.client.getEntries(...Object.values(clientOptions), { since: 'a', until: 'b' }),
+        error => error.code === 'malformed_response'
+    );
+});
+
 test('Clockodo client rejects malformed customer and service lists without exposing response bodies', async () => {
     const missingList = makeClient(async () => Response.json({ customers: 'not-a-list' }));
     await assert.rejects(

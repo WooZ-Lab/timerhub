@@ -64,7 +64,8 @@
             try {
                 let response;
                 try {
-                    response = await this.fetchImpl(`${path}?clientId=${encodeURIComponent(clientId)}`, {
+                    const separator = path.includes('?') ? '&' : '?';
+                    response = await this.fetchImpl(`${path}${separator}clientId=${encodeURIComponent(clientId)}`, {
                         method,
                         headers,
                         body: body === undefined ? undefined : JSON.stringify(body),
@@ -84,7 +85,7 @@
                     const safeErrorCodes = new Set([
                         'invalid_credentials', 'rate_limited', 'clockodo_rejected', 'service_error', 'timeout', 'network_error',
                         'malformed_response', 'configuration_missing', 'invalid_entry', 'missing_idempotency_key',
-                        'operation_outcome_unknown', 'timeout_outcome_unknown', 'network_outcome_unknown',
+                        'invalid_time_range', 'operation_outcome_unknown', 'timeout_outcome_unknown', 'network_outcome_unknown',
                         'clockodo_outcome_unknown', 'not_found', 'unauthorized', 'method_not_allowed', 'invalid_client_id'
                     ]);
                     const safeErrorCode = safeErrorCodes.has(data?.error) ? data.error : '';
@@ -146,6 +147,47 @@
         async getProjects(clientId, accessToken) {
             const data = await this.request('/api/clockodo/projects', { clientId, accessToken });
             return { projects: this.validateReferenceList(data, 'projects') };
+        }
+
+        validateEntryList(data) {
+            if (!data || typeof data !== 'object' || Array.isArray(data) || !Array.isArray(data.entries)) {
+                throw new ClockodoClientError('malformed_response');
+            }
+            return data.entries.map(item => {
+                if (!item || typeof item !== 'object' || Array.isArray(item) ||
+                    !Number.isSafeInteger(item.id) || item.id < 1 ||
+                    !Number.isSafeInteger(item.customers_id) || item.customers_id < 0 ||
+                    !Number.isSafeInteger(item.services_id) || item.services_id < 0) {
+                    throw new ClockodoClientError('malformed_response');
+                }
+                const projectId = item.projects_id === null || item.projects_id === undefined
+                    ? null
+                    : item.projects_id;
+                if (projectId !== null && (!Number.isSafeInteger(projectId) || projectId < 0)) {
+                    throw new ClockodoClientError('malformed_response');
+                }
+                const since = Date.parse(item.time_since);
+                const until = Date.parse(item.time_until);
+                if (!Number.isFinite(since) || !Number.isFinite(until) || until <= since) {
+                    throw new ClockodoClientError('malformed_response');
+                }
+                return {
+                    id: item.id,
+                    customers_id: item.customers_id,
+                    services_id: item.services_id,
+                    projects_id: projectId,
+                    time_since: item.time_since,
+                    time_until: item.time_until,
+                    billable: Number(item.billable) === 0 ? 0 : 1,
+                    text: typeof item.text === 'string' ? item.text : ''
+                };
+            });
+        }
+
+        async getEntries(clientId, accessToken, { since, until } = {}) {
+            const query = `since=${encodeURIComponent(String(since || ''))}&until=${encodeURIComponent(String(until || ''))}`;
+            const data = await this.request(`/api/clockodo/entries?${query}`, { clientId, accessToken });
+            return { entries: this.validateEntryList(data) };
         }
 
         saveConfig(clientId, accessToken, credentials) {

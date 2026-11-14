@@ -184,7 +184,10 @@ function createTestApp(initialData = {}) {
         'backupRestoreMergeBtn', 'backupRestoreReplaceBtn', 'backupRestoreCancelBtn', 'backupRestoreCloseBtn',
         'lastBackupStatus', 'storagePersistenceStatus', 'backupDiagnostics', 'backupRestoreEmptyWarning',
         'backupRestoreEmptyConfirm', 'missingDataWarning', 'missingDataRestoreBtn', 'missingDataDismissBtn',
-        'reviewShareLinkBtn', 'shareLinkModal', 'shareLinkExpirySelect', 'shareLinkSummary', 'shareLinkEntryList',
+        'reviewShareLinkBtn', 'reviewLoadClockodoBtn', 'clockodoLoadModal', 'clockodoLoadCloseBtn',
+        'clockodoLoadDoneBtn', 'clockodoLoadDayInput', 'clockodoLoadDayBtn', 'clockodoLoadFromInput',
+        'clockodoLoadToInput', 'clockodoLoadRangeBtn', 'clockodoLoadStatus',
+        'shareLinkModal', 'shareLinkExpirySelect', 'shareLinkSummary', 'shareLinkEntryList',
         'shareLinkStatus', 'shareLinkResult', 'shareLinkActions', 'shareLinkCreateBtn', 'shareLinkCopyBtn',
         'shareLinkSendBtn', 'shareLinkCloseBtn', 'shareLinkCancelBtn',
         'sharedDayModal', 'sharedDayPreviewSummary', 'sharedDayPreviewWarnings', 'sharedDayPreviewList',
@@ -10706,6 +10709,117 @@ test('share link includes manual day entries that have no activity', async () =>
     assert.equal(payload.entries.length, 2, 'entries without an activity are shared as well');
     assert.equal(payload.entries[0].activityName, app.t('noActivity'));
     assert.equal(payload.entries[1].activityName, 'Taping');
+});
+
+test('loads a full day from Clockodo, deduplicates it, and shares the imported entries', async () => {
+    const backend = makeShareBackend();
+    const remoteEntries = [];
+    const { app } = createTestApp({
+        fetch: (path, init) => backend.request(path, init)
+    });
+    const dayStart = new Date(2026, 10, 14, 8, 0, 0, 0).getTime();
+    const date = app.toDateString(new Date(dayStart));
+    app.reviewDate = date;
+    app.clockodoConfigured = true;
+    app.clockodoClient = {
+        getEntries: async () => ({ entries: structuredClone(remoteEntries) })
+    };
+    app.clockodoReferenceStatus = 'ready';
+    app.clockodoCustomers = [{ id: 5, name: 'Customer Example' }];
+    app.clockodoServices = [{ id: 9, name: 'Repair' }, { id: 10, name: 'Taping' }];
+    app.clockodoProjects = [{ id: 4, name: 'Project Example', customerId: 5 }];
+    app.activities = [{
+        id: 'act-repair', name: 'Repair activity', color: '#3498DB', shape: 'circle',
+        customerId: '5', serviceId: '9', projectId: '4', customerName: 'Customer Example',
+        serviceName: 'Repair', projectName: 'Project Example', position: 0
+    }];
+    remoteEntries.push(
+        {
+            id: 31, customers_id: 5, services_id: 9, projects_id: 4,
+            time_since: new Date(dayStart).toISOString(),
+            time_until: new Date(dayStart + 3600000).toISOString(),
+            billable: 1, text: 'First coat'
+        },
+        {
+            id: 32, customers_id: 5, services_id: 10, projects_id: null,
+            time_since: new Date(dayStart + 7200000).toISOString(),
+            time_until: new Date(dayStart + 10800000).toISOString(),
+            billable: 0, text: ''
+        }
+    );
+
+    assert.equal(await app.loadClockodoDay(date), true, app.clockodoLoadStatus);
+    const imported = app.getDayEntries(date);
+    assert.equal(imported.length, 2);
+    assert.equal(imported[0].syncStatus, 'synced');
+    assert.equal(imported[0].source, 'clockodo');
+    assert.equal(imported[0].clockodoEntryId, 31);
+    assert.equal(imported[0].activityId, 'act-repair');
+    assert.equal(imported[0].activityNameSnapshot, 'Repair activity');
+    assert.equal(imported[0].customerName, 'Customer Example');
+    assert.equal(imported[0].project, 'Project Example');
+    assert.equal(imported[0].notes, 'First coat');
+    assert.equal(imported[1].activityNameSnapshot, 'Taping');
+    assert.equal(imported[1].clockodoEntryId, 32);
+
+    assert.equal(await app.loadClockodoDay(date), false, 'a second load imports nothing');
+    assert.equal(app.getDayEntries(date).length, 2, 'existing Clockodo entries are not duplicated');
+
+    assert.equal(app.openShareLinkModal(), true);
+    assert.equal(await app.createShareLink(), true, `${app.shareLinkErrorCode}: ${app.shareLinkStatus}`);
+    const link = app.getShareLinkModule().parseShareUrl(app.lastShareLink.url);
+    const fetched = await backend.request(`/api/share/${link.shareId}`);
+    const { envelope } = await fetched.json();
+    const payload = await app.getExchange().decryptPayload(envelope, link.secret);
+    assert.equal(payload.entries.length, 2, 'both loaded entries can be shared');
+});
+
+test('loads entries for selected Clockodo days and rejects oversized ranges', async () => {
+    const { app } = createTestApp({ fetch: async () => Response.json({ entries: [] }) });
+    const firstStart = new Date(2026, 10, 10, 8, 0, 0, 0).getTime();
+    const secondStart = new Date(2026, 10, 11, 8, 0, 0, 0).getTime();
+    const calls = [];
+    app.clockodoConfigured = true;
+    app.clockodoReferenceStatus = 'ready';
+    app.clockodoClient = {
+        getEntries: async (clientId, token, { since, until }) => {
+            calls.push({ since, until });
+            return {
+                entries: [
+                    {
+                        id: 41, customers_id: 5, services_id: 9, projects_id: null,
+                        time_since: new Date(firstStart).toISOString(),
+                        time_until: new Date(firstStart + 3600000).toISOString(),
+                        billable: 1, text: 'Day one'
+                    },
+                    {
+                        id: 42, customers_id: 5, services_id: 9, projects_id: null,
+                        time_since: new Date(secondStart).toISOString(),
+                        time_until: new Date(secondStart + 3600000).toISOString(),
+                        billable: 1, text: 'Day two'
+                    },
+                    {
+                        id: 43, customers_id: 5, services_id: 9, projects_id: null,
+                        time_since: new Date(secondStart + 48 * 3600000).toISOString(),
+                        time_until: new Date(secondStart + 49 * 3600000).toISOString(),
+                        billable: 1, text: 'Outside the range'
+                    }
+                ]
+            };
+        }
+    };
+    const from = app.toDateString(new Date(firstStart));
+    const to = app.toDateString(new Date(secondStart));
+    assert.equal(await app.loadClockodoSelectedDays(from, to), true, app.clockodoLoadStatus);
+    assert.equal(calls.length, 1);
+    assert.equal(app.getDayEntries(from).length, 1);
+    assert.equal(app.getDayEntries(to).length, 1);
+    assert.equal(app.timeEntries.some(entry => entry.clockodoEntryId === 43), false, 'entries outside the selected days are ignored');
+
+    const before = calls.length;
+    assert.equal(await app.loadClockodoSelectedDays('2026-01-01', '2026-03-01'), false);
+    assert.equal(calls.length, before, 'oversized ranges never reach Clockodo');
+    assert.equal(app.clockodoLoadStatus, app.t('clockodoLoadInvalidRange'));
 });
 
 test('shared day preview shows every entry, including entries the sender synced', async () => {

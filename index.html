@@ -119,6 +119,7 @@
                     <button id="reviewShareDayBtn" class="action-btn exchange-action" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98m-.01-10.98-6.82 3.98"/></svg><span data-i18n="share">Share</span></button>
                 </div>
                 <button id="reviewShareLinkBtn" class="action-btn" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M10 14a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11.5 5.43"/><path d="M14 10a5 5 0 0 0-7.07 0L4.1 12.83a5 5 0 0 0 7.07 7.07l1.32-1.33"/></svg><span data-i18n="shareLinkBtn">Share link</span></button>
+                <button id="reviewLoadClockodoBtn" class="action-btn" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v12m-4-4 4 4 4-4M5 21h14"/></svg><span data-i18n="loadFromClockodo">Load from Clockodo</span></button>
             </div>
 
             <div id="reviewEntriesList" class="review-entries-list">
@@ -669,6 +670,38 @@
                     <button id="dayImportCancelBtn" class="btn-secondary" type="button" data-i18n="cancel">Cancel</button>
                     <button id="exchangeDecryptBtn" class="btn-primary" type="button" data-i18n="decrypt">Decrypt</button>
                     <button id="exchangeImportBtn" class="btn-primary-green" type="button" style="display:none;" data-i18n="importBtn">Import</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: Load entries from Clockodo -->
+        <div id="clockodoLoadModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="clockodoLoadTitle">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="clockodoLoadTitle" data-i18n="clockodoLoadTitle">Load from Clockodo</h3>
+                    <button id="clockodoLoadCloseBtn" class="modal-close" type="button" aria-label="Close" data-i18n-aria-label="close"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+                </div>
+                <div class="modal-body">
+                    <p data-i18n="clockodoLoadDesc">Download entries from Clockodo into TimerHub so you can review or share the day.</p>
+                    <div class="form-group">
+                        <label for="clockodoLoadDayInput" data-i18n="clockodoLoadDayLabel">Single day</label>
+                        <div class="form-row">
+                            <input type="date" id="clockodoLoadDayInput" class="date-input">
+                            <button id="clockodoLoadDayBtn" class="btn-primary" type="button" data-i18n="clockodoLoadDayBtn">Load day</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="clockodoLoadFromInput" data-i18n="clockodoLoadRangeLabel">Selected days</label>
+                        <div class="form-row">
+                            <input type="date" id="clockodoLoadFromInput" class="date-input" aria-label="From" data-i18n-aria-label="clockodoLoadFromLabel">
+                            <input type="date" id="clockodoLoadToInput" class="date-input" aria-label="To" data-i18n-aria-label="clockodoLoadToLabel">
+                        </div>
+                        <button id="clockodoLoadRangeBtn" class="btn-secondary" type="button" data-i18n="clockodoLoadRangeBtn">Load selected days</button>
+                    </div>
+                    <div id="clockodoLoadStatus" class="settings-help" role="status" aria-live="polite" style="display:none;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button id="clockodoLoadDoneBtn" class="btn-secondary" type="button" data-i18n="close">Close</button>
                 </div>
             </div>
         </div>
