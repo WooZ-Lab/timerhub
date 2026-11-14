@@ -10685,6 +10685,29 @@ test('share link creation encrypts the selected day and stores only ciphertext',
     assert.equal(payload.entries[0].notes, 'First coat');
 });
 
+test('share link includes manual day entries that have no activity', async () => {
+    const backend = makeShareBackend();
+    const { app } = createTestApp({
+        fetch: (path, init) => backend.request(path, init)
+    });
+    const dayStart = new Date(2026, 8, 28, 8, 0, 0, 0).getTime();
+    app.reviewDate = app.toDateString(new Date(dayStart));
+    app.timeEntries = [
+        { id: 'manual-a', activityId: '', activityNameSnapshot: '', startTimestamp: dayStart, endTimestamp: dayStart + 3600000 },
+        { id: 'named-b', activityId: 'act-b', activityNameSnapshot: 'Taping', startTimestamp: dayStart + 7200000, endTimestamp: dayStart + 10800000 }
+    ];
+    assert.equal(app.openShareLinkModal(), true);
+    assert.equal(await app.createShareLink(), true, `${app.shareLinkErrorCode}: ${app.shareLinkStatus}`);
+    const link = app.getShareLinkModule().parseShareUrl(app.lastShareLink.url);
+    const fetched = await backend.request(`/api/share/${link.shareId}`);
+    assert.equal(fetched.status, 200);
+    const { envelope } = await fetched.json();
+    const payload = await app.getExchange().decryptPayload(envelope, link.secret);
+    assert.equal(payload.entries.length, 2, 'entries without an activity are shared as well');
+    assert.equal(payload.entries[0].activityName, app.t('noActivity'));
+    assert.equal(payload.entries[1].activityName, 'Taping');
+});
+
 test('shared day preview shows every entry, including entries the sender synced', async () => {
     const backend = makeShareBackend();
     const { app, document } = makeShareRecipientHarness(backend);

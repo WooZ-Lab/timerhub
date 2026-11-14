@@ -12087,11 +12087,16 @@ class TimerHubApp {
     }
 
     getDayExchangeEntries(date) {
-        return this.getDayEntries(date).filter(entry =>
-            entry.endTimestamp !== null &&
-            Number.isFinite(Number(entry.endTimestamp)) &&
-            Number(entry.endTimestamp) > Number(entry.startTimestamp)
-        );
+        return this.getDayEntries(date)
+            .filter(entry =>
+                entry.endTimestamp !== null &&
+                Number.isFinite(Number(entry.endTimestamp)) &&
+                Number(entry.endTimestamp) > Number(entry.startTimestamp)
+            )
+            .map(entry => ({
+                ...entry,
+                activityNameSnapshot: entry.activityNameSnapshot || this.t('noActivity')
+            }));
     }
 
     async prepareExchangeExport() {
@@ -12717,6 +12722,7 @@ class TimerHubApp {
             share_expired: this.t('shareLinkExpired'),
             share_exists: this.t('shareLinkExists'),
             invalid_share_payload: this.t('shareLinkInvalid'),
+            invalid_exchange_payload: this.t('shareLinkInvalid'),
             invalid_share: this.t('shareLinkInvalid'),
             invalid_share_request: this.t('shareLinkInvalid'),
             invalid_expiry: this.t('shareLinkInvalid'),
