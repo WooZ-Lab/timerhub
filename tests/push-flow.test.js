@@ -1064,6 +1064,7 @@ test('Clockodo Worker loads day entries for a range without leaking private fiel
                     paging: { items_per_page: 1000, current_page: 1, count_pages: 2, count_items: 2 },
                     entries: [{
                         id: 12,
+                        type: 1,
                         customers_id: 5,
                         services_id: 9,
                         projects_id: null,
@@ -1080,6 +1081,7 @@ test('Clockodo Worker loads day entries for a range without leaking private fiel
                 paging: { items_per_page: 1000, current_page: 2, count_pages: 2, count_items: 2 },
                 entries: [{
                     id: 11,
+                    type: 1,
                     customers_id: 5,
                     services_id: 9,
                     projects_id: 4,
@@ -1090,6 +1092,7 @@ test('Clockodo Worker loads day entries for a range without leaking private fiel
                     text: null
                 }, {
                     id: 13,
+                    type: 1,
                     customers_id: 5,
                     services_id: 9,
                     projects_id: null,
@@ -1098,6 +1101,18 @@ test('Clockodo Worker loads day entries for a range without leaking private fiel
                     time_until: null,
                     billable: 1,
                     text: 'Running timer'
+                }, {
+                    id: 14,
+                    type: 2,
+                    customers_id: 5,
+                    projects_id: null,
+                    users_id: 1,
+                    time_since: '2026-11-14T11:00:00Z',
+                    time_until: '2026-11-14T12:00:00Z',
+                    billable: 1,
+                    text: 'Lump-sum service',
+                    lumpsum_services_id: 7,
+                    lumpsum_services_amount: 100
                 }]
             });
         }

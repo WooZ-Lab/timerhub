@@ -31,7 +31,7 @@ const WORKER_VERSION = "2026-11-14-clockodo-download-v1";
 const CLOCKODO_ENTRY_RANGE_MAX_MS = 32 * 24 * 60 * 60 * 1000;
 
 function normalizeClockodoRangeValue(value) {
-    if (typeof value !== "string" || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?(?:Z|[+-]\d\d:\d\d)$/.test(value)) {
+    if (typeof value !== "string" || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?(?:Z|[+-]\d\d:\d\d)?$/.test(value)) {
         return null;
     }
     const timestamp = Date.parse(value);
@@ -416,12 +416,12 @@ export class TimerHubDurableObject {
                     return jsonError("malformed_response", 502);
                 }
                 for (const item of data.entries) {
-                    // A currently running Clockodo timer has no end timestamp and
-                    // cannot be imported as a completed interval.
-                    if (item && typeof item === "object" && (item.time_until === null || item.time_until === undefined)) continue;
+                    // Clockodo returns time, lump-sum value, and lump-sum service
+                    // entries in the same list. TimerHub can only import completed
+                    // time entries, so skip the other types and running timers.
+                    if (item && item.type !== undefined && Number(item.type) !== 1) continue;
                     const normalized = normalizeClockodoEntry(item);
-                    if (!normalized) return jsonError("malformed_response", 502);
-                    entries.push(normalized);
+                    if (normalized) entries.push(normalized);
                 }
                 const countPages = data.paging && Number.isSafeInteger(data.paging.count_pages)
                     ? data.paging.count_pages
